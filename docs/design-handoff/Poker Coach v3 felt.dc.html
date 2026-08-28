@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas"><link rel="stylesheet" href="_ds/modernist-109bb473-b82b-41f7-b0c3-90738a8bb2de/styles.css"><script src="_ds/modernist-109bb473-b82b-41f7-b0c3-90738a8bb2de/_ds_bundle.js"></script><style>
+body{margin:0;background:#080d0a;font-family:"Archivo",system-ui,sans-serif;color:#f0efe9}
+a{color:#ff9783;text-underline-offset:3px}a:hover{color:#ff7a63}
+input{font-family:"Archivo",system-ui,sans-serif}
+[data-phone] *{scrollbar-width:none;-ms-overflow-style:none}
+[data-phone] *::-webkit-scrollbar{width:0;height:0}
+@keyframes pop{0%{transform:scale(.92);opacity:0}60%{transform:scale(1.02)}100%{transform:scale(1);opacity:1}}
+@keyframes rise{0%{transform:translateY(14px);opacity:0}100%{transform:translateY(0);opacity:1}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(2px)}}
+@keyframes chipdrop{0%{transform:translateY(-18px) rotate(-12deg);opacity:0}100%{transform:translateY(0) rotate(0);opacity:1}}
+@keyframes drift{0%{transform:translateY(0) rotate(0)}50%{transform:translateY(-10px) rotate(3deg)}100%{transform:translateY(0) rotate(0)}}
+@keyframes flipa{0%{transform:perspective(800px) rotateY(-84deg);opacity:0}55%{opacity:1}100%{transform:perspective(800px) rotateY(0);opacity:1}}
+@keyframes flipb{0%{transform:perspective(800px) rotateY(84deg);opacity:0}55%{opacity:1}100%{transform:perspective(800px) rotateY(0);opacity:1}}
+@keyframes tilt3d{0%{transform:perspective(900px) rotateX(2deg) rotateY(-2.4deg) translate3d(-5px,4px,0)}50%{transform:perspective(900px) rotateX(-2deg) rotateY(2.4deg) translate3d(5px,-4px,0)}100%{transform:perspective(900px) rotateX(2deg) rotateY(-2.4deg) translate3d(-5px,4px,0)}}
+@keyframes sheen{0%{opacity:.10;transform:translate(-16%,18%)}50%{opacity:.26;transform:translate(16%,-18%)}100%{opacity:.10;transform:translate(-16%,18%)}}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 rgba(232,207,160,.30)}50%{box-shadow:0 0 0 9px rgba(232,207,160,0)}}
+</style></helmet>
+
+<div style="padding:40px 44px 56px;display:flex;gap:36px;align-items:flex-start">
+
+<div style="width:320px;flex:none;padding-top:8px">
+  <div style="font:800 11px/1 'Archivo',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#ff9783;margin-bottom:12px">Version 3 · felt</div>
+  <h1 style="font:800 40px/.98 'Archivo',sans-serif;letter-spacing:-.03em;margin:0 0 14px">Poker Coach, after dark</h1>
+  <p style="font:400 14px/1.5 'Archivo',sans-serif;color:#adc2b6;margin:0 0 18px">Dark felt ground with table-green surfaces. Rewards — streaks, correct answers, the drill button — are near-black with a 1px gold hairline; red is left for the chip action and hearts. Court cards drift behind each section, and the chip case and Balance section carry the setup maths.</p>
+  <div style="height:2px;background:rgba(240,239,233,.25);margin:0 0 16px"></div>
+  <div style="font:400 12px/1.7 'Archivo',sans-serif;color:#adc2b6">
+    <div>· Scroll the home screen for parallax</div>
+    <div>· Chips tab → Auto or My values</div>
+    <div>· Run a drill, answer wrong on purpose</div>
+  </div>
+</div>
+
+<div data-phone="true" style="width:390px;height:844px;flex:none;position:relative;overflow:hidden;border-radius:38px;border:2px solid #050907;background:repeating-linear-gradient(0deg, rgba(240,239,233,.022) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(0,0,0,.055) 0 1px, transparent 1px 3px), radial-gradient(130% 85% at 50% -5%, #1d4433 0%, #12271d 45%, #0b1610 100%);display:flex;flex-direction:column;box-shadow:0 12px 32px rgba(0,0,0,.22)">
+
+  <div style="position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0">
+    <svg viewBox="0 0 120 170" style="position:absolute;top:120px;left:-40px;width:230px;opacity:.34;transform:rotate(-9deg) translateY({{ pl1 }})" fill="none" stroke="#e8cf8a" stroke-width="1.1" vector-effect="non-scaling-stroke">
+      <rect x="2" y="2" width="116" height="166" rx="9"></rect><rect x="26" y="14" width="68" height="142"></rect>
+      <text x="9" y="25" font-family="Archivo, sans-serif" font-size="18" font-weight="800" fill="#e8cf8a" stroke="none">{{ rankA }}</text><text x="9" y="42" font-family="Archivo, sans-serif" font-size="15" fill="#e8cf8a" stroke="none">♠</text>
+      <sc-if value="{{ aceA }}" hint-placeholder-val="{{ false }}">
+        <text x="60" y="103" text-anchor="middle" font-family="Archivo, sans-serif" font-size="72" fill="rgba(232,207,160,.55)" stroke="none">♠</text>
+      </sc-if>
+      <sc-if value="{{ courtA }}" hint-placeholder-val="{{ true }}">
+        <g transform="translate(26,14) scale(0.68)"><path d="M30 30 L36 14 L42 26 L50 10 L58 26 L64 14 L70 30 Z"></path><path d="M30 36 H70"></path><circle cx="50" cy="49" r="11"></circle><path d="M39 49 H61"></path><path d="M28 63 Q50 75 72 63"></path><path d="M20 80 L30 65 Q50 79 70 65 L80 80"></path><path d="M50 67 l6 8 -6 8 -6 -8 z"></path><path d="M6 104 H94"></path><g transform="rotate(180 50 104)"><path d="M30 30 L36 14 L42 26 L50 10 L58 26 L64 14 L70 30 Z"></path><circle cx="50" cy="49" r="11"></circle><path d="M39 49 H61"></path><path d="M28 63 Q50 75 72 63"></path><path d="M20 80 L30 65 Q50 79 70 65 L80 80"></path></g></g>
+      </sc-if>
+    </svg>
+    <svg viewBox="0 0 120 170" style="position:absolute;top:560px;right:-56px;width:190px;opacity:.16;transform:rotate(13deg) translateY({{ pl3 }})" fill="none" stroke="#e8cf8a" stroke-width="1.1" vector-effect="non-scaling-stroke">
+      <rect x="2" y="2" width="116" height="166" rx="9"></rect><rect x="26" y="14" width="68" height="142"></rect>
+      <text x="9" y="25" font-family="Archivo, sans-serif" font-size="18" font-weight="800" fill="#e8cf8a" stroke="none">{{ rankB }}</text><text x="9" y="42" font-family="Archivo, sans-serif" font-size="15" fill="#e8cf8a" stroke="none">♠</text>
+      <g transform="translate(26,14) scale(0.68)"><path d="M30 30 L36 14 L42 26 L50 10 L58 26 L64 14 L70 30 Z"></path><circle cx="50" cy="49" r="11"></circle><path d="M39 49 H61"></path><path d="M28 63 Q50 75 72 63"></path><path d="M20 80 L30 65 Q50 79 70 65 L80 80"></path><path d="M6 104 H94"></path></g>
+    </svg>
+  </div>
+
+  <div style="position:absolute;top:0;left:0;right:0;z-index:6;display:flex;align-items:center;justify-content:space-between;padding:16px 18px 12px;background:rgba(10,20,15,.58);backdrop-filter:blur(12px) saturate(1.15);-webkit-backdrop-filter:blur(12px) saturate(1.15);border-bottom:1px solid rgba(240,239,233,.07)">
+    <div style="display:flex;align-items:center;gap:9px">
+      <div style="width:30px;height:30px;border-radius:10px;background:#1d4433;color:#f0efe9;display:flex;align-items:center;justify-content:center;font:800 15px/1 'Archivo',sans-serif">♠</div>
+      <div style="font:800 14px/1 'Archivo',sans-serif;letter-spacing:-.01em">Poker Coach</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="display:flex;align-items:center;gap:5px;background-image:linear-gradient(#0b1210,#0b1210),linear-gradient(115deg,#8a6a2f 0%,#f0dca0 36%,#c8a558 62%,#7d5f2a 100%);background-origin:border-box;background-clip:padding-box,border-box;border:1px solid transparent;border-radius:999px;padding:6px 11px;font:800 12px/1 'Archivo',sans-serif;color:#e8cf8a">{{ streak }}<span style="font-weight:400;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.7)">day</span></div>
+      <div style="display:flex;gap:2px;background:#1e3228;border-radius:999px;padding:6px 9px">
+        <sc-for list="{{ heartCells }}" as="h" hint-placeholder-count="5"><span style="font:800 11px/1 'Archivo',sans-serif;color:{{ h.fill }}">♥</span></sc-for>
+      </div>
+    </div>
+  </div>
+
+  <div style="position:relative;z-index:1;flex:1;overflow:hidden">
+
+    <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+    <div onScroll="{{ onScroll }}" style="height:100%;overflow:auto;padding:66px 18px 26px">
+      <div style="border-radius:28px;background-image:linear-gradient(155deg,#151a18 0%,#0d1211 60%,#080c0a 100%),linear-gradient(115deg,#8a6a2f 0%,#f0dca0 36%,#c8a558 62%,#7d5f2a 100%);background-origin:border-box;background-clip:padding-box,border-box;border:1px solid transparent;color:#ffffff;padding:22px 20px 20px;position:relative;overflow:hidden;box-shadow:0 16px 30px rgba(0,0,0,.20);will-change:transform;animation:rise .45s ease both, tilt3d 8s ease-in-out .45s infinite">
+        <div style="position:absolute;inset:-30%;pointer-events:none;background:radial-gradient(closest-side, rgba(255,255,255,.5), rgba(255,255,255,0) 70%);animation:sheen 8s ease-in-out .45s infinite"></div>
+        <div style="position:absolute;right:-14px;bottom:-46px;font:800 150px/1 'Archivo',sans-serif;color:rgba(240,239,233,.08)">♠</div>
+        <div style="font:400 10px/1 'Archivo',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:rgba(240,239,233,.6);margin-bottom:10px">Today's hand</div>
+        <h2 style="font:800 30px/1.03 'Archivo',sans-serif;letter-spacing:-.025em;margin:0 0 16px;max-width:16ch">Three more drills and the streak is yours</h2>
+        <div style="height:12px;border-radius:999px;background:rgba(240,239,233,.18);overflow:hidden;margin-bottom:9px"><div style="height:12px;border-radius:999px;background:#57b183;width:{{ dailyPct }};transition:width .6s cubic-bezier(.2,.8,.2,1)"></div></div>
+        <div style="display:flex;justify-content:space-between;font:400 11px/1 'Archivo',sans-serif;color:rgba(240,239,233,.65)"><span>{{ dailyLabel }}</span><span>{{ xp }} XP</span></div>
+      </div>
+
+      <button onClick="{{ startEx }}" style="width:100%;min-height:58px;margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;background-image:linear-gradient(#0b1210,#0b1210),linear-gradient(115deg,#8a6a2f 0%,#f0dca0 36%,#c8a558 62%,#7d5f2a 100%);background-origin:border-box;background-clip:padding-box,border-box;border:1px solid transparent;color:#ffffff;border-radius:999px;padding:0 12px 0 20px;font:800 15px/1 'Archivo',sans-serif;letter-spacing:.02em;cursor:pointer;animation:glow 2.6s ease-in-out infinite;transition:transform .12s ease" style-hover="background-image:linear-gradient(#141c19,#141c19),linear-gradient(115deg,#8a6a2f 0%,#f0dca0 36%,#c8a558 62%,#7d5f2a 100%)" style-active="transform:scale(.98)">Deal me in — Position<span style="width:38px;height:38px;flex:none;border-radius:50%;background:rgba(240,239,233,.16);display:flex;align-items:center;justify-content:center;font-size:16px">♠</span></button>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+        <button onClick="{{ goPath }}" style="text-align:left;border:0;cursor:pointer;border-radius:22px;background:#16261e;box-shadow:0 1px 2px rgba(0,0,0,.14);padding:14px;display:flex;flex-direction:column;gap:6px" style-hover="background:#1e3228">
+          <span style="font:800 22px/1 'Archivo',sans-serif;color:#f0efe9">♣</span>
+          <span style="font:800 13px/1.15 'Archivo',sans-serif;color:#f0efe9">Unit 2 · Position</span>
+          <span style="font:400 11px/1.2 'Archivo',sans-serif;color:#8ea79a">3 of 6 lessons</span>
+        </button>
+        <button onClick="{{ goChips }}" style="text-align:left;border:0;cursor:pointer;border-radius:22px;background:#33201a;box-shadow:0 1px 2px rgba(0,0,0,.14);padding:14px;display:flex;flex-direction:column;gap:6px" style-hover="background:#4d2318">
+          <span style="font:800 22px/1 'Archivo',sans-serif;color:#ff563c">♦</span>
+          <span style="font:800 13px/1.15 'Archivo',sans-serif;color:#f0efe9">Chips for tonight</span>
+          <span style="font:400 11px/1.2 'Archivo',sans-serif;color:#8ea79a">{{ chipTeaser }}</span>
+        </button>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+        <sc-for list="{{ homeStats }}" as="s" hint-placeholder-count="4">
+          <div style="border-radius:999px;background:#1e3228;padding:9px 14px;display:flex;align-items:baseline;gap:6px">
+            <span style="font:800 15px/1 'Archivo',sans-serif">{{ s.value }}</span>
+            <span style="font:400 10px/1 'Archivo',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#8ea79a">{{ s.label }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="margin-top:16px;border-radius:24px;background:#33201a;border:2px solid #7a3324;padding:16px 18px">
+        <div style="font:800 15px/1.25 'Archivo',sans-serif;color:#f0efe9;margin-bottom:6px">You fold too much from the button.</div>
+        <div style="font:400 12px/1.45 'Archivo',sans-serif;color:#ffc4b8">Last seat to act, best seat at the table. Tomorrow's drill is all yours.</div>
+      </div>
+
+      <div style="margin-top:16px;border-radius:24px;background:#16261e;box-shadow:0 1px 2px rgba(0,0,0,.14);padding:16px 18px">
+        <div style="font:400 10px/1 'Archivo',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8ea79a;margin-bottom:10px">This week</div>
+        <div style="display:flex;align-items:flex-end;gap:7px;height:74px">
+          <sc-for list="{{ week }}" as="d" hint-placeholder-count="7">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
+              <div style="width:100%;border-radius:8px;background:{{ d.fill }};height:{{ d.h }}"></div>
+              <span style="font:400 9px/1 'Archivo',sans-serif;color:#8ea79a">{{ d.label }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="height:40px"></div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ isPath }}" hint-placeholder-val="{{ false }}">
+    <div onScroll="{{ onScroll }}" style="height:100%;overflow:auto;padding:66px 18px 26px">
+      <h2 style="font:800 27px/1.03 'Archivo',sans-serif;letter-spacing:-.025em;margin:0 0 4px">Hold'em, one habit at a time</h2>
+      <p style="font:400 12px/1.4 'Archivo',sans-serif;color:#8ea79a;margin:0 0 16px">Five drills a day. No lectures.</p>
+      <sc-for list="{{ units }}" as="u" hint-placeholder-count="5">
+        <div onClick="{{ u.onPick }}" style="display:flex;gap:14px;align-items:flex-start;border-radius:26px;background:{{ u.bg }};box-shadow:{{ u.shadow }};padding:16px;margin-bottom:10px;cursor:pointer;transition:transform .12s ease" style-hover="transform:translateY(-2px)">
+          <div style="position:relative;flex:none;width:42px;height:58px">
+            <div style="position:absolute;inset:0;border-radius:8px;background:{{ u.cardBg }};border:1.5px solid {{ u.cardBorder }};color:{{ u.markInk }};display:flex;align-items:center;justify-content:center;font:800 19px/1 'Archivo',sans-serif;box-shadow:0 3px 8px rgba(0,0,0,.45)">{{ u.glyph }}</div>
+            <sc-if value="{{ u.isCurrent }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;right:-9px;bottom:-7px;width:24px;height:24px;border-radius:50%;background:#f4f1e6;color:#17181a;display:flex;align-items:center;justify-content:center;font:800 10px/1 'Archivo',sans-serif;box-shadow:0 2px 5px rgba(0,0,0,.5)" title="Dealer">D</div>
+            </sc-if>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
+              <div style="font:800 17px/1.15 'Archivo',sans-serif;color:{{ u.ink }}">{{ u.title }}</div>
+              <div style="flex:none;border-radius:999px;background:{{ u.tagBg }};color:{{ u.tagInk }};padding:4px 9px;font:800 9px/1 'Archivo',sans-serif;letter-spacing:.08em;text-transform:uppercase">{{ u.tag }}</div>
+            </div>
+            <div style="font:400 12px/1.35 'Archivo',sans-serif;color:#8ea79a;margin-top:5px">{{ u.sub }}</div>
+            <div style="height:8px;border-radius:999px;background:#22362b;margin-top:11px;overflow:hidden"><div style="height:8px;border-radius:999px;background:{{ u.barFill }};width:{{ u.pct }};transition:width .6s ease"></div></div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ isChips }}" hint-placeholder-val="{{ false }}">
+    <div onScroll="{{ onScroll }}" style="height:100%;overflow:auto;padding:66px 18px 26px">
+      <h2 style="font:800 27px/1.03 'Archivo',sans-serif;letter-spacing:-.025em;margin:0 0 4px">What's in the case?</h2>
+      <p style="font:400 12px/1.4 'Archivo',sans-serif;color:#8ea79a;margin:0 0 16px">Count your real chips. We'll deal fair stacks and pick the denominations.</p>
+
+      <div style="display:flex;gap:10px;margin-bottom:14px">
+        <div style="flex:1;border-radius:22px;background:#16261e;box-shadow:0 1px 2px rgba(0,0,0,.14);padding:12px 14px">
+          <div style="font:400 10px/1 'Archivo',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#8ea79a;margin-bottom:9px">Players</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+            <button onClick="{{ decPlayers }}" style="width:44px;height:44px;flex:none;border-radius:50%;border:0;background:#1e3228;font:800 20px/1 'Archivo',sans-serif;cursor:pointer;color:#f0efe9" style-hover="background:#2c4238">−</button>
+            <div style="font:800 26px/1 'Archivo',sans-serif">{{ players }}</div>
+            <button onClick="{{ incPlayers }}" style="width:44px;height:44px;flex:none;border-radius:50%;border:0;background:#1d4433;color:#f0efe9;font:800 20px/1 'Archivo',sans-serif;cursor:pointer" style-hover="background:#2a5f47">+</button>
+          </div>
+        </div>
+        <div style="flex:1;border-radius:22px;background:#16261e;box-shadow:0 1px 2px rgba(0,0,0,.14);padding:12px 14px">
+          <div style="font:400 10px/1 'Archivo',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#8ea79a;margin-bottom:9px">Entry bet</div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input value="{{ bet }}" onChange="{{ setBet }}" inputmode="numeric" style="width:78px;min-height:44px;border-radius:14px;padding:6px 10px;font:800 22px/1 'Archivo',sans-serif;color:#f0efe9;background:#1e3228;border:2px solid transparent;caret-color:#ff563c" style-focus="border-color:#ff563c;outline:none">
+            <span style="font:400 10px/1.1 'Archivo',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#8ea79a">units</span>
+          </div>
+          <div style="font:400 10px/1.35 'Archivo',sans-serif;color:#6d887a;margin-top:8px">1 unit = 100 points<span style="display:block;color:#8ea79a;margin-top:2px">Stack: {{ stackPts }} pts · case holds {{ availPts }}</span></div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
+        <div style="font:400 10px/1 'Archivo',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8ea79a">The chip case</div>
+        <div style="display:flex;gap:3px;background:#1e3228;border-radius:999px;padding:3px">
+          <button onClick="{{ setAuto }}" style="border:0;border-radius:999px;cursor:pointer;padding:8px 13px;font:800 10px/1 'Archivo',sans-serif;letter-spacing:.06em;text-transform:uppercase;background:{{ autoBg }};color:{{ autoInk }}">Auto values</button>
+          <button onClick="{{ setManual }}" style="border:0;border-radius:999px;cursor:pointer;padding:8px 13px;font:800 10px/1 'Archivo',sans-serif;letter-spacing:.06em;text-transform:uppercase;background:{{ manBg }};color:{{ manInk }}">My values</button>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ colorRows }}" as="c" hint-placeholder-count="5">
+          <div style="border-radius:22px;background:#16261e;box-shadow:0 1px 2px rgba(0,0,0,.14);padding:11px 12px;display:flex;align-items:center;gap:10px;animation:chipdrop .3s ease both">
+            <label style="position:relative;width:36px;height:36px;flex:none;border-radius:50%;background:{{ c.swatch }};border:2px dashed rgba(240,239,233,.35);cursor:pointer;display:block" title="Chip colour">
+              <input type="color" value="{{ c.swatch }}" onChange="{{ c.onSwatch }}" style="position:absolute;inset:0;opacity:0;width:100%;height:100%;border:0;padding:0;cursor:pointer">
+            </label>
+            <input value="{{ c.name }}" onChange="{{ c.onName }}" style="flex:1;min-width:0;min-height:36px;border-radius:12px;border:2px solid transparent;background:transparent;padding:4px 6px;font:800 14px/1 'Archivo',sans-serif;color:#f0efe9;caret-color:#ff563c" style-focus="border-color:#ff563c;background:#12201a;outline:none" style-hover="background:#1e3228">
+            <div style="flex:none;display:flex;flex-direction:column;align-items:center;gap:2px">
+              <input value="{{ c.count }}" onChange="{{ c.onCount }}" inputmode="numeric" style="width:52px;min-height:36px;border-radius:12px;border:2px solid transparent;background:#1e3228;padding:4px 6px;font:800 14px/1 'Archivo',sans-serif;text-align:center;color:#f0efe9;caret-color:#ff563c" style-focus="border-color:#ff563c;outline:none">
+              <span style="font:400 8px/1 'Archivo',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#8ea79a">qty</span>
+            </div>
+            <div style="flex:none;display:flex;flex-direction:column;align-items:center;gap:2px">
+              <input value="{{ c.value }}" onChange="{{ c.onValue }}" disabled="{{ c.valueLocked }}" inputmode="numeric" style="width:56px;min-height:36px;border-radius:12px;border:2px solid transparent;background:{{ c.valueBg }};padding:4px 6px;font:800 14px/1 'Archivo',sans-serif;text-align:center;color:{{ c.valueInk }};caret-color:#ff563c" style-focus="border-color:#ff563c;outline:none">
+              <span style="font:400 8px/1 'Archivo',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#8ea79a">value</span>
+            </div>
+            <button onClick="{{ c.onRemove }}" style="width:30px;height:30px;flex:none;border-radius:50%;border:0;background:transparent;color:#8ea79a;font:800 14px/1 'Archivo',sans-serif;cursor:pointer" style-hover="background:#4d2318;color:#ff9783">×</button>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px">
+        <button onClick="{{ addColor }}" style="border:2px dashed rgba(240,239,233,.3);border-radius:999px;background:transparent;cursor:pointer;padding:11px 16px;font:800 11px/1 'Archivo',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#f0efe9;min-height:44px" style-hover="border-color:#ff563c;color:#ff9783">+ Add chip colour</button>
+        <div style="font:400 11px/1.2 'Archivo',sans-serif;color:#8ea79a;text-align:right">{{ totalChips }} chips<br>in the case</div>
+      </div>
+
+      <button onClick="{{ solve }}" style="width:100%;min-height:58px;margin-top:16px;display:flex;align-items:center;justify-content:space-between;background:#ff563c;color:#f7e9e4;border:0;border-radius:999px;padding:0 12px 0 20px;font:800 15px/1 'Archivo',sans-serif;cursor:pointer;transition:transform .12s ease" style-hover="background:#ff7a63" style-active="transform:scale(.98)">Deal the stacks<span style="width:38px;height:38px;flex:none;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:15px;color:#f7e9e4">♦</span></button>
+
+      <sc-if value="{{ solved }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:18px;border-radius:28px;background-image:linear-gradient(155deg,#151a18 0%,#0d1211 60%,#080c0a 100%),linear-gradient(115deg,#8a6a2f 0%,#f0dca0 36%,#c8a558 62%,#7d5f2a 100%);background-origin:border-box;background-clip:padding-box,border-box;border:1px solid transparent;color:#ffffff;padding:20px;position:relative;overflow:hidden;box-shadow:0 16px 30px rgba(0,0,0,.20);will-change:transform;animation:pop .35s ease both, tilt3d 8s ease-in-out .35s infinite reverse">
+        <div style="position:absolute;inset:-30%;pointer-events:none;background:radial-gradient(closest-side, rgba(255,255,255,.5), rgba(255,255,255,0) 70%);animation:sheen 8s ease-in-out .35s infinite reverse"></div>
+        <div style="position:relative;font:400 10px/1 'Archivo',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:rgba(240,239,233,.6);margin-bottom:8px">{{ resultKicker }}</div>
+        <h3 style="font:800 24px/1.05 'Archivo',sans-serif;letter-spacing:-.02em;margin:0 0 16px">{{ resultHeadline }}</h3>
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <sc-for list="{{ resultRows }}" as="r" hint-placeholder-count="5">
+            <div style="display:flex;align-items:center;gap:11px;animation:chipdrop .4s ease both">
+              <span style="position:relative;width:32px;height:32px;flex:none;border-radius:50%;background:{{ r.edge }};box-shadow:0 2px 4px rgba(0,0,0,.55)"><span style="position:absolute;inset:4px;border-radius:50%;background:{{ r.swatch }};border:1px solid rgba(255,255,255,.42);display:flex;align-items:center;justify-content:center;font:800 10px/1 'Archivo',sans-serif;color:{{ r.numInk }};text-shadow:{{ r.numShade }}">{{ r.value }}</span></span>
+              <span style="flex:1;font:400 13px/1 'Archivo',sans-serif;color:rgba(240,239,233,.85)">{{ r.name }}</span>
+              <span style="font:800 15px/1 'Archivo',sans-serif">×{{ r.qty }}</span>
+              <span style="width:56px;text-align:right;font:400 12px/1 'Archivo',sans-serif;color:rgba(240,239,233,.6)">{{ r.total }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="height:1px;background:rgba(240,239,233,.25);margin:16px 0 12px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div style="border-radius:999px;background:rgba(240,239,233,.12);padding:8px 13px;font:800 12px/1 'Archivo',sans-serif">{{ stackValue }} <span style="font-weight:400;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:rgba(240,239,233,.7)">per player</span></div>
+          <div style="border-radius:999px;background:rgba(240,239,233,.12);padding:8px 13px;font:800 12px/1 'Archivo',sans-serif">{{ chipsDealt }} <span style="font-weight:400;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:rgba(240,239,233,.7)">dealt</span></div>
+          <div style="border-radius:999px;background:rgba(240,239,233,.12);padding:8px 13px;font:800 12px/1 'Archivo',sans-serif">{{ chipsLeft }} <span style="font-weight:400;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:rgba(240,239,233,.7)">in bank</span></div>
+        </div>
+        <p style="font:400 12px/1.45 'Archivo',sans-serif;color:rgba(240,239,233,.75);margin:14px 0 0">{{ resultNote }}</p>
+        <div style="font:400 11px/1.4 'Archivo',sans-serif;color:rgba(240,239,233,.55);margin-top:6px">Blinds: {{ blindNote }}</div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ solved }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:20px;border-radius:28px;background:#16261e;box-shadow:0 1px 2px rgba(0,0,0,.14);padding:20px 18px;animation:rise .35s ease both">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font:800 18px/1 'Archivo',sans-serif;color:#ff563c">♣</span>
+          <div style="font:400 10px/1 'Archivo',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8ea79a">Balance</div>
+        </div>
+        <h3 style="font:800 22px/1.05 'Archivo',sans-serif;letter-spacing:-.02em;margin:0 0 6px">What a point is worth</h3>
+        <p style="font:400 12px/1.45 'Archivo',sans-serif;color:#8ea79a;margin:0 0 14px">{{ balanceIntro }}</p>
+
+        <div style="display:flex;flex-wrap:wrap;gap:16px 14px;align-items:flex-end;padding:4px 2px 6px;margin-bottom:12px">
+          <sc-for list="{{ stacks }}" as="st" hint-placeholder-count="4">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:7px">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                <span style="position:relative;width:30px;height:30px;border-radius:50%;background:{{ st.edge }};box-shadow:0 1px 3px rgba(0,0,0,.55)"><span style="position:absolute;inset:4px;border-radius:50%;background:{{ st.swatch }};border:1px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;font:800 9px/1 'Archivo',sans-serif;color:{{ st.numInk }}">{{ st.valueNum }}</span></span>
+                <sc-for list="{{ st.slices }}" as="d" hint-placeholder-count="2">
+                  <span style="width:26px;height:5px;border-radius:50%;background:{{ d.swatch }};box-shadow:inset 0 -1.5px 0 rgba(0,0,0,.4)"></span>
+                </sc-for>
+              </div>
+              <span style="font:800 10px/1 'Archivo',sans-serif;color:#adc2b6">×{{ st.qty }}</span>
+              <span style="font:400 9px/1 'Archivo',sans-serif;color:#8ea79a">{{ st.value }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+          <div style="border-radius:999px;background:#1d4433;color:#f0efe9;padding:9px 14px;font:800 12px/1 'Archivo',sans-serif">1 point = {{ scaleTxt }} <span style="font-weight:400;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:rgba(240,239,233,.7)">of entry</span></div>
+          <div style="border-radius:999px;background:#1e3228;padding:9px 14px;font:800 12px/1 'Archivo',sans-serif;color:#f0efe9">1 unit = 100 <span style="font-weight:400;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#8ea79a">points, always</span></div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;padding:0 4px 8px;font:400 9px/1 'Archivo',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#6d887a">
+          <span style="width:58px">Seat</span><span style="width:62px;text-align:center">End pts</span><span style="flex:1;text-align:right">Counts as</span><span style="width:70px;text-align:right">Balance</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <sc-for list="{{ balanceRows }}" as="b" hint-placeholder-count="6">
+            <div style="display:flex;align-items:center;gap:10px;border-radius:18px;background:{{ b.bg }};padding:8px 10px">
+              <input value="{{ b.shown }}" onChange="{{ b.onName }}" onFocus="{{ b.onFocus }}" onBlur="{{ b.onBlur }}" placeholder="{{ b.label }}" title="{{ b.name }}" style="width:58px;flex:none;min-width:0;min-height:38px;border-radius:12px;border:1px solid transparent;background:transparent;padding:4px 6px;font:800 13px/1 'Archivo',sans-serif;color:#f0efe9;caret-color:#e8cf8a;text-overflow:ellipsis;white-space:nowrap;overflow:hidden" style-focus="border-color:#c9a75c;background:#12201a;outline:none" style-hover="background:#1e3228">
+              <input value="{{ b.end }}" onChange="{{ b.onEnd }}" inputmode="numeric" style="width:62px;flex:none;min-height:38px;border-radius:12px;border:2px solid transparent;background:#1e3228;padding:4px 6px;font:800 14px/1 'Archivo',sans-serif;text-align:center;color:#f0efe9;caret-color:#ff563c" style-focus="border-color:#ff563c;outline:none">
+              <span style="flex:1;min-width:0;text-align:right;font:400 12px/1 'Archivo',sans-serif;color:#8ea79a">{{ b.value }}</span>
+              <span style="width:70px;flex:none;text-align:right;font:800 14px/1 'Archivo',sans-serif;color:{{ b.netInk }}">{{ b.net }}<span style="display:block;font-weight:400;font-size:10px;color:#8ea79a;margin-top:3px">{{ b.units }}</span></span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid rgba(240,239,233,.12);font:400 12px/1.4 'Archivo',sans-serif;color:{{ tallyInk }}">
+          <span>{{ tallyMsg }}</span><span style="font-weight:800;flex:none">{{ tallyFigure }}</span>
+        </div>
+      </div>
+      </sc-if>
+
+
+      <div style="height:30px"></div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ isYou }}" hint-placeholder-val="{{ false }}">
+    <div onScroll="{{ onScroll }}" style="height:100%;overflow:auto;padding:66px 18px 26px">
+      <div style="border-radius:28px;background:#16261e;box-shadow:0 1px 2px rgba(0,0,0,.14);padding:20px;display:flex;align-items:center;gap:14px">
+        <div style="width:60px;height:60px;flex:none;border-radius:50%;background:#1d4433;color:#f0efe9;display:flex;align-items:center;justify-content:center;font:800 22px/1 'Archivo',sans-serif">MR</div>
+        <div>
+          <div style="font:800 23px/1.05 'Archivo',sans-serif;letter-spacing:-.02em">Marta R.</div>
+          <div style="font:400 12px/1.2 'Archivo',sans-serif;color:#8ea79a;margin-top:5px">Level 4 · Friday-night regular</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+        <sc-for list="{{ profileStats }}" as="s" hint-placeholder-count="4">
+          <div style="border-radius:22px;background:{{ s.bg }};padding:14px 16px">
+            <div style="font:800 24px/1 'Archivo',sans-serif;color:{{ s.ink }}">{{ s.value }}</div>
+            <div style="font:400 10px/1.2 'Archivo',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#8ea79a;margin-top:5px">{{ s.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="font:400 10px/1 'Archivo',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8ea79a;margin:20px 0 12px">Mastery</div>
+      <sc-for list="{{ mastery }}" as="m" hint-placeholder-count="4">
+        <div style="margin-bottom:13px">
+          <div style="display:flex;justify-content:space-between;font:400 12px/1 'Archivo',sans-serif;margin-bottom:6px"><span style="font-weight:800">{{ m.name }}</span><span style="color:#8ea79a">{{ m.pct }}</span></div>
+          <div style="height:9px;border-radius:999px;background:#22362b;overflow:hidden"><div style="height:9px;border-radius:999px;background:{{ m.fill }};width:{{ m.pct }}"></div></div>
+        </div>
+      </sc-for>
+      <button onClick="{{ toggleGames }}" style="width:100%;min-height:52px;margin-top:20px;display:flex;align-items:center;justify-content:space-between;border:1.5px solid {{ gamesBorder }};border-radius:999px;background:transparent;color:{{ gamesInk }};padding:0 12px 0 18px;font:800 12px/1 'Archivo',sans-serif;letter-spacing:.04em;text-transform:uppercase;cursor:pointer" style-hover="border-color:#c9a75c;color:#e8cf8a">Your games<span style="font:800 15px/1 'Archivo',sans-serif">{{ gamesChevron }}</span></button>
+
+      <sc-if value="{{ gamesOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:10px;border-radius:26px;background:#0f1c15;border:1px solid rgba(240,239,233,.10);padding:16px 14px;animation:rise .3s ease both">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:12px;padding:0 2px">
+          <div style="font:400 10px/1 'Archivo',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8ea79a">{{ gamesCount }}</div>
+          <div style="font:400 10px/1 'Archivo',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#6d887a">Balance in units</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ games }}" as="g" hint-placeholder-count="3">
+            <div style="border-radius:20px;background:#16261e;box-shadow:0 1px 2px rgba(0,0,0,.45);padding:13px 14px;display:flex;align-items:center;gap:12px">
+              <div style="flex:1;min-width:0">
+                <div style="font:800 13px/1.15 'Archivo',sans-serif;color:#f0efe9">{{ g.date }}</div>
+                <div style="font:400 11px/1.3 'Archivo',sans-serif;color:#8ea79a;margin-top:4px">{{ g.detail }}</div>
+              </div>
+              <div style="font:800 14px/1 'Archivo',sans-serif;color:{{ g.ink }};flex:none">{{ g.net }}<span style="display:block;font-weight:400;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:#8ea79a;margin-top:3px">units</span></div>
+              <button onClick="{{ g.onLoad }}" style="flex:none;min-height:44px;border:1.5px solid rgba(240,239,233,.22);border-radius:999px;background:transparent;color:#f0efe9;padding:0 14px;font:800 10px/1 'Archivo',sans-serif;letter-spacing:.06em;text-transform:uppercase;cursor:pointer" style-hover="border-color:#57b183;color:#7fd6a5">Reuse</button>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+      <button onClick="{{ signOut }}" style="width:100%;min-height:44px;margin-top:14px;border:0;background:transparent;color:#6d887a;font:400 11px/1 'Archivo',sans-serif;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;text-align:left" style-hover="color:#e8cf8a">Log out</button>
+      <div style="height:20px"></div>
+    </div>
+    </sc-if>
+
+  </div>
+
+  <div style="position:relative;z-index:1;display:flex;gap:4px;padding:8px 12px 14px;flex:none;background:rgba(10,20,15,.86);border-top:1px solid rgba(240,239,233,.12)">
+    <button onClick="{{ goHome }}" style="flex:1;min-height:52px;border:0;border-radius:20px;background:{{ homeBg }};color:{{ homeInk }};font:800 10px/1 'Archivo',sans-serif;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px" style-hover="background:#1e3228"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><path d="M9 22V12h6v10"></path></svg>Home</button>
+    <button onClick="{{ goPath }}" style="flex:1;min-height:52px;border:0;border-radius:20px;background:{{ pathBg }};color:{{ pathInk }};font:800 10px/1 'Archivo',sans-serif;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px" style-hover="background:#1e3228"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"></path><path d="m22 7-8.5 8.5-5-5L2 17"></path></svg>Path</button>
+    <button onClick="{{ goChips }}" style="flex:1;min-height:52px;border:0;border-radius:20px;background:{{ chipsBg }};color:{{ chipsInk }};font:800 10px/1 'Archivo',sans-serif;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px" style-hover="background:#1e3228"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>Chips</button>
+    <button onClick="{{ goYou }}" style="flex:1;min-height:52px;border:0;border-radius:20px;background:{{ youBg }};color:{{ youInk }};font:800 10px/1 'Archivo',sans-serif;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px" style-hover="background:#1e3228"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>You</button>
+  </div>
+
+  <sc-if value="{{ loginOpen }}" hint-placeholder-val="{{ false }}">
+  <div style="position:absolute;inset:0;z-index:30;overflow:hidden;display:flex;flex-direction:column;justify-content:center;padding:28px 22px;background-color:#080d0a;background-image:repeating-linear-gradient(0deg, rgba(240,239,233,.022) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(0,0,0,.055) 0 1px, transparent 1px 3px), radial-gradient(130% 85% at 50% -5%, #1d4433 0%, #12271d 45%, #0b1610 100%);animation:rise .35s ease both">
+    <svg viewBox="0 0 120 170" style="position:absolute;top:-24px;right:-58px;width:200px;opacity:.22;transform:rotate(13deg);pointer-events:none" fill="none" stroke="#e8cf8a" stroke-width="1.1" vector-effect="non-scaling-stroke"><rect x="2" y="2" width="116" height="166" rx="9"></rect><rect x="26" y="14" width="68" height="142"></rect><text x="9" y="25" font-family="Archivo, sans-serif" font-size="18" font-weight="800" fill="#e8cf8a" stroke="none">A</text><text x="9" y="42" font-family="Archivo, sans-serif" font-size="15" fill="#e8cf8a" stroke="none">♠</text><text x="60" y="103" text-anchor="middle" font-family="Archivo, sans-serif" font-size="72" fill="rgba(232,207,160,.5)" stroke="none">♠</text></svg>
+    <svg viewBox="0 0 120 170" style="position:absolute;bottom:-70px;left:-64px;width:190px;opacity:.14;transform:rotate(-11deg);pointer-events:none" fill="none" stroke="#e8cf8a" stroke-width="1.1" vector-effect="non-scaling-stroke"><rect x="2" y="2" width="116" height="166" rx="9"></rect><rect x="26" y="14" width="68" height="142"></rect><text x="9" y="25" font-family="Archivo, sans-serif" font-size="18" font-weight="800" fill="#e8cf8a" stroke="none">K</text><text x="9" y="42" font-family="Archivo, sans-serif" font-size="15" fill="#e8cf8a" stroke="none">♠</text><g transform="translate(26,14) scale(0.68)"><path d="M30 30 L36 14 L42 26 L50 10 L58 26 L64 14 L70 30 Z"></path><circle cx="50" cy="49" r="11"></circle><path d="M39 49 H61"></path><path d="M28 63 Q50 75 72 63"></path><path d="M20 80 L30 65 Q50 79 70 65 L80 80"></path><path d="M6 104 H94"></path></g></svg>
+    <div style="position:relative;display:flex;align-items:center;gap:9px;margin-bottom:26px">
+      <div style="width:30px;height:30px;border-radius:10px;background:#1d4433;color:#f0efe9;display:flex;align-items:center;justify-content:center;font:800 15px/1 'Archivo',sans-serif">♠</div>
+      <div style="font:800 14px/1 'Archivo',sans-serif;letter-spacing:-.01em;color:#f0efe9">Poker Coach</div>
+    </div>
+
+    <h2 style="position:relative;font:800 30px/1.03 'Archivo',sans-serif;letter-spacing:-.03em;margin:0 0 6px;color:#ffffff">Take a seat</h2>
+    <p style="font:400 13px/1.45 'Archivo',sans-serif;color:#8ea79a;margin:0 0 22px">Your streak, your units, your chip case — all waiting.</p>
+
+    <div style="position:relative;display:flex;flex-direction:column;gap:9px">
+      <input value="{{ email }}" onChange="{{ setEmail }}" placeholder="you@table.com" inputmode="email" style="width:100%;min-height:50px;border-radius:16px;border:1px solid rgba(240,239,233,.14);background:#12201a;padding:6px 15px;font:400 14px/1 'Archivo',sans-serif;color:#f0efe9;caret-color:#e8cf8a" style-focus="border-color:#c9a75c;outline:none">
+      <input value="{{ pass }}" onChange="{{ setPass }}" type="password" placeholder="Password" style="width:100%;min-height:50px;border-radius:16px;border:1px solid rgba(240,239,233,.14);background:#12201a;padding:6px 15px;font:400 14px/1 'Archivo',sans-serif;color:#f0efe9;caret-color:#e8cf8a" style-focus="border-color:#c9a75c;outline:none">
+      <button onClick="{{ signIn }}" style="width:100%;min-height:54px;margin-top:5px;display:flex;align-items:center;justify-content:space-between;background-image:linear-gradient(#0b1210,#0b1210),linear-gradient(115deg,#8a6a2f 0%,#f0dca0 36%,#c8a558 62%,#7d5f2a 100%);background-origin:border-box;background-clip:padding-box,border-box;border:1px solid transparent;border-radius:999px;color:#ffffff;padding:0 12px 0 20px;font:800 15px/1 'Archivo',sans-serif;cursor:pointer;transition:transform .12s ease" style-hover="background-image:linear-gradient(#141c19,#141c19),linear-gradient(115deg,#8a6a2f 0%,#f0dca0 36%,#c8a558 62%,#7d5f2a 100%)" style-active="transform:scale(.99)">Log in<span style="width:36px;height:36px;flex:none;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:14px;color:#e8cf8a">♠</span></button>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:12px;margin:20px 0">
+      <span style="flex:1;height:1px;background:rgba(240,239,233,.14)"></span>
+      <span style="font:400 9px/1 'Archivo',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#6d887a">or</span>
+      <span style="flex:1;height:1px;background:rgba(240,239,233,.14)"></span>
+    </div>
+
+    <button onClick="{{ signIn }}" style="width:100%;min-height:52px;display:flex;align-items:center;justify-content:center;gap:11px;background:#f4f1e6;border:0;border-radius:999px;color:#17181a;padding:0 18px;font:800 14px/1 'Archivo',sans-serif;cursor:pointer" style-hover="background:#ffffff"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 12.2c0-.8-.1-1.6-.2-2.3H12v4.4h6.2a5.3 5.3 0 0 1-2.3 3.5v2.9h3.7c2.2-2 3.4-4.9 3.4-8.5z" fill="#4285f4"></path><path d="M12 23.5c3.1 0 5.7-1 7.6-2.8l-3.7-2.9c-1 .7-2.3 1.1-3.9 1.1-3 0-5.6-2-6.5-4.8H1.7v3c1.9 3.8 5.8 6.4 10.3 6.4z" fill="#34a853"></path><path d="M5.5 14.1a7.1 7.1 0 0 1 0-4.5v-3H1.7a11.6 11.6 0 0 0 0 10.5l3.8-3z" fill="#fbbc05"></path><path d="M12 4.8c1.7 0 3.2.6 4.4 1.7l3.3-3.3C17.7 1.3 15.1.3 12 .3 7.5.3 3.6 2.9 1.7 6.7l3.8 2.9C6.4 6.8 9 4.8 12 4.8z" fill="#ea4335"></path></svg>Continue with Google</button>
+
+    <div style="display:flex;justify-content:space-between;gap:10px;margin-top:22px">
+      <button onClick="{{ signIn }}" style="border:0;background:transparent;padding:8px 0;font:400 11px/1 'Archivo',sans-serif;color:#8ea79a;cursor:pointer;text-decoration:underline;text-underline-offset:3px" style-hover="color:#e8cf8a">Create an account</button>
+      <button onClick="{{ signIn }}" style="border:0;background:transparent;padding:8px 0;font:400 11px/1 'Archivo',sans-serif;color:#6d887a;cursor:pointer" style-hover="color:#e8cf8a">Forgot password?</button>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ exOpen }}" hint-placeholder-val="{{ false }}">
+  <div style="position:absolute;inset:0;z-index:20;background:repeating-linear-gradient(0deg, rgba(240,239,233,.022) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(0,0,0,.055) 0 1px, transparent 1px 3px), radial-gradient(130% 85% at 50% -5%, #1d4433 0%, #12271d 45%, #0b1610 100%);display:flex;flex-direction:column;animation:rise .3s ease both">
+    <div style="display:flex;align-items:center;gap:12px;padding:16px 18px 12px;flex:none">
+      <button onClick="{{ closeEx }}" style="width:40px;height:40px;flex:none;border-radius:50%;border:0;background:#1e3228;cursor:pointer;color:#f0efe9;display:flex;align-items:center;justify-content:center" style-hover="background:#2c4238"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg></button>
+      <div style="flex:1;display:flex;gap:4px">
+        <sc-for list="{{ exSegments }}" as="s" hint-placeholder-count="3"><span style="flex:1;height:9px;border-radius:999px;background:{{ s.fill }};transition:background .3s ease"></span></sc-for>
+      </div>
+      <div style="display:flex;gap:2px;background:#1e3228;border-radius:999px;padding:6px 9px">
+        <sc-for list="{{ heartCells }}" as="h" hint-placeholder-count="5"><span style="font:800 11px/1 'Archivo',sans-serif;color:{{ h.fill }}">♥</span></sc-for>
+      </div>
+    </div>
+
+    <sc-if value="{{ exDone }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1;padding:24px 18px;display:flex;flex-direction:column;justify-content:center;animation:pop .4s ease both">
+      <div style="font:800 64px/1 'Archivo',sans-serif;color:#57b183;margin-bottom:14px">♠</div>
+      <div style="font:400 10px/1 'Archivo',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8ea79a;margin-bottom:8px">Hand played</div>
+      <h2 style="font:800 46px/.98 'Archivo',sans-serif;letter-spacing:-.035em;margin:0 0 10px">+{{ xpGain }} XP</h2>
+      <p style="font:400 14px/1.45 'Archivo',sans-serif;color:#adc2b6;margin:0 0 24px">{{ doneNote }}</p>
+      <button onClick="{{ closeEx }}" style="width:100%;min-height:58px;display:flex;align-items:center;justify-content:space-between;background-image:linear-gradient(#0b1210,#0b1210),linear-gradient(115deg,#8a6a2f 0%,#f0dca0 36%,#c8a558 62%,#7d5f2a 100%);background-origin:border-box;background-clip:padding-box,border-box;border:1px solid transparent;color:#ffffff;border-radius:999px;padding:0 12px 0 20px;font:800 15px/1 'Archivo',sans-serif;cursor:pointer" style-hover="background-image:linear-gradient(#141c19,#141c19),linear-gradient(115deg,#8a6a2f 0%,#f0dca0 36%,#c8a558 62%,#7d5f2a 100%)">Back to today<span style="width:38px;height:38px;flex:none;border-radius:50%;background:rgba(240,239,233,.16);display:flex;align-items:center;justify-content:center;font-size:15px">♥</span></button>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ exActive }}" hint-placeholder-val="{{ true }}">
+    <div style="flex:1;display:flex;flex-direction:column;overflow:auto">
+      <div style="padding:6px 18px 0;animation:{{ flipAnim }};transform-origin:center">
+        <div style="display:inline-flex;border-radius:999px;background:#1e3228;padding:6px 12px;font:800 9px/1 'Archivo',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#adc2b6;margin-bottom:12px">{{ q.kicker }}</div>
+        <h3 style="font:800 23px/1.12 'Archivo',sans-serif;letter-spacing:-.02em;margin:0 0 16px">{{ q.prompt }}</h3>
+        <sc-if value="{{ q.hasCards }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;gap:7px;margin-bottom:9px">
+          <sc-for list="{{ q.cards }}" as="c" hint-placeholder-count="5">
+            <div style="width:52px;height:72px;border-radius:12px;background:#f4f1e6;box-shadow:0 2px 8px rgba(0,0,0,.5);display:flex;flex-direction:column;justify-content:space-between;padding:7px 8px;font:800 17px/1 'Archivo',sans-serif;color:{{ c.ink }};margin-top:{{ c.offset }};animation:chipdrop .4s ease both"><span>{{ c.rank }}</span><span style="align-self:flex-end;font-size:16px">{{ c.suit }}</span></div>
+          </sc-for>
+        </div>
+        <div style="font:400 10px/1 'Archivo',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#8ea79a;margin-bottom:16px">{{ q.cardsLabel }}</div>
+        </sc-if>
+        <div style="font:400 13px/1.45 'Archivo',sans-serif;color:#adc2b6;margin-bottom:18px">{{ q.context }}</div>
+      </div>
+      <div style="margin-top:auto;padding:0 18px 18px;display:flex;flex-direction:column;gap:9px">
+        <sc-for list="{{ q.options }}" as="o" hint-placeholder-count="3">
+          <button onClick="{{ o.onPick }}" style="width:100%;min-height:56px;display:flex;align-items:center;justify-content:space-between;gap:10px;background:{{ o.bg }};color:{{ o.ink }};border:1px solid {{ o.border }};border-radius:20px;padding:0 16px;font:800 14px/1.2 'Archivo',sans-serif;cursor:pointer;text-align:left;animation:{{ o.anim }};transition:background .2s ease,border-color .2s ease" style-hover="background:#1e3228">{{ o.label }}<span style="font:800 16px/1 'Archivo',sans-serif;flex:none;color:{{ o.markInk }}">{{ o.mark }}</span></button>
+        </sc-for>
+        <sc-if value="{{ answered }}" hint-placeholder-val="{{ false }}">
+        <div style="border-radius:24px;background:{{ fbBg }};border:1px solid {{ fbBorder }};padding:16px 18px;margin-top:4px;animation:rise .3s ease both">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+            <span style="font:800 18px/1 'Archivo',sans-serif;color:{{ fbInk }}">{{ fbGlyph }}</span>
+            <span style="font:800 13px/1 'Archivo',sans-serif;letter-spacing:.04em;color:{{ fbInk }}">{{ fbTitle }}</span>
+          </div>
+          <div style="font:400 13px/1.45 'Archivo',sans-serif;color:{{ fbBody2Ink }}">{{ fbBody }}</div>
+        </div>
+        <button onClick="{{ nextQ }}" style="width:100%;min-height:56px;display:flex;align-items:center;justify-content:space-between;background:#1d4433;color:#f0efe9;border:0;border-radius:999px;padding:0 12px 0 20px;font:800 15px/1 'Archivo',sans-serif;cursor:pointer;animation:rise .35s ease both" style-hover="background:#2a5f47">{{ nextLabel }}<span style="width:38px;height:38px;flex:none;border-radius:50%;background:rgba(240,239,233,.16);display:flex;align-items:center;justify-content:center;font-size:15px">♣</span></button>
+        </sc-if>
+      </div>
+    </div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:840,&quot;height&quot;:960}}">
+const LADDERS = [
+  [1,2,5,10,25,50,100,250],
+  [1,5,10,25,50,100,500,1000],
+  [5,10,25,50,100,500,1000,2500],
+  [1,2,5,20,50,100,200,500]
+];
+
+const QUESTIONS = [
+  {
+    kicker: "Unit 2 · Position · 1 of 3",
+    prompt: "You're first to act before the flop. Where are you sitting?",
+    cards: [],
+    cardsLabel: "",
+    context: "Six-handed. You're one seat left of the big blind.",
+    options: [
+      { id: "a", label: "Under the gun" },
+      { id: "b", label: "The cutoff" },
+      { id: "c", label: "The button" }
+    ],
+    correct: "a",
+    why: "Under the gun, with five players still to act behind you. Worst seat in the house — open tight and don't be a hero."
+  },
+  {
+    kicker: "Unit 2 · Position · 2 of 3",
+    prompt: "How good is this, really?",
+    cards: [
+      { rank: "A", suit: "♠", ink: "#17181a", offset: "0px" },
+      { rank: "K", suit: "♠", ink: "#17181a", offset: "0px" },
+      { rank: "Q", suit: "♦", ink: "#b5121f", offset: "10px" },
+      { rank: "J", suit: "♦", ink: "#b5121f", offset: "10px" },
+      { rank: "4", suit: "♠", ink: "#17181a", offset: "10px" }
+    ],
+    cardsLabel: "Your two cards, then the board",
+    context: "You hold A♠ K♠. The board came Q♦ J♦ 4♠.",
+    options: [
+      { id: "a", label: "A made straight" },
+      { id: "b", label: "Two overcards and a flush draw" },
+      { id: "c", label: "Nothing — give it up" }
+    ],
+    correct: "b",
+    why: "No pair yet, but two live overcards and four spades to come. That's a hand you keep betting, not one you check down."
+  },
+  {
+    kicker: "Unit 2 · Position · 3 of 3",
+    prompt: "Pot's 40. They bet 20. What's it going to be?",
+    cards: [],
+    cardsLabel: "",
+    context: "You pay 20 to win 60 — that's 3-to-1, so you need to win about one time in four.",
+    options: [
+      { id: "a", label: "Fold, you missed" },
+      { id: "b", label: "Call, the price is right" },
+      { id: "c", label: "Raise to 90" }
+    ],
+    correct: "b",
+    why: "Your draw lands about a third of the time and the pot only asks for a quarter. Easy call — save the raise for when it hits."
+  }
+];
+
+class Component extends DCLogic {
+  state = {
+    tab: "home",
+    sy: 0,
+    hearts: 4,
+    xp: 1240,
+    streak: 7,
+    exOpen: false,
+    qi: 0,
+    chosen: null,
+    exDone: false,
+    gained: 0,
+    players: 6,
+    buyIn: 500,
+    autoValues: true,
+    pointsPerUnit: 100,
+    gamesOpen: false,
+    authed: false,
+    email: "",
+    pass: "",
+    gamesTotal: 11,
+    ends: [],
+    names: [],
+    editingName: null,
+    colors: [
+      { name: "White", swatch: "#f4f1e6", count: 40, value: 1 },
+      { name: "Red", swatch: "#ff7a63", count: 40, value: 5 },
+      { name: "Green", swatch: "#4a6b52", count: 40, value: 25 },
+      { name: "Blue", swatch: "#3a4f6b", count: 40, value: 50 },
+      { name: "Black", swatch: "#1a1a1a", count: 40, value: 100 }
+    ],
+    result: null
+  };
+
+  onScroll = e => {
+    const y = e.target.scrollTop;
+    if (Math.abs(y - this.state.sy) > 1) this.setState({ sy: y });
+  };
+
+  go(tab) { this.setState({ tab, sy: 0 }); }
+
+  startEx = () => this.setState({ exOpen: true, qi: 0, chosen: null, exDone: false, gained: 0 });
+  closeEx = () => this.setState({ exOpen: false });
+
+  pick(id) {
+    if (this.state.chosen) return;
+    const right = id === QUESTIONS[this.state.qi].correct;
+    this.setState(s => ({
+      chosen: id,
+      hearts: right ? s.hearts : Math.max(0, s.hearts - 1),
+      gained: right ? s.gained + 8 : s.gained,
+      xp: right ? s.xp + 8 : s.xp
+    }));
+  }
+
+  nextQ = () => {
+    if (this.state.qi >= QUESTIONS.length - 1) this.setState({ exDone: true, chosen: null });
+    else this.setState(s => ({ qi: s.qi + 1, chosen: null }));
+  };
+
+  setPlayers(d) {
+    this.setState(s => ({ players: Math.min(10, Math.max(2, s.players + d)), result: null }));
+  }
+
+  num(v, max) {
+    return Math.max(0, Math.min(max, parseInt(String(v).replace(/[^0-9]/g, ""), 10) || 0));
+  }
+
+  patch(i, key, val) {
+    this.setState(s => {
+      const colors = s.colors.map((c, j) => j === i ? Object.assign({}, c, { [key]: val }) : c);
+      return { colors, result: null };
+    });
+  }
+
+  addColor = () => {
+    this.setState(s => {
+      if (s.colors.length >= 8) return {};
+      const top = s.colors.reduce((m, c) => Math.max(m, c.value), 0);
+      const spare = [
+        { name: "Purple", swatch: "#6b4a7a" },
+        { name: "Orange", swatch: "#d97b2b" },
+        { name: "Grey", swatch: "#8a8a8a" },
+        { name: "Pink", swatch: "#c9628a" },
+        { name: "Teal", swatch: "#2f7d7a" },
+        { name: "Yellow", swatch: "#d8b23a" }
+      ];
+      const used = s.colors.map(c => String(c.swatch).toLowerCase());
+      const pick = spare.find(c => used.indexOf(c.swatch) < 0) || spare[s.colors.length % spare.length];
+      return {
+        colors: s.colors.concat([{ name: pick.name, swatch: pick.swatch, count: 20, value: top * 5 || 5 }]),
+        result: null
+      };
+    });
+  };
+
+  removeColor(i) {
+    this.setState(s => s.colors.length <= 2 ? {} : { colors: s.colors.filter((c, j) => j !== i), result: null });
+  }
+
+  setBet = e => this.setState({ buyIn: Math.max(1, this.num(e.target.value, 1000)) * 100, result: null });
+
+  exact(denoms, avail, buyIn) {
+    const n = denoms.length;
+    if (buyIn < 1 || buyIn > 4000) return null;
+    const dp = [new Uint8Array(buyIn + 1)];
+    const cnt = [null];
+    dp[0][0] = 1;
+    for (let i = 0; i < n; i++) {
+      const row = new Uint8Array(buyIn + 1);
+      const cs = new Int32Array(buyIn + 1).fill(-1);
+      const d = denoms[i], cap = avail[i];
+      for (let sum = 0; sum <= buyIn; sum++) {
+        if (sum >= d && row[sum - d] && cs[sum - d] < cap) { row[sum] = 1; cs[sum] = cs[sum - d] + 1; }
+        else if (dp[i][sum]) { row[sum] = 1; cs[sum] = 0; }
+      }
+      dp.push(row); cnt.push(cs);
+    }
+    if (!dp[n][buyIn]) return null;
+    const qty = new Array(n).fill(0);
+    let sum = buyIn;
+    for (let i = n - 1; i >= 0; i--) { qty[i] = cnt[i + 1][sum]; sum -= qty[i] * denoms[i]; }
+    // The DP lands on the fewest, largest chips. Break big chips down into
+    // smaller ones (exact value, within availability) until the stack is playable.
+    let guard = 0;
+    while (qty.reduce((a, b) => a + b, 0) < 20 && guard++ < 300) {
+      let swapped = false;
+      for (let i = n - 1; i >= 1 && !swapped; i--) {
+        if (qty[i] <= 0) continue;
+        let rem = denoms[i];
+        const add = new Array(n).fill(0);
+        for (let j = i - 1; j >= 0; j--) {
+          const k = Math.min(avail[j] - qty[j], Math.floor(rem / denoms[j]));
+          if (k > 0) { add[j] = k; rem -= k * denoms[j]; }
+        }
+        if (rem === 0 && add.reduce((a, b) => a + b, 0) > 1) {
+          qty[i]--;
+          for (let j = 0; j < n; j++) qty[j] += add[j];
+          swapped = true;
+        }
+      }
+      if (!swapped) break;
+    }
+    const total = qty.reduce((a, b) => a + b, 0);
+    return { denoms, qty, val: buyIn, ok: true, total, spread: qty.filter(q => q > 0).length };
+  }
+
+  fit(denoms, avail, buyIn) {
+    const n = denoms.length;
+    const wsum = n * (n + 1) / 2;
+    const qty = denoms.map((d, i) => Math.min(avail[i], Math.max(i === 0 ? 4 : 0, Math.round(((i + 1) / wsum) * buyIn / d))));
+    let val = qty.reduce((s, c, i) => s + c * denoms[i], 0);
+    let guard = 0;
+    while (val !== buyIn && guard++ < 5000) {
+      if (val < buyIn) {
+        let k = -1;
+        for (let i = n - 1; i >= 0; i--) if (denoms[i] <= buyIn - val && qty[i] < avail[i]) { k = i; break; }
+        if (k < 0) break;
+        qty[k]++; val += denoms[k];
+      } else {
+        let k = -1;
+        for (let i = n - 1; i >= 0; i--) if (qty[i] > 0 && denoms[i] <= val - buyIn) { k = i; break; }
+        if (k < 0) for (let i = 0; i < n; i++) if (qty[i] > 0) { k = i; break; }
+        if (k < 0) break;
+        qty[k]--; val -= denoms[k];
+      }
+    }
+    if (val !== buyIn) {
+      const ex = this.exact(denoms, avail, buyIn);
+      if (ex) return ex;
+    }
+    const total = qty.reduce((a, b) => a + b, 0);
+    return { denoms, qty, val, ok: val === buyIn, total, spread: qty.filter(q => q > 0).length };
+  }
+
+  solve = () => {
+    const { players, buyIn, colors, autoValues } = this.state;
+    const order = colors.map((c, i) => i).sort((a, b) => colors[a].value - colors[b].value);
+    const avail = order.map(i => Math.floor(colors[i].count / players));
+    const n = colors.length;
+    let pick;
+    if (autoValues) {
+      const cands = LADDERS.map(l => this.fit(l.slice(0, n), avail, buyIn));
+      const ok = cands.filter(c => c.ok && c.total >= 8);
+      const pool = ok.length ? ok : cands.filter(c => c.ok);
+      pick = (pool.length ? pool : cands).sort((a, b) =>
+        (b.spread - a.spread) || (Math.abs(a.total - 24) - Math.abs(b.total - 24)) || (Math.abs(a.val - buyIn) - Math.abs(b.val - buyIn))
+      )[0];
+    } else {
+      pick = this.fit(order.map(i => colors[i].value), avail, buyIn);
+    }
+    const nextColors = autoValues
+      ? colors.map((c, i) => {
+          const k = order.indexOf(i);
+          return k < 0 ? c : Object.assign({}, c, { value: pick.denoms[k] });
+        })
+      : colors;
+    this.setState({
+      colors: nextColors,
+      result: { order, denoms: pick.denoms, qty: pick.qty, val: pick.val, ok: pick.ok, total: pick.total },
+      ends: new Array(players).fill(pick.val)
+    });
+  };
+
+  shortName(n) {
+    const t = String(n).trim();
+    if (!t) return "";
+    if (t.length <= 7) return t;
+    const parts = t.split(/\s+/).filter(Boolean);
+    if (parts.length > 1) return parts.slice(0, 3).map(p => p[0].toUpperCase()).join("");
+    return t.slice(0, 2).toUpperCase();
+  }
+
+  setName(i, v) {
+    this.setState(s => {
+      const names = s.names.slice();
+      names[i] = String(v).slice(0, 24);
+      return { names };
+    });
+  }
+
+  setEnd(i, v) {
+    this.setState(s => {
+      const ends = s.ends.slice();
+      ends[i] = this.num(v, 1000000);
+      return { ends };
+    });
+  }
+
+  chipLum(hex) {
+    const h = String(hex).replace("#", "");
+    const n = h.length === 3 ? h.split("").map(c => c + c).join("") : h;
+    return (0.299 * (parseInt(n.slice(0, 2), 16) || 0) + 0.587 * (parseInt(n.slice(2, 4), 16) || 0) + 0.114 * (parseInt(n.slice(4, 6), 16) || 0)) / 255;
+  }
+
+  chipEdge(hex) {
+    const h = String(hex).replace("#", "");
+    const n = h.length === 3 ? h.split("").map(c => c + c).join("") : h;
+    const r = parseInt(n.slice(0, 2), 16) || 0, g = parseInt(n.slice(2, 4), 16) || 0, b = parseInt(n.slice(4, 6), 16) || 0;
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    const dash = lum > 0.62 ? "#2b2b2b" : "#ffffff";
+    return "repeating-conic-gradient(from 0deg, " + dash + " 0 8deg, " + hex + " 8deg 30deg)";
+  }
+
+  loadGame(players, buyIn) { this.setState({ players, buyIn, result: null, ends: [], tab: "chips", sy: 0 }); }
+
+  setPPU = e => this.setState({ pointsPerUnit: Math.max(1, this.num(e.target.value, 1000000)) });
+
+  renderVals() {
+    const s = this.state;
+    const r = s.result;
+    const on = (t, dark) => s.tab === t;
+    const tabBg = t => s.tab === t ? "#2e6b4f" : "transparent";
+    const tabInk = t => s.tab === t ? "#f0efe9" : "#8ea79a";
+
+    const unitDefs = [
+      { glyph: "♠", title: "Hand ranks", sub: "What beats what, no memorising", state: "done", pct: 100 },
+      { glyph: "♥", title: "Position", sub: "Why the last seat to act prints money", state: "now", pct: 50 },
+      { glyph: "♦", title: "Pot odds", sub: "The price of a call, in one number", state: "next", pct: 0 },
+      { glyph: "♣", title: "Bet sizing", sub: "Small, big, and when to shove it", state: "locked", pct: 0 },
+      { glyph: "♠", title: "Reading the table", sub: "Patterns beat tells, every time", state: "locked", pct: 0 }
+    ];
+    const faceUp = st => st === "done" || st === "now";
+    const units = unitDefs.map(u => ({
+      glyph: u.glyph, title: u.title, sub: u.sub, pct: u.pct + "%",
+      isCurrent: u.state === "now",
+      cardBg: faceUp(u.state) ? "#f4f1e6" : "repeating-linear-gradient(45deg,#2e6b4f 0 5px,#1d4433 5px 10px)",
+      cardBorder: faceUp(u.state) ? "rgba(0,0,0,.35)" : "rgba(240,239,233,.25)",
+      bg: u.state === "now" ? "#33201a" : u.state === "locked" ? "#15231c" : "#16261e",
+      shadow: u.state === "locked" ? "none" : "0 2px 6px rgba(0,0,0,.13)",
+      ink: u.state === "locked" ? "#6d887a" : "#f0efe9",
+      tag: u.state === "done" ? "Mastered" : u.state === "now" ? "Playing" : u.state === "next" ? "Up next" : "Locked",
+      tagBg: u.state === "now" ? "#ff563c" : u.state === "done" ? "#2e6b4f" : "#22362b",
+      tagInk: u.state === "now" || u.state === "done" ? "#f0efe9" : "#8ea79a",
+      markBg: u.state === "done" ? "#2e6b4f" : u.state === "now" ? "#ff563c" : "transparent",
+      markInk: faceUp(u.state)
+        ? (u.glyph === "♥" || u.glyph === "♦" ? "#b5121f" : "#17181a")
+        : "rgba(240,239,233,.55)",
+      markBorder: u.state === "locked" ? "#2c4238" : "transparent",
+      barFill: "#57b183",
+      onPick: u.state === "locked" ? () => {} : this.startEx
+    }));
+
+    const q0 = QUESTIONS[s.qi];
+    const answered = !!s.chosen;
+    const right = answered && s.chosen === q0.correct;
+
+    const rows = r ? r.order.map((ci, k) => ({
+      name: s.colors[ci].name,
+      swatch: s.colors[ci].swatch,
+      edge: this.chipEdge(s.colors[ci].swatch),
+      numInk: this.chipLum(s.colors[ci].swatch) > 0.62 ? "#17181a" : "#ffffff",
+      numShade: this.chipLum(s.colors[ci].swatch) > 0.62 ? "none" : "0 1px 2px rgba(0,0,0,.75)",
+      value: r.denoms[k],
+      qty: r.qty[k],
+      total: r.denoms[k] * r.qty[k]
+    })).filter(x => x.qty > 0) : [];
+    const totalChips = s.colors.reduce((a, c) => a + c.count, 0);
+    const dealt = r ? r.total * s.players : 0;
+    const lowest = rows.length ? Math.min.apply(null, rows.map(x => x.value)) : 1;
+
+    return {
+      streak: s.streak, xp: s.xp.toLocaleString(),
+      heartCells: [0,1,2,3,4].map(i => ({ fill: i < s.hearts ? "#ff563c" : "#2c4238" })),
+      isHome: s.tab === "home", isPath: s.tab === "path", isChips: s.tab === "chips", isYou: s.tab === "you",
+      goHome: () => this.go("home"), goPath: () => this.go("path"),
+      goChips: () => this.go("chips"), goYou: () => this.go("you"),
+      homeBg: tabBg("home"), homeInk: tabInk("home"),
+      pathBg: tabBg("path"), pathInk: tabInk("path"),
+      chipsBg: tabBg("chips"), chipsInk: tabInk("chips"),
+      youBg: tabBg("you"), youInk: tabInk("you"),
+
+      rankA: { home: "K", path: "Q", chips: "J", you: "A" }[s.tab],
+      rankB: { home: "Q", path: "J", chips: "K", you: "Q" }[s.tab],
+      aceA: s.tab === "you",
+      courtA: s.tab !== "you",
+      onScroll: this.onScroll,
+      pl1: (-s.sy * 0.12).toFixed(1) + "px",
+      pl2: (-s.sy * 0.26).toFixed(1) + "px",
+      pl3: (-s.sy * 0.42).toFixed(1) + "px",
+
+      dailyPct: "40%", dailyLabel: "2 of 5 drills",
+      chipTeaser: s.players + " players · " + Math.round(s.buyIn / 100) + " units in",
+      homeStats: [
+        { value: "78%", label: "Sharp" },
+        { value: "42", label: "Drills" },
+        { value: "7", label: "Streak" },
+        { value: "L4", label: "Level" }
+      ],
+      week: [
+        { label: "M", h: "46px", fill: "#f0efe9" },
+        { label: "T", h: "62px", fill: "#f0efe9" },
+        { label: "W", h: "30px", fill: "#f0efe9" },
+        { label: "T", h: "70px", fill: "#f0efe9" },
+        { label: "F", h: "54px", fill: "#f0efe9" },
+        { label: "S", h: "18px", fill: "#2c4238" },
+        { label: "S", h: "26px", fill: "#ff563c" }
+      ],
+      units,
+
+      startEx: this.startEx, closeEx: this.closeEx, nextQ: this.nextQ,
+      exOpen: s.exOpen, exDone: s.exDone, exActive: !s.exDone,
+      exSegments: QUESTIONS.map((_, i) => ({ fill: i < s.qi ? "#f0efe9" : i === s.qi ? "#ff563c" : "#22362b" })),
+      answered,
+      flipAnim: (s.qi % 2 === 0 ? "flipa" : "flipb") + " .5s cubic-bezier(.2,.8,.2,1) both",
+      stacks: rows.map(r => ({
+        qty: r.qty,
+        value: r.value + " pts",
+        valueNum: r.value,
+        swatch: r.swatch,
+        edge: r.edge,
+        numInk: r.numInk,
+        slices: new Array(Math.max(0, Math.min(4, r.qty - 1))).fill(0).map(() => ({ swatch: r.swatch }))
+      })),
+      q: {
+        kicker: q0.kicker, prompt: q0.prompt, context: q0.context,
+        hasCards: q0.cards.length > 0, cards: q0.cards, cardsLabel: q0.cardsLabel,
+        options: q0.options.map(o => {
+          const isC = o.id === q0.correct, isP = o.id === s.chosen;
+          return {
+            label: o.label,
+            onPick: () => this.pick(o.id),
+            mark: !answered ? "" : isC ? "♠" : isP ? "♥" : "",
+            markInk: isC ? "#e8cf8a" : "#ff563c",
+            bg: !answered ? "#16261e" : isC ? "#08110d" : isP ? "#1e3228" : "#13211a",
+            ink: !answered ? "#f0efe9" : isC ? "#ffffff" : isP ? "#f0efe9" : "#6d887a",
+            border: !answered ? "transparent" : isC ? "#c9a75c" : isP ? "#f0efe9" : "transparent",
+            anim: !answered ? "none" : isC ? "pop .35s ease both" : isP ? "shake .4s ease both" : "none"
+          };
+        })
+      },
+      fbBg: right ? "#08110d" : "#1e3228",
+      fbBorder: right ? "#c9a75c" : "transparent",
+      fbBody2Ink: right ? "#ffffff" : "#f0efe9",
+      fbInk: right ? "#e8cf8a" : "#f0efe9",
+      fbGlyph: right ? "♠" : "♥",
+      fbTitle: right ? "Nice hand" : "Not quite — look again",
+      fbBody: q0.why,
+      nextLabel: s.qi >= QUESTIONS.length - 1 ? "Finish the hand" : "Next one",
+      xpGain: s.gained,
+      doneNote: s.gained === QUESTIONS.length * 8
+        ? "Clean sweep. One more session and Position is yours."
+        : "Two from three. The one you missed comes back tomorrow.",
+
+      players: s.players, buyIn: s.buyIn, totalChips,
+      bet: Math.round(s.buyIn / 100),
+      stackPts: s.buyIn.toLocaleString(),
+      availPts: s.colors.reduce((a, c) => a + Math.floor(c.count / s.players) * c.value, 0).toLocaleString() + " pts each",
+      incPlayers: () => this.setPlayers(1),
+      decPlayers: () => this.setPlayers(-1),
+      setBet: this.setBet,
+      setAuto: () => this.setState({ autoValues: true, result: null }),
+      setManual: () => this.setState({ autoValues: false, result: null }),
+      autoBg: s.autoValues ? "#2e6b4f" : "transparent",
+      autoInk: s.autoValues ? "#f0efe9" : "#8ea79a",
+      manBg: s.autoValues ? "transparent" : "#2e6b4f",
+      manInk: s.autoValues ? "#8ea79a" : "#f0efe9",
+      addColor: this.addColor,
+      colorRows: s.colors.map((c, i) => ({
+        name: c.name, swatch: c.swatch, count: c.count, value: c.value,
+        valueLocked: s.autoValues,
+        valueBg: s.autoValues ? "#152219" : "#1e3228",
+        valueInk: s.autoValues ? "#6d887a" : "#f0efe9",
+        onName: e => this.patch(i, "name", String(e.target.value).slice(0, 14)),
+        onSwatch: e => this.patch(i, "swatch", e.target.value),
+        onCount: e => this.patch(i, "count", this.num(e.target.value, 500)),
+        onValue: e => this.patch(i, "value", Math.max(1, this.num(e.target.value, 10000))),
+        onRemove: () => this.removeColor(i)
+      })),
+      solve: this.solve,
+      solved: !!r,
+      resultKicker: r && r.ok ? "Every player gets" : "Closest we can get",
+      resultHeadline: r ? (r.ok
+        ? r.total + " chips, worth " + s.buyIn + " points"
+        : "Only " + r.val + " points fits") : "",
+      resultRows: rows,
+      stackValue: r ? r.val : 0,
+      chipsDealt: dealt,
+      chipsLeft: totalChips - dealt,
+      resultNote: r ? (r.ok
+        ? (lowest <= s.buyIn * 0.05
+          ? "Smallest chip is worth " + lowest + " — small enough for blinds, few enough to stack by eye."
+          : "Careful: your smallest chip is worth " + lowest + ", a big bite out of a " + s.buyIn + "-point stack. Add a smaller chip for room to bet.")
+        : (s.autoValues
+          ? "Add more low chips, drop the entry stack, or seat fewer players."
+          : "Your values can't make " + s.buyIn + " exactly. Try Auto values, or add a smaller chip.")) : "",
+      blindNote: r ? (lowest <= s.buyIn * 0.05
+        ? lowest + " / " + (lowest * 2) + ", up every 20 minutes"
+        : "too coarse to suggest — add a smaller chip") : "",
+
+      pointsPerUnit: s.pointsPerUnit,
+      setPPU: this.setPPU,
+      scaleTxt: r && r.val ? (s.buyIn / r.val).toFixed(3) : "1.000",
+      balanceIntro: r
+        ? s.players + " players got " + r.val.toLocaleString() + " points each against a " + s.buyIn.toLocaleString() + "-point entry (" + Math.round(s.buyIn / 100) + " units). Count the chips at the end and every point converts back at the rate below."
+        : "",
+      balanceRows: (r ? s.ends : []).map((e, i) => {
+        const scale = s.buyIn / (r.val || 1);
+        const value = Math.round(e * scale);
+        const net = value - s.buyIn;
+        const u = net / s.pointsPerUnit;
+        const full = s.names[i] || "";
+        return {
+          label: "P" + (i + 1),
+          name: full,
+          shown: s.editingName === i ? full : this.shortName(full),
+          onName: ev => this.setName(i, ev.target.value),
+          onFocus: () => this.setState({ editingName: i }),
+          onBlur: () => this.setState({ editingName: null }),
+          end: e,
+          onEnd: ev => this.setEnd(i, ev.target.value),
+          value: value.toLocaleString() + " pts",
+          net: (net > 0 ? "+" : net < 0 ? "−" : "") + Math.abs(net).toLocaleString(),
+          netInk: net > 0 ? "#ff9783" : net < 0 ? "#adc2b6" : "#6d887a",
+          units: (u > 0 ? "+" : u < 0 ? "−" : "") + Math.abs(u).toFixed(2) + " units",
+          bg: net > 0 ? "#33201a" : net < 0 ? "#15231c" : "#16261e"
+        };
+      }),
+      tallyMsg: (() => {
+        if (!r) return "";
+        const counted = s.ends.reduce((a, b) => a + b, 0);
+        const dealtPts = r.val * s.players;
+        const off = counted - dealtPts;
+        if (off === 0) return "Every chip accounted for.";
+        return (off > 0
+          ? Math.abs(off).toLocaleString() + " points over the " + dealtPts.toLocaleString() + " dealt"
+          : "Missing " + Math.abs(off).toLocaleString() + " points against the " + dealtPts.toLocaleString() + " dealt") + " — recount before paying out.";
+      })(),
+      tallyInk: r && s.ends.reduce((a, b) => a + b, 0) === r.val * s.players ? "#8ea79a" : "#ff9783",
+      tallyFigure: r ? (s.buyIn * s.players / s.pointsPerUnit).toFixed(2) + " units in play" : "",
+
+      loginOpen: !s.authed,
+      email: s.email, pass: s.pass,
+      setEmail: e => this.setState({ email: e.target.value }),
+      setPass: e => this.setState({ pass: e.target.value }),
+      signIn: () => this.setState({ authed: true }),
+      signOut: () => this.setState({ authed: false, gamesOpen: false }),
+      gamesOpen: s.gamesOpen,
+      toggleGames: () => this.setState(p => ({ gamesOpen: !p.gamesOpen })),
+      gamesChevron: s.gamesOpen ? "×" : "♠",
+      gamesBorder: s.gamesOpen ? "#c9a75c" : "rgba(240,239,233,.22)",
+      gamesInk: s.gamesOpen ? "#e8cf8a" : "#f0efe9",
+      gamesCount: "Last 3 of " + s.gamesTotal,
+      games: [
+        { date: "Fri 21 Aug", detail: "6 players · 20 units in · 1,900 pts dealt", net: "+2.00", ink: "#7fd6a5", onLoad: () => this.loadGame(6, 2000) },
+        { date: "Sat 15 Aug", detail: "5 players · 10 units in · 1,000 pts dealt", net: "−0.60", ink: "#adc2b6", onLoad: () => this.loadGame(5, 1000) },
+        { date: "Fri 8 Aug", detail: "8 players · 30 units in · 2,940 pts dealt", net: "+3.20", ink: "#7fd6a5", onLoad: () => this.loadGame(8, 3000) }
+      ],
+      profileStats: [
+        { value: "1,240", label: "Total XP", bg: "#1d4433", ink: "#f0efe9" },
+        { value: "7", label: "Day streak", bg: "#0b1210", ink: "#e8cf8a" },
+        { value: "78%", label: "Accuracy", bg: "#16261e", ink: "#f0efe9" },
+        { value: String(s.gamesTotal), label: "Games set up", bg: "#16261e", ink: "#f0efe9" }
+      ],
+      mastery: [
+        { name: "Hand ranks", pct: "100%", fill: "#57b183" },
+        { name: "Position", pct: "50%", fill: "#57b183" },
+        { name: "Pot odds", pct: "15%", fill: "#57b183" },
+        { name: "Bet sizing", pct: "0%", fill: "#57b183" }
+      ]
+    };
+  }
+}
+
+</script>
+</body>
+</html>
