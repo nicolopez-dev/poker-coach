@@ -1,0 +1,56 @@
+# Poker Coach — working notes
+
+Expo SDK 57 / React Native 0.86 app built from a Claude Design handoff. Read
+[README.md](README.md) first for what the product is and how to run it.
+
+## The design handoff is the spec
+
+`docs/design-handoff/` is the delivered bundle — **treat it as read-only**. When a screen needs
+changing, check `docs/design-handoff/README.md` first: it carries the exact colours, type scale,
+radii, spacing, motion timings and copy, and `screens/*.png` are 2× captures to compare against.
+`Poker Coach v3 felt.dc.html` is the design to implement; v1/v2 and `support.js` are context only
+and must not be ported.
+
+Every value in `src/theme/tokens.ts` comes from that README. Add new design values there rather
+than inline, and keep the names the handoff uses (`reward`, `gold hairline`, `felt`, `surface`).
+
+## Conventions
+
+- **Colour semantics matter.** Red is only for the chip action, hearts, the "Playing" badge and
+  chip-tool focus rings. "Good" states are near-black + white text + a 1px gold hairline
+  (`GoldFrame`), never green fills. Green is felt/surfaces and thin progress fills.
+- **Suit pips render in the platform font** via `<Suit>` — Archivo ships no card glyphs, and a
+  missing glyph in a named family is tofu on Android.
+- **Letter spacing** is in em in CSS and points in RN: use `ls(fontSize, em)`.
+- Shared primitives live in `src/components/ui.tsx`; screens keep their own `StyleSheet`.
+
+## React Native gotchas hit here
+
+- Use `boxShadow: '0 1px 2px rgba(0,0,0,.45)'` (the CSS string from the handoff), not the
+  deprecated `shadow*` props.
+- `pointerEvents` goes in `style`, not as a prop.
+- `StyleSheet.absoluteFillObject` is gone from the RN 0.86 types — use `absoluteFill` from
+  `src/theme/tokens.ts` when spreading into a style object.
+- `Animated.interpolate` needs an ascending `inputRange`; reverse an animation by swapping the
+  **outputRange** (see `Tilt`).
+- Animation is the built-in `Animated` API on purpose — it needs no babel plugin and works on web.
+  Loops pass `useNativeDriver: Platform.OS !== 'web'`.
+
+## Before finishing a change
+
+```bash
+npm run typecheck
+```
+
+```bash
+npm test
+```
+
+The tests cover the chip solver and the Balance maths — the two things that must not drift from
+the handoff. Keep them passing when touching `src/lib/`.
+
+## Editing files on Windows
+
+Do not pipe source files through PowerShell `Get-Content` / `Set-Content` to do bulk edits: the
+default encodings mangle the em dashes and suit glyphs that are all over this codebase. Use the
+editing tools.
