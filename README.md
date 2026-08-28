@@ -56,16 +56,34 @@ App.tsx                  root: fonts, felt, tabs, header, overlays
 src/
   theme/tokens.ts        colours, type scale, radii, shadows, motion constants
   state/store.tsx        the whole app state as one reducer
+  content/
+    course.ts            the course — chapters and lessons
+    types.ts             Question, DrillLesson, TableLesson, Chapter
+    progress.ts          chapter states and where to pick up, derived
   lib/
     chips.ts             chip-fitting solver (greedy + exact DP fallback)
     balance.ts           point-to-unit conversion and the tally
     color.ts             chip luminance, dash and ink
     names.ts             seat-name initials rule
-  data/                  questions, course units, chip case, sample profile
-  components/            felt, gold frame, chip, court card, header, tab bar, motion
+  data/                  chip case defaults, sample profile
+  components/            felt, gold frame, chip, ace card, header, tab bar, motion
   screens/               Login, Home, Path, Drill, Chips (+ Result, Balance), You
 docs/design-handoff/     the design bundle — read-only reference
+docs/authoring-lessons.md  how to add chapters and lessons
 ```
+
+## Adding lessons
+
+The learning side is the point of the app, so all content lives in
+[`src/content/course.ts`](src/content/course.ts) — add chapters and lessons there and the Path
+rows, the Home CTA, the drill and the mastery bars follow. Progress is derived from the lesson
+ids the player has finished, and a chapter with no lessons written yet reads as locked, so the
+whole syllabus can be sketched up front. See
+[docs/authoring-lessons.md](docs/authoring-lessons.md).
+
+Two lesson kinds exist. `drill` — multiple-choice questions — is what ships. `table`, beating a
+table of AI players, is future scope: the type, the course and the launcher already handle it,
+and anything that isn't a drill opens a placeholder until that screen is built.
 
 ### The algorithms
 
@@ -82,14 +100,28 @@ Both are ported closely from the prototype and covered by tests:
 
 Carried over from the handoff's own open items:
 
-- Lessons content is three questions in one unit; the other four units are placeholders.
-- Streak, XP, accuracy, the week chart, mastery percentages and the games list are sample data.
-  Nothing persists between launches.
+- Content is one lesson of three questions, in Position. The other four chapters are sketched
+  and read as locked until lessons are written for them.
+- Table lessons against AI players are modelled but not built.
+- Streak, XP, accuracy, the week chart and the games list are sample data.
+  Nothing persists between launches, progress included.
 - Setting up a game does not append to "Your games".
 - Seat names live only in the Balance rows.
 - No sign-up, password reset, or real Google OAuth — every login button authenticates.
 
-## Deviations from the prototype
+## Deviations from the handoff
+
+- **Background cards are always aces**, on every tab and on login, rather than the handoff's
+  per-tab court ranks.
+- **"Deal the stacks" is carmesí** (`#dc143c`) rather than the handoff's `#ff563c`, which is
+  still the colour of hearts, the "Playing" badge and the chip tool's focus rings.
+- **The Path derives its states from real progress**, so chapters without lessons read as locked
+  instead of the handoff's fixed sample states.
+- **The solver retries for full spread.** Where the prototype could silently deal zero of a
+  colour, a fit that leaves one out is retried with one of every denomination reserved, and any
+  colour that still can't be dealt is named on the result card.
+
+### React Native equivalents
 
 - **Colour picker** — the web prototype opens the OS `input[type=color]`. React Native has no
   equivalent, so tapping a chip's colour well opens a sheet of the case's own swatches.

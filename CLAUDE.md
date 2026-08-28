@@ -14,6 +14,21 @@ and must not be ported.
 Every value in `src/theme/tokens.ts` comes from that README. Add new design values there rather
 than inline, and keep the names the handoff uses (`reward`, `gold hairline`, `felt`, `surface`).
 
+The design has since been taken further in a few places — always aces in the background, a
+carmesí "Deal the stacks", and a Path driven by real progress. Those are listed under
+"Deviations from the handoff" in the README; keep that list current when the design and the app
+part ways again.
+
+## Content
+
+Lessons are the product. Content lives in `src/content/course.ts` and nothing else should hold
+course data — the screens derive everything from it through `src/content/progress.ts`.
+`docs/authoring-lessons.md` is the guide for adding chapters and lessons, so keep it accurate
+when the content model changes.
+
+`Lesson` is a union: `drill` today, `table` (beating a table of AI players) reserved for later.
+Anything switching on `lesson.kind` must stay total over both.
+
 ## Conventions
 
 - **Colour semantics matter.** Red is only for the chip action, hearts, the "Playing" badge and
