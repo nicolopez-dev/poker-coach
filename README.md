@@ -117,6 +117,10 @@ Carried over from the handoff's own open items:
   still the colour of hearts, the "Playing" badge and the chip tool's focus rings.
 - **The Path derives its states from real progress**, so chapters without lessons read as locked
   instead of the handoff's fixed sample states.
+- **The Path carries fourteen units, not the handoff's five.** The syllabus runs from never having
+  played to river combinatorics, so the row titles and one-liners are the course's rather than the
+  handoff's sample copy. The tiers and the format are set out at the top of
+  [`src/content/course.ts`](src/content/course.ts).
 - **The solver retries for full spread.** Where the prototype could silently deal zero of a
   colour, a fit that leaves one out is retried with one of every denomination reserved, and any
   colour that still can't be dealt is named on the result card.
