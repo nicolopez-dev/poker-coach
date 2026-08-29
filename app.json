@@ -9,9 +9,11 @@
     "userInterfaceStyle": "dark",
     "backgroundColor": "#080d0a",
     "ios": {
+      "bundleIdentifier": "app.pokercoach.mobile",
       "supportsTablet": true
     },
     "android": {
+      "package": "app.pokercoach.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#0b1610",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -28,3 +30,4 @@
     ]
   }
 }
+

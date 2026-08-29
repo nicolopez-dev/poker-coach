@@ -32,6 +32,8 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env.admin
+.env
 
 # typescript
 *.tsbuildinfo
@@ -42,3 +44,12 @@ yarn-error.*
 
 # local tool settings
 .claude/settings.local.json
+
+# OAuth docs
+OAauth-docs/Clients/Android client - client_secret_9731935605-htm1ahojavpcjlssim7ieih3jeaatnv6.apps.googleusercontent.com.json
+OAauth-docs/Clients/Android client.png
+OAauth-docs/Clients/iOS client - client_9731935605-2hsh259h7an19o399totnerhp6ufv7ct.apps.googleusercontent.com.plist
+OAauth-docs/Clients/iOS client.png
+OAauth-docs/Clients/Web client - client_secret_9731935605-jtv027lpl262b1tu454t0ibror4cjier.apps.googleusercontent.com.json
+OAauth-docs/Clients/Web client.png
+resend/sending-permission.png
