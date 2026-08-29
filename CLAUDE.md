@@ -26,6 +26,12 @@ course data — the screens derive everything from it through `src/content/progr
 `docs/authoring-lessons.md` is the guide for adding chapters and lessons, so keep it accurate
 when the content model changes.
 
+The course is fourteen units of ten lessons, all of it six-handed no-limit hold'em at €1/€2 with
+€200 stacks. **Never write a number into a lesson that isn't computed in `src/lib/holdem.ts` and
+asserted in `holdem.test.ts`** — a remembered equity is how the app stops being trustworthy.
+`src/content/course.test.ts` fails the build on a card dealt twice, a partial or oversized card
+fan, or a lesson with the wrong number of questions for its tier.
+
 `Lesson` is a union: `drill` today, `table` (beating a table of AI players) reserved for later.
 Anything switching on `lesson.kind` must stay total over both.
 
