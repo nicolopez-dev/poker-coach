@@ -4,10 +4,12 @@
  */
 import { colors } from '../theme/tokens';
 
+/**
+ * The name, the avatar and the subtitle are real now — they come from `profiles`
+ * through the store. What is left here is the games count, which stays sample data
+ * until games are recorded for real (P18).
+ */
 export const PROFILE = {
-  initials: 'MR',
-  name: 'Marta R.',
-  subtitle: 'Level 4 · Friday-night regular',
   gamesTotal: 11,
 } as const;
 

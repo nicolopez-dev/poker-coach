@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useMemo, useReducer } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
 
+import { useAuth } from '../auth/AuthProvider';
 import { COURSE, SEED_COMPLETED } from '../content/course';
 import {
   courseProgress,
@@ -25,13 +26,14 @@ import { POINTS_PER_UNIT } from '../lib/balance';
 import { deal, type ChipColor, type DealResult } from '../lib/chips';
 import { clamp, digits } from '../lib/num';
 import { NAME_MAX_LENGTH } from '../lib/names';
+import { fetchProfile, type Profile } from '../server/profile';
 
 export type Tab = 'home' | 'path' | 'chips' | 'you';
 
 export type State = {
-  authed: boolean;
-  email: string;
-  pass: string;
+  /** the player's own profile, hydrated from the server on sign-in */
+  displayName: string | null;
+  avatarId: string | null;
 
   tab: Tab;
 
@@ -68,14 +70,14 @@ export type State = {
   editingName: number | null;
 
   gamesOpen: boolean;
+
+  /** the verify-email strip is dismissible for the session; `reset` brings it back */
+  verifyDismissed: boolean;
 };
 
-export const MAX_HEARTS = 5;
-
 const initialState: State = {
-  authed: false,
-  email: '',
-  pass: '',
+  displayName: null,
+  avatarId: null,
 
   tab: 'home',
 
@@ -103,13 +105,13 @@ const initialState: State = {
   editingName: null,
 
   gamesOpen: false,
+
+  verifyDismissed: false,
 };
 
 type Action =
-  | { type: 'signIn' }
-  | { type: 'signOut' }
-  | { type: 'setEmail'; value: string }
-  | { type: 'setPass'; value: string }
+  | { type: 'reset' }
+  | { type: 'setProfile'; profile: Profile }
   | { type: 'go'; tab: Tab }
   | { type: 'startLesson'; ref: LessonRef | undefined }
   | { type: 'closeDrill' }
@@ -126,6 +128,7 @@ type Action =
   | { type: 'setName'; index: number; value: string }
   | { type: 'setEditingName'; index: number | null }
   | { type: 'toggleGames' }
+  | { type: 'dismissVerify' }
   | { type: 'loadGame'; players: number; buyIn: number };
 
 /** Any edit to the case invalidates the deal — the user has to deal again. */
@@ -139,14 +142,15 @@ function activeQuestions(state: State): Question[] {
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case 'signIn':
-      return { ...state, authed: true };
-    case 'signOut':
-      return { ...state, authed: false, gamesOpen: false };
-    case 'setEmail':
-      return { ...state, email: action.value };
-    case 'setPass':
-      return { ...state, pass: action.value };
+    case 'reset':
+      return initialState;
+
+    case 'setProfile':
+      return {
+        ...state,
+        displayName: action.profile.displayName,
+        avatarId: action.profile.avatarId,
+      };
 
     case 'go':
       return { ...state, tab: action.tab };
@@ -279,6 +283,9 @@ function reducer(state: State, action: Action): State {
     case 'toggleGames':
       return { ...state, gamesOpen: !state.gamesOpen };
 
+    case 'dismissVerify':
+      return { ...state, verifyDismissed: true };
+
     case 'loadGame':
       return {
         ...state,
@@ -295,10 +302,6 @@ function reducer(state: State, action: Action): State {
 }
 
 export type Store = State & {
-  signIn: () => void;
-  signOut: () => void;
-  setEmail: (value: string) => void;
-  setPass: (value: string) => void;
   go: (tab: Tab) => void;
   /** open a specific lesson */
   startLesson: (ref: LessonRef | undefined) => void;
@@ -321,6 +324,9 @@ export type Store = State & {
   setName: (index: number, value: string) => void;
   setEditingName: (index: number | null) => void;
   toggleGames: () => void;
+  dismissVerify: () => void;
+  /** local echo of a saved profile; the write itself goes through set_profile */
+  setProfile: (profile: Profile) => void;
   loadGame: (players: number, buyIn: number) => void;
 };
 
@@ -328,14 +334,34 @@ const StoreContext = createContext<Store | null>(null);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const { status } = useAuth();
+
+  // Signing out clears the store, and so does a session expiring underneath us — one
+  // player's hearts and streak must never be the next one's. Resetting to the initial
+  // state is idempotent, so a cold start that is already signed out costs nothing.
+  useEffect(() => {
+    if (status === 'signedOut') dispatch({ type: 'reset' });
+  }, [status]);
+
+  // The profile is the first thing hydrated from the server. A cancelled flag rather
+  // than a bare promise, so signing out mid-flight cannot land the old player's name
+  // in the store the new one is looking at.
+  useEffect(() => {
+    if (status !== 'signedIn') return;
+    let live = true;
+
+    fetchProfile().then((profile) => {
+      if (live && profile) dispatch({ type: 'setProfile', profile });
+    });
+
+    return () => {
+      live = false;
+    };
+  }, [status]);
 
   const value = useMemo<Store>(
     () => ({
       ...state,
-      signIn: () => dispatch({ type: 'signIn' }),
-      signOut: () => dispatch({ type: 'signOut' }),
-      setEmail: (value) => dispatch({ type: 'setEmail', value }),
-      setPass: (value) => dispatch({ type: 'setPass', value }),
       go: (tab) => dispatch({ type: 'go', tab }),
       startLesson: (ref) => dispatch({ type: 'startLesson', ref }),
       startNextLesson: () =>
@@ -365,6 +391,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setName: (index, value) => dispatch({ type: 'setName', index, value }),
       setEditingName: (index) => dispatch({ type: 'setEditingName', index }),
       toggleGames: () => dispatch({ type: 'toggleGames' }),
+      dismissVerify: () => dispatch({ type: 'dismissVerify' }),
+      setProfile: (profile) => dispatch({ type: 'setProfile', profile }),
       loadGame: (players, buyIn) => dispatch({ type: 'loadGame', players, buyIn }),
     }),
     [state],

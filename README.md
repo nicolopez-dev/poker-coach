@@ -48,6 +48,15 @@ tablets and desktop.
 | `npm start` | Expo dev server (pick a target) |
 | `npm test` | Jest — the chip solver and Balance maths |
 | `npm run typecheck` | `tsc --noEmit` |
+| `npm run sync:content` | Regenerates the server's answer key from `src/content/course.ts` |
+| `npm run env:local` | Points the app at the local Supabase stack (writes `.env.local`) |
+| `npm run env:hosted` | Removes `.env.local`, back to the project in `.env` |
+| `npx supabase db reset` | Rebuilds the local database from `supabase/migrations/` |
+| `npx supabase test db` | pgTAP — the row level security rules |
+
+The two Supabase commands need Docker running and `npx supabase start` done once. `db reset`
+drops and replays every migration, so it is the way to check a migration actually applies;
+`test db` runs `supabase/tests/*.sql` against the result.
 
 ## Layout
 
@@ -107,7 +116,95 @@ Carried over from the handoff's own open items:
   Nothing persists between launches, progress included.
 - Setting up a game does not append to "Your games".
 - Seat names live only in the Balance rows.
-- No sign-up, password reset, or real Google OAuth — every login button authenticates.
+- Apple sign-in is not wired yet, and profile setup is a placeholder.
+
+## Running against the local stack
+
+`.env` points at the hosted project, so a plain `npm run web` talks to production. To work
+against the local Supabase stack instead — Docker running first:
+
+```bash
+npx supabase start
+```
+
+```bash
+npm run env:local
+```
+
+Then `npm run web` (restart it if it was already running — `EXPO_PUBLIC_*` is inlined at
+build time). `npm run env:hosted` puts it back.
+
+Three things differ from the hosted project, on purpose:
+
+- **Email confirmation is off locally**, so sign-up returns a session immediately and lands on
+  profile setup. Hosted has it on, so sign-up ends at "Check your inbox".
+- **Sent mail goes to Mailpit**, not to a real inbox: <http://127.0.0.1:54324>. That is where
+  the reset link is during local testing.
+- **No leaked-password check locally** — see [Passwords](#passwords).
+
+Google sign-in works in neither: it is a native module, so it needs a dev build
+(`npx expo prebuild` and `npm run android` / `npm run ios`).
+
+## Accounts
+
+Email and password, password reset, and Google are wired against Supabase; see
+[`docs/accounts-plan.md`](docs/accounts-plan.md) for the whole design.
+
+**Google uses the native ID-token flow**, not a browser redirect: Google's own sheet returns a
+signed ID token and Supabase verifies it against Google's keys, so no web view and no redirect
+sit in the middle. That makes it a native module — **Google sign-in cannot run in Expo Go or on
+web**, only in a custom dev build (`npx expo prebuild` then `npm run android` / `npm run ios`).
+The button is present on web and reports that it is unavailable rather than crashing.
+
+Three OAuth clients exist (web, iOS, Android) but the app only ever sends the **web** client id
+as `webClientId` — that is the audience Supabase checks the token against. The iOS client id is
+passed too, because Google needs it to mint the token on that platform; Android is matched by
+package name and signing certificate instead, so it needs no id in the app. Client ids are
+public and live in `.env`; the web client **secret** belongs only in the Supabase dashboard.
+
+### Passwords
+
+**Ten characters, and nothing else — with leaked-password protection doing the real
+work.** Character-class rules were tried and dropped: they wave through `Password1!`,
+which satisfies all four classes and sits near the top of every breach list, while
+blocking the long passphrases that are actually strong. Supabase checks each candidate
+against Have I Been Pwned instead, so the passwords that get accounts taken are the ones
+refused.
+
+The split matters for error handling. Length is checked in
+[`src/auth/password.ts`](src/auth/password.ts) before the network, so it is answered
+while the player is still typing. The breach check can only happen server-side, and
+comes back as `weak_password` with `reasons: ['pwned']` — which is why
+[`src/auth/errors.ts`](src/auth/errors.ts) reads those reasons rather than the error code
+alone. Reading the code alone is what once reported a fourteen-character password as too
+short.
+
+Two settings hold this up, and only one of them lives in this repo:
+
+| Where | Setting | Value |
+| --- | --- | --- |
+| `supabase/config.toml` | `minimum_password_length` | `10` |
+| `supabase/config.toml` | `password_requirements` | `""` (empty — length only) |
+| Dashboard → Authentication → Sign In / Providers | Minimum password length | `10` |
+| Dashboard → Authentication → Sign In / Providers | Password Requirements | *No required characters* |
+| Dashboard → Authentication → Sign In / Providers | Prevent use of leaked passwords | **on** |
+
+The leaked-password check has no `config.toml` key, so **the local stack accepts breached
+passwords the hosted project refuses** — the one place local is deliberately laxer than
+production. Do not "fix" it by adding a character rule locally.
+
+### Account linking
+
+**A Google sign-in joins an existing password account only when both sides have a verified
+email.** Supabase links identities that share a confirmed address; where the existing account's
+address was never confirmed, it stays a separate user rather than being absorbed — otherwise
+anyone able to register an unconfirmed address could later claim it by signing in with Google.
+
+This is Supabase's default and it is the behaviour we want, but it is **dashboard state, not
+something this repo can pin**: check Authentication → Providers → Google, and Authentication →
+Sign In / Providers, on the hosted project before release. `supabase/config.toml` sets
+`enable_manual_linking = false` for the local stack, which is a different setting — it governs
+`linkIdentity()` calls, not automatic linking by email.
 
 ## Deviations from the handoff
 

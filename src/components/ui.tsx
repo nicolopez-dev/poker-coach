@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef, useState } from 'react';
 import {
   Pressable,
   StyleProp,
@@ -11,10 +11,10 @@ import {
   ViewStyle,
 } from 'react-native';
 
+import { MAX_HEARTS } from '../lib/hearts';
 import { colors, font, ls, radius, shadows, TOUCH } from '../theme/tokens';
 import { Glow } from './anim';
 import { GoldFrame } from './Gold';
-import { MAX_HEARTS } from '../state/store';
 
 /**
  * Suit pips render in the platform font: Archivo ships no card glyphs, and a
@@ -43,6 +43,36 @@ export function Suit({
     </Text>
   );
 }
+
+/**
+ * The field the auth screens are built from — one border, one focus ring, one place to
+ * change either. It owns its focus state so callers only pass what they actually differ
+ * on; anything a `TextInput` takes passes straight through.
+ */
+export const AuthField = forwardRef<TextInput, TextInputProps>(function AuthField(
+  { onFocus, onBlur, style, ...rest },
+  ref,
+) {
+  const [focused, setFocused] = useState(false);
+
+  return (
+    <TextInput
+      ref={ref}
+      placeholderTextColor={colors.textFaint}
+      selectionColor={colors.gold}
+      {...rest}
+      onFocus={(event) => {
+        setFocused(true);
+        onFocus?.(event);
+      }}
+      onBlur={(event) => {
+        setFocused(false);
+        onBlur?.(event);
+      }}
+      style={[styles.authField, focused && styles.authFieldFocused, style]}
+    />
+  );
+});
 
 /** The ♠ mark plus wordmark, used in the header and on the login screen. */
 export function Brand() {
@@ -145,6 +175,7 @@ export function RewardButton({
   circleSize = 38,
   glow = false,
   glyphColor = colors.textOnReward,
+  disabled = false,
   style,
 }: {
   label: string;
@@ -154,10 +185,17 @@ export function RewardButton({
   circleSize?: number;
   glow?: boolean;
   glyphColor?: string;
+  /** dims the pill and stops the press — used while a form is in flight */
+  disabled?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   const button = (
-    <Pressable onPress={onPress} accessibilityRole="button" style={pressable()}>
+    <Pressable
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      style={pressable(disabled ? styles.ctaDisabled : undefined)}>
       <GoldFrame radius={radius.pill} fill={colors.rewardAlt}>
         <View style={[styles.ctaInner, { minHeight: height - 2 }]}>
           <Text style={styles.ctaLabel}>{label}</Text>
@@ -388,6 +426,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  /** In flight: dim the whole pill, gold hairline included, and keep it in place. */
+  ctaDisabled: { opacity: 0.55 },
+  /** Lifted from the login screen so sign-up cannot drift away from it. */
+  authField: {
+    minHeight: 50,
+    borderRadius: radius.loginInput,
+    borderWidth: 1,
+    borderColor: 'rgba(240,239,233,.14)',
+    backgroundColor: colors.surfaceInputAlt,
+    paddingVertical: 6,
+    paddingHorizontal: 15,
+    fontFamily: font.regular,
+    fontSize: 14,
+    color: colors.text,
+  },
+  authFieldFocused: { borderColor: colors.goldRule },
   redButton: {
     minHeight: 58,
     flexDirection: 'row',

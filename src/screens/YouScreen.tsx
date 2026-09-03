@@ -1,17 +1,30 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useAuth } from '../auth/AuthProvider';
 import { Rise } from '../components/anim';
+import { Avatar } from '../components/Avatar';
 import { TabScreen } from '../components/TabScreen';
 import { OutlineButton, ProgressBar } from '../components/ui';
+import { currentChapter } from '../content/progress';
 import { GAMES, PROFILE } from '../data/profile';
 import { fmt } from '../lib/balance';
 import { useProgress, useStore } from '../state/store';
 import { colors, font, ls, radius, shadows } from '../theme/tokens';
 
 export function YouScreen() {
-  const { xp, streak, gamesOpen, toggleGames, loadGame, signOut } = useStore();
+  const { xp, streak, gamesOpen, toggleGames, loadGame, displayName, avatarId } = useStore();
+  const { signOut, goTo } = useAuth();
   const progress = useProgress();
+
+  // "Unit 3 · 7-day streak" — the same unit the Path and Home headers name, and the
+  // streak the header pill shows, rather than the handoff's invented "Friday-night
+  // regular". A run of nothing says so instead of reading "0-day streak".
+  const unit = currentChapter(progress);
+  const subtitle = [
+    unit ? `Unit ${unit.index + 1}` : 'Yet to sit down',
+    streak > 0 ? `${streak}-day streak` : 'No streak yet',
+  ].join(' · ');
 
   const stats = [
     { value: fmt(xp), label: 'Total XP', bg: colors.greenDeep, ink: colors.text },
@@ -23,12 +36,18 @@ export function YouScreen() {
   return (
     <TabScreen>
       <View style={styles.profile}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarLabel}>{PROFILE.initials}</Text>
-        </View>
-        <View>
-          <Text style={styles.name}>{PROFILE.name}</Text>
-          <Text style={styles.subtitle}>{PROFILE.subtitle}</Text>
+        <Avatar avatarId={avatarId} name={displayName} size={60} />
+        <View style={styles.identity}>
+          <Text style={styles.name} numberOfLines={1}>
+            {displayName ?? 'Your seat'}
+          </Text>
+          <Text style={styles.subtitle}>{subtitle}</Text>
+          <Pressable
+            onPress={() => goTo('profileSetup')}
+            accessibilityRole="button"
+            style={styles.edit}>
+            <Text style={styles.editLabel}>Edit profile</Text>
+          </Pressable>
         </View>
       </View>
 
@@ -96,7 +115,8 @@ export function YouScreen() {
         </Rise>
       )}
 
-      <Pressable onPress={signOut} accessibilityRole="button" style={styles.logout}>
+      {/* wrapped, not passed by reference: the press event is not a sign-out scope */}
+      <Pressable onPress={() => signOut()} accessibilityRole="button" style={styles.logout}>
         <Text style={styles.logoutLabel}>Log out</Text>
       </Pressable>
       <View style={{ height: 20 }} />
@@ -114,15 +134,15 @@ const styles = StyleSheet.create({
     gap: 14,
     ...shadows.row,
   },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: colors.greenDeep,
-    alignItems: 'center',
-    justifyContent: 'center',
+  identity: { flex: 1, minWidth: 0 },
+  edit: { alignSelf: 'flex-start', paddingVertical: 6 },
+  editLabel: {
+    fontFamily: font.regular,
+    fontSize: 11,
+    lineHeight: 13,
+    color: colors.textMuted,
+    textDecorationLine: 'underline',
   },
-  avatarLabel: { fontFamily: font.bold, fontSize: 22, lineHeight: 26, color: colors.text },
   name: {
     fontFamily: font.bold,
     fontSize: 23,
