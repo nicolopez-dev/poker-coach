@@ -159,7 +159,14 @@ site_url = "http://127.0.0.1:3000"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+# The app's own scheme has to be here or GoTrue drops it and sends confirmation and
+# recovery links to site_url instead — which is what made the P8 reset link come back
+# pointing at 127.0.0.1:3000. localhost:8081 is where `npm run web` serves.
+additional_redirect_urls = [
+  "https://127.0.0.1:3000",
+  "pokercoach://auth-callback",
+  "http://localhost:8081"
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -178,9 +185,18 @@ enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
 enable_manual_linking = false
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
-minimum_password_length = 6
+# Matches the hosted project (docs/phase-0-setup.md) and MIN_PASSWORD in SignUpScreen.tsx.
+minimum_password_length = 10
 # Passwords that do not meet the following requirements will be rejected as weak. Supported values
 # are: `letters_digits`, `lower_upper_letters_digits`, `lower_upper_letters_digits_symbols`
+#
+# Deliberately empty: length is the only rule, and the hosted project checks candidates
+# against Have I Been Pwned instead. Character classes push people towards `Password1!`,
+# which passes all four and is one of the most breached strings there is.
+#
+# The HIBP check has no key here — it is dashboard state (Authentication → Sign In /
+# Providers → "Prevent use of leaked passwords"), so local accepts breached passwords
+# that the real project refuses. Keep PASSWORD_RULE in src/auth/password.ts in step.
 password_requirements = ""
 
 # Configure passkey sign-ins.

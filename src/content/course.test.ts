@@ -11,6 +11,8 @@
  * the question rather than just the number that came out wrong.
  */
 import { COURSE } from './course';
+import manifest from './content-hash.json';
+import { answerKey, manifestHash } from './manifest';
 import { isDrill } from './progress';
 import type { DrillLesson, Question } from './types';
 import { RANKS, SUITS, toCard } from '../lib/holdem';
@@ -130,5 +132,36 @@ describe('the cards on screen', () => {
       if (!question.cards) continue;
       expect(tag(at, Boolean(question.cardsLabel?.trim()))).toBe(tag(at, true));
     }
+  });
+});
+
+describe('the answer key mirror', () => {
+  /**
+   * `content_questions` is what the server marks answers against (§5). If a lesson is
+   * edited and the mirror is not re-synced, `submit_answer` keeps grading against the
+   * old key — silently, and only for real users. So the build fails instead.
+   */
+  const STALE = 'the answer key has changed — run `npm run sync:content`';
+
+  it('matches the manifest the server was last synced to', () => {
+    const rows = answerKey(COURSE);
+    expect(tag(STALE, rows.length)).toBe(tag(STALE, manifest.questions));
+    expect(tag(STALE, manifestHash(rows))).toBe(tag(STALE, manifest.hash));
+  });
+
+  it('carries one row per drill question, and none for a table lesson', () => {
+    expect(answerKey(COURSE)).toHaveLength(questions.length);
+  });
+
+  it('names an option the question actually offers', () => {
+    for (const row of answerKey(COURSE)) {
+      const at = `${row.lesson_id} #${row.question_index + 1}`;
+      expect(tag(at, row.option_ids.includes(row.correct_option_id))).toBe(tag(at, true));
+    }
+  });
+
+  it("is keyed uniquely, as the table's primary key requires", () => {
+    const keys = answerKey(COURSE).map((row) => `${row.lesson_id}#${row.question_index}`);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });

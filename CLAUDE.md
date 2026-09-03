@@ -26,6 +26,12 @@ course data — the screens derive everything from it through `src/content/progr
 `docs/authoring-lessons.md` is the guide for adding chapters and lessons, so keep it accurate
 when the content model changes.
 
+The server keeps its own copy of the answer key in `content_questions`, so `submit_answer`
+decides right or wrong rather than trusting the client. That table is a **generated mirror,
+never hand-edited** — `scripts/sync-content.ts` extracts it from `COURSE`. Editing a question
+means re-running `npm run sync:content`, and `course.test.ts` fails the build against
+`src/content/content-hash.json` until you do. See `docs/accounts-plan.md` §5.
+
 The course is fourteen units of ten lessons, all of it six-handed no-limit hold'em at €1/€2 with
 €200 stacks. **Never write a number into a lesson that isn't computed in `src/lib/holdem.ts` and
 asserted in `holdem.test.ts`** — a remembered equity is how the app stops being trustworthy.

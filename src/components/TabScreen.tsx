@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { spacing } from '../theme/tokens';
 import { BackgroundCards } from './BackgroundCards';
+import { useVerifyBanner } from './VerifyBanner';
 
 /**
  * One tab's pane: the parallax aces, then a scroller whose offset drives them.
@@ -19,6 +20,8 @@ export function TabScreen({
 }) {
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
+  // the verify strip sits under the header, so the pane has to start under it too
+  const banner = useVerifyBanner();
 
   return (
     <View style={styles.pane}>
@@ -32,7 +35,7 @@ export function TabScreen({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           {
-            paddingTop: spacing.screen.paddingTop + insets.top,
+            paddingTop: spacing.screen.paddingTop + insets.top + banner.height,
             paddingHorizontal: spacing.screen.paddingHorizontal,
             paddingBottom: spacing.screen.paddingBottom,
           },
