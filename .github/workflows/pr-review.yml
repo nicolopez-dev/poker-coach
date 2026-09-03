@@ -1,0 +1,104 @@
+# Runs the pr-review skill (.claude/skills/pr-review/) against every PR opened or
+# updated against main, and posts the result as a single PR comment — updated in place
+# on later pushes rather than piling up.
+#
+# Setup (one-time, by a repo admin): add ONE secret in
+# GitHub → Settings → Secrets and variables → Actions:
+#
+#   ANTHROPIC_API_KEY          a Claude API key from https://platform.claude.com, or
+#   CLAUDE_CODE_OAUTH_TOKEN    a subscription token from `claude setup-token` — swap the
+#                              `anthropic_api_key:` line below for
+#                              `claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`
+#
+# Nothing else to install: this uses the job's own automatic GITHUB_TOKEN to comment,
+# not the separate Claude GitHub App, so `contents` stays read-only throughout — see the
+# `permissions:` block on the review job.
+#
+# Two jobs on purpose. `verify` is a real, deterministic pass/fail — wire it into branch
+# protection as a required check if you want typecheck/tests to gate the merge button
+# regardless of what the AI review says. `review` always runs after it, even when verify
+# fails, so a failing PR still gets a comment explaining why rather than silence.
+#
+# Secrets aren't available to workflows triggered by a fork's pull request on a public
+# repo, so this only reviews PRs from branches in this repository.
+
+name: PR review
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+    branches: [main]
+
+concurrency:
+  group: pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      typecheck: ${{ steps.typecheck.outcome }}
+      test: ${{ steps.test.outcome }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        id: typecheck
+        run: npm run typecheck
+        continue-on-error: true
+
+      - name: Test
+        id: test
+        run: npm test
+        continue-on-error: true
+
+      # continue-on-error above lets both checks run and record their real outcome even
+      # when one fails; this step turns that outcome into the job's actual pass/fail.
+      - name: Fail the job if either check failed
+        if: steps.typecheck.outcome == 'failure' || steps.test.outcome == 'failure'
+        run: exit 1
+
+  review:
+    needs: verify
+    if: always() && needs.verify.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      # For npm audit / npm outdated to report real, installed versions rather than
+      # just what the lockfile claims.
+      - run: npm ci
+
+      - name: Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: >-
+            /pr-review ${{ github.event.pull_request.number }}
+            ${{ (needs.verify.outputs.typecheck == 'success' && needs.verify.outputs.test == 'success') && 'green' || 'red' }}
