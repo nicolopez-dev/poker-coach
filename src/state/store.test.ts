@@ -311,3 +311,49 @@ describe('finishing', () => {
     expect(state.drillDone).toBe(false);
   });
 });
+
+describe('opening a lesson', () => {
+  it('refuses at zero hearts, and shows the countdown instead', () => {
+    const empty = { ...initialState, hydrated: true, hearts: 0 };
+    const state = reducer(empty, { type: 'startLesson', ref: REF });
+
+    expect(state.outOfHearts).toBe(true);
+    expect(state.drillOpen).toBe(false);
+    // the lesson is not started, so it is not half-played either
+    expect(state.activeLesson).toBeNull();
+  });
+
+  it('opens on the last heart', () => {
+    const last = { ...initialState, hydrated: true, hearts: 1 };
+    const state = reducer(last, { type: 'startLesson', ref: REF });
+
+    expect(state.drillOpen).toBe(true);
+    expect(state.outOfHearts).toBe(false);
+  });
+
+  it('does not refuse on a zero it has not heard from the server yet', () => {
+    // the store starts on zero hearts; an unhydrated one is ignorance, not an empty pile
+    const state = reducer(initialState, { type: 'startLesson', ref: REF });
+
+    expect(state.drillOpen).toBe(true);
+    expect(state.outOfHearts).toBe(false);
+  });
+
+  it('closes the drill when the run ends, so the countdown can take the screen', () => {
+    const s = store();
+    s.dispatch({ type: 'outOfHearts' });
+
+    expect(s.state.drillOpen).toBe(false);
+    expect(s.state.outOfHearts).toBe(true);
+    expect(s.state.hearts).toBe(0);
+  });
+
+  it('leaves the out-of-hearts screen for Home', () => {
+    const s = store();
+    s.dispatch({ type: 'outOfHearts' });
+    s.dispatch({ type: 'dismissHearts' });
+
+    expect(s.state.outOfHearts).toBe(false);
+    expect(s.state.tab).toBe('home');
+  });
+});

@@ -17,10 +17,14 @@ export function Header({
   streak,
   hearts,
   pending = false,
+  nextHeartAt = null,
+  clockOffset = 0,
 }: {
   streak: number;
   hearts: number;
   pending?: boolean;
+  nextHeartAt?: string | null;
+  clockOffset?: number;
 }) {
   const insets = useSafeAreaInsets();
 
@@ -34,7 +38,12 @@ export function Header({
       <Brand />
       <View style={styles.right}>
         <StreakPill streak={streak} pending={pending} />
-        <HeartsPill hearts={hearts} pending={pending} />
+        <HeartsPill
+          hearts={hearts}
+          pending={pending}
+          nextHeartAt={nextHeartAt}
+          clockOffset={clockOffset}
+        />
       </View>
     </BlurView>
   );

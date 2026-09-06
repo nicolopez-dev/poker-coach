@@ -14,6 +14,7 @@ import { DrillOverlay } from './src/screens/DrillOverlay';
 import { ForgotScreen } from './src/screens/ForgotScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
+import { OutOfHeartsScreen } from './src/screens/OutOfHeartsScreen';
 import { PathScreen } from './src/screens/PathScreen';
 import { ProfileSetupScreen } from './src/screens/ProfileSetupScreen';
 import { ResetScreen } from './src/screens/ResetScreen';
@@ -53,7 +54,8 @@ function Gate() {
  * stacked on top. Panes unmount on tab change, which resets the parallax.
  */
 function Root({ signedIn }: { signedIn: boolean }) {
-  const { tab, drillOpen, streak, hearts, hydrated, go } = useStore();
+  const { tab, drillOpen, outOfHearts, streak, hearts, hydrated, nextHeartAt, clockOffset, go } =
+    useStore();
   const { screen } = useAuth();
 
   const gate = authScreenShowing(screen, signedIn);
@@ -66,9 +68,16 @@ function Root({ signedIn }: { signedIn: boolean }) {
       {tab === 'chips' && <ChipsScreen />}
       {tab === 'you' && <YouScreen />}
       <TabBar tab={tab} onSelect={go} />
-      <Header streak={streak} hearts={hearts} pending={!hydrated} />
+      <Header
+        streak={streak}
+        hearts={hearts}
+        pending={!hydrated}
+        nextHeartAt={nextHeartAt}
+        clockOffset={clockOffset}
+      />
       {signedIn && <VerifyBanner />}
       {drillOpen && <DrillOverlay />}
+      {outOfHearts && <OutOfHeartsScreen />}
       {gate && <AuthStack />}
     </View>
   );

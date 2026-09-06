@@ -173,6 +173,7 @@ type Action =
   | { type: 'setName'; index: number; value: string }
   | { type: 'setEditingName'; index: number | null }
   | { type: 'toggleGames' }
+  | { type: 'dismissHearts' }
   | { type: 'dismissVerify' }
   | { type: 'loadGame'; players: number; buyIn: number };
 
@@ -241,6 +242,10 @@ export function reducer(state: State, action: Action): State {
 
     case 'startLesson':
       if (!action.ref) return state;
+      // No heart, no hand. The lesson is left where it is — it is not started, so it is
+      // not half-finished either — and the countdown takes the screen instead. Only
+      // once the count is known: an unhydrated zero is ignorance, not an empty pile.
+      if (state.hydrated && state.hearts === 0) return { ...state, outOfHearts: true };
       return {
         ...state,
         activeLesson: action.ref,
@@ -291,9 +296,20 @@ export function reducer(state: State, action: Action): State {
       return { ...state, syncError: action.message };
 
     // No heart to spend: the drill ends here, the lesson is not completed, and it can be
-    // played again from the start once one returns.
+    // played again from the start once one returns. The overlay closes and the
+    // out-of-hearts screen takes over.
     case 'outOfHearts':
-      return { ...state, hearts: 0, outOfHearts: true, completing: false, drillDone: false };
+      return {
+        ...state,
+        hearts: 0,
+        outOfHearts: true,
+        drillOpen: false,
+        drillDone: false,
+        completing: false,
+      };
+
+    case 'dismissHearts':
+      return { ...state, outOfHearts: false, tab: 'home' };
 
     // Advancing only. The last question does not end the drill by itself any more — the
     // done card waits on `complete_lesson`, so that a lesson the server refused is never
@@ -430,6 +446,12 @@ export function reducer(state: State, action: Action): State {
 }
 
 export type Store = State & {
+  /**
+   * Whether a lesson can be opened at all. Not knowing yet counts as yes: an unhydrated
+   * zero must not lock the Path or turn the CTA into "Out of hearts" for a player who
+   * has five.
+   */
+  canPlay: boolean;
   go: (tab: Tab) => void;
   /** open a specific lesson */
   startLesson: (ref: LessonRef | undefined) => void;
@@ -452,6 +474,10 @@ export type Store = State & {
   setName: (index: number, value: string) => void;
   setEditingName: (index: number | null) => void;
   toggleGames: () => void;
+  /** leaves the out-of-hearts screen for Home */
+  dismissHearts: () => void;
+  /** asks the server for the state again — the countdown's end, and P15's foreground */
+  refresh: () => void;
   dismissVerify: () => void;
   /** local echo of a saved profile; the write itself goes through set_profile */
   setProfile: (profile: Profile) => void;
@@ -466,7 +492,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   // Hearts, streak, XP and the lessons behind them, from the cache and then the server.
   // Keyed on the user id so that signing in as someone else re-reads from scratch.
-  useHydrate(status === 'signedIn' ? (user?.id ?? null) : null, dispatch);
+  const refresh = useHydrate(status === 'signedIn' ? (user?.id ?? null) : null, dispatch);
 
   // Signing out clears the store, and so does a session expiring underneath us — one
   // player's hearts and streak must never be the next one's. Resetting to the initial
@@ -494,6 +520,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<Store>(
     () => ({
       ...state,
+      canPlay: !state.hydrated || state.hearts > 0,
       go: (tab) => dispatch({ type: 'go', tab }),
       startLesson: (ref) => {
         beginRun();
@@ -553,11 +580,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setName: (index, value) => dispatch({ type: 'setName', index, value }),
       setEditingName: (index) => dispatch({ type: 'setEditingName', index }),
       toggleGames: () => dispatch({ type: 'toggleGames' }),
+      dismissHearts: () => dispatch({ type: 'dismissHearts' }),
+      refresh,
       dismissVerify: () => dispatch({ type: 'dismissVerify' }),
       setProfile: (profile) => dispatch({ type: 'setProfile', profile }),
       loadGame: (players, buyIn) => dispatch({ type: 'loadGame', players, buyIn }),
     }),
-    [state],
+    [state, refresh],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

@@ -12,7 +12,7 @@ import { useProgress, useStore } from '../state/store';
 import { colors, font, ls, radius, shadows, type } from '../theme/tokens';
 
 export function HomeScreen() {
-  const { xp, players, buyIn, hydrated, startNextLesson, go } = useStore();
+  const { xp, players, buyIn, hydrated, canPlay, startNextLesson, go } = useStore();
   const progress = useProgress();
   // Until the server answers, the course reads as untouched — which for a returning
   // player is a lie about where they are. Withhold the unit rather than name the wrong
@@ -39,11 +39,20 @@ export function HomeScreen() {
         </RewardCard>
       </Rise>
 
+      {/* Out of hearts the CTA stays pressable — it is how you get to the countdown —
+          but it stops glowing and stops promising a lesson it cannot open. */}
       <RewardButton
-        label={chapter ? `Deal me in — ${chapter.chapter.title}` : 'Deal me in'}
-        glyph="♠"
+        label={
+          !canPlay
+            ? 'Out of hearts'
+            : chapter
+              ? `Deal me in — ${chapter.chapter.title}`
+              : 'Deal me in'
+        }
+        glyph={canPlay ? '♠' : '♥'}
+        glyphColor={canPlay ? colors.textOnReward : colors.red}
         onPress={startNextLesson}
-        glow
+        glow={canPlay}
         style={styles.cta}
       />
 

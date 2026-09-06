@@ -11,10 +11,11 @@ import {
   ViewStyle,
 } from 'react-native';
 
-import { MAX_HEARTS } from '../lib/hearts';
+import { MAX_HEARTS, formatCountdown } from '../lib/hearts';
 import { colors, font, ls, radius, shadows, TOUCH } from '../theme/tokens';
 import { Glow } from './anim';
 import { GoldFrame } from './Gold';
+import { useCountdown } from './useCountdown';
 
 /**
  * Suit pips render in the platform font: Archivo ships no card glyphs, and a
@@ -93,7 +94,25 @@ export function Brand() {
  */
 export const PENDING = '—';
 
-export function HeartsPill({ hearts, pending = false }: { hearts: number; pending?: boolean }) {
+/**
+ * The hearts, and how long until the next one. The countdown only appears below max —
+ * at full there is nothing to wait for — and it ticks inside this component, so the
+ * header counts down without re-rendering the screen behind it.
+ */
+export function HeartsPill({
+  hearts,
+  pending = false,
+  nextHeartAt = null,
+  clockOffset = 0,
+}: {
+  hearts: number;
+  pending?: boolean;
+  nextHeartAt?: string | null;
+  clockOffset?: number;
+}) {
+  const waiting = !pending && hearts < MAX_HEARTS ? nextHeartAt : null;
+  const remaining = useCountdown(waiting, clockOffset);
+
   return (
     <View style={styles.heartsPill}>
       {pending ? (
@@ -103,6 +122,9 @@ export function HeartsPill({ hearts, pending = false }: { hearts: number; pendin
           <Suit key={i} glyph="♥" size={11} color={i < hearts ? colors.red : colors.greenSpent} />
         ))
       )}
+      {waiting && remaining > 0 ? (
+        <Text style={styles.heartsCountdown}>{formatCountdown(remaining)}</Text>
+      ) : null}
     </View>
   );
 }
@@ -353,6 +375,16 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 9,
     alignItems: 'center',
+  },
+  /** the wait for the next heart, at the micro scale the header uses for labels */
+  heartsCountdown: {
+    fontFamily: font.regular,
+    fontSize: 9,
+    lineHeight: 11,
+    letterSpacing: ls(9, 0.06),
+    textTransform: 'uppercase',
+    color: colors.textMuted,
+    marginLeft: 4,
   },
   /** the placeholder mark, sized to the pips it stands in for */
   pendingMark: {

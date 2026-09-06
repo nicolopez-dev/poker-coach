@@ -11,7 +11,7 @@
  * clock forward does not conjure hearts (§3 rule 8).
  */
 
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import { getState, serverErrorMessage, type PlayerState } from './client';
 import { readCachedState, writeCachedState } from './stateCache';
@@ -31,45 +31,66 @@ export type HydrateAction =
 /**
  * `userId` is null whenever nobody is signed in; the effect then does nothing, and the
  * store's own sign-out reset is what clears the last player's numbers.
+ *
+ * Returns a way to ask again — used when a heart's countdown runs out, and by P15 on
+ * every foreground, since a streak goes stale across local midnight.
  */
-export function useHydrate(userId: string | null, dispatch: (action: HydrateAction) => void) {
+export function useHydrate(
+  userId: string | null,
+  dispatch: (action: HydrateAction) => void,
+): () => void {
+  // Whose store this is, right now. A reply that arrives after a sign-out, or after
+  // somebody else signed in, is dropped: one player's streak must never land in
+  // another's store.
+  const active = useRef(userId);
+  useEffect(() => {
+    active.current = userId;
+  }, [userId]);
+
+  // Whether the server has answered for this user yet. The cache is usually first, but
+  // a slow disk behind a fast network would otherwise let stale numbers overwrite fresh.
+  const served = useRef(false);
+
+  const sync = useCallback(async () => {
+    if (!userId) return;
+    dispatch({ type: 'syncStart' });
+
+    try {
+      const state = await getState();
+      if (active.current !== userId) return;
+      served.current = true;
+      dispatch({
+        type: 'hydrate',
+        state,
+        clockOffset: Date.parse(state.serverNow) - Date.now(),
+        source: 'server',
+      });
+      await writeCachedState(userId, state);
+    } catch (error: unknown) {
+      if (active.current === userId) {
+        dispatch({ type: 'syncFailed', message: serverErrorMessage(error) });
+      }
+    }
+  }, [userId, dispatch]);
+
   useEffect(() => {
     if (!userId) return;
-
-    // Two flags rather than one. `live` drops everything once the user changes or the
-    // provider unmounts — one player's streak must never land in another's store. The
-    // second is the race between the two reads: the cache is usually first, but a slow
-    // disk behind a fast network would otherwise let stale numbers overwrite fresh ones.
     let live = true;
-    let answered = false;
+    served.current = false;
 
     readCachedState(userId).then((cached) => {
-      if (!live || answered || !cached) return;
+      if (!live || served.current || !cached) return;
       // no clock offset from the cache: a stored one says nothing about the device's
       // clock now, and zero is the honest answer until the server gives a real one
       dispatch({ type: 'hydrate', state: cached, clockOffset: 0, source: 'cache' });
     });
 
-    dispatch({ type: 'syncStart' });
-
-    getState()
-      .then(async (state) => {
-        answered = true;
-        if (!live) return;
-        dispatch({
-          type: 'hydrate',
-          state,
-          clockOffset: Date.parse(state.serverNow) - Date.now(),
-          source: 'server',
-        });
-        await writeCachedState(userId, state);
-      })
-      .catch((error: unknown) => {
-        if (live) dispatch({ type: 'syncFailed', message: serverErrorMessage(error) });
-      });
+    void sync();
 
     return () => {
       live = false;
     };
-  }, [userId, dispatch]);
+  }, [userId, dispatch, sync]);
+
+  return sync;
 }

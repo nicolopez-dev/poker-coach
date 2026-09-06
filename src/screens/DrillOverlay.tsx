@@ -20,10 +20,11 @@ export function DrillOverlay() {
     chosen,
     hearts,
     hydrated,
+    nextHeartAt,
+    clockOffset,
     drillDone,
     completing,
     completionError,
-    outOfHearts,
     gained,
     pick,
     nextQuestion,
@@ -74,26 +75,17 @@ export function DrillOverlay() {
                 />
               ))}
             </View>
-            <HeartsPill hearts={hearts} pending={!hydrated} />
+            <HeartsPill
+              hearts={hearts}
+              pending={!hydrated}
+              nextHeartAt={nextHeartAt}
+              clockOffset={clockOffset}
+            />
           </View>
 
-          {outOfHearts ? (
-            /* P14 replaces this with OutOfHeartsScreen and its countdown to the next
-               heart; what matters here is that the drill stops rather than carrying on
-               against a server that has already refused the answer. */
-            <Pop duration={400} style={styles.done}>
-              <Suit glyph="♥" size={64} color={colors.red} style={{ marginBottom: 14 }} />
-              <Text style={styles.doneKicker}>Out of hearts</Text>
-              <Text style={[type.sectionHeading, { marginBottom: 10 }]}>
-                That was your last one.
-              </Text>
-              <Text style={styles.doneNote}>
-                Hearts come back one at a time. This lesson stays unfinished, so you can play
-                it from the top when the next one lands.
-              </Text>
-              <RewardButton label="Back to today" glyph="♠" onPress={closeDrill} />
-            </Pop>
-          ) : drillDone ? (
+          {/* Running out closes this overlay: `OutOfHeartsScreen` takes the screen from
+              App.tsx, so the drill never sits behind a state it cannot continue from. */}
+          {drillDone ? (
             <Pop duration={400} style={styles.done}>
               {completionError ? (
                 <>

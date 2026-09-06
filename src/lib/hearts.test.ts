@@ -12,7 +12,15 @@
  *   H6  a backdated `at` grants nothing and takes nothing away
  */
 
-import { MAX_HEARTS, OUT_OF_HEARTS, REGEN_MS, nextHeartAt, settle, spend } from './hearts';
+import {
+  MAX_HEARTS,
+  OUT_OF_HEARTS,
+  REGEN_MS,
+  formatCountdown,
+  nextHeartAt,
+  settle,
+  spend,
+} from './hearts';
 
 const T0 = new Date('2026-08-30T08:00:00.000Z');
 
@@ -100,5 +108,34 @@ describe('nextHeartAt', () => {
   it('counts from the remainder, not from now', () => {
     // an hour into the second interval, the next heart is three hours out
     expect(nextHeartAt({ hearts: 3, settledAt: T0 }, after(5))).toEqual(after(8));
+  });
+});
+
+describe('formatCountdown', () => {
+  const ms = (hours: number, minutes: number, seconds = 0) =>
+    ((hours * 60 + minutes) * 60 + seconds) * 1000;
+
+  it('shows hours and minutes while an hour or more is left', () => {
+    expect(formatCountdown(ms(3, 41))).toBe('3:41');
+    expect(formatCountdown(ms(1, 0, 30))).toBe('1:00');
+  });
+
+  it('shows minutes and seconds under the hour', () => {
+    expect(formatCountdown(ms(0, 59, 59))).toBe('59:59');
+    expect(formatCountdown(ms(0, 0, 9))).toBe('0:09');
+  });
+
+  it('holds the last second rather than reading zero early', () => {
+    expect(formatCountdown(1)).toBe('0:01');
+    expect(formatCountdown(999)).toBe('0:01');
+  });
+
+  it('is zero at zero, and never negative', () => {
+    expect(formatCountdown(0)).toBe('0:00');
+    expect(formatCountdown(-5000)).toBe('0:00');
+  });
+
+  it('reads a whole regen interval as four hours', () => {
+    expect(formatCountdown(REGEN_MS)).toBe('4:00');
   });
 });
