@@ -44,6 +44,10 @@ yarn-error.*
 
 # local tool settings
 .claude/settings.local.json
+.idea/
+
+# local notes
+docs/environments.md
 
 # OAuth docs
 OAauth-docs/Clients/Android client - client_secret_9731935605-htm1ahojavpcjlssim7ieih3jeaatnv6.apps.googleusercontent.com.json
