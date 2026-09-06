@@ -10362,9 +10362,3 @@ export const COURSE: Chapter[] = [
     ],
   },
 ];
-
-/**
- * Progress the app starts with, as lesson ids. Empty means a clean slate;
- * nothing is persisted between launches yet.
- */
-export const SEED_COMPLETED: string[] = [];

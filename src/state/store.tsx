@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
 
 import { useAuth } from '../auth/AuthProvider';
-import { COURSE, SEED_COMPLETED } from '../content/course';
+import { COURSE } from '../content/course';
 import {
   courseProgress,
   findLesson,
@@ -27,6 +27,7 @@ import { deal, type ChipColor, type DealResult } from '../lib/chips';
 import { clamp, digits } from '../lib/num';
 import { NAME_MAX_LENGTH } from '../lib/names';
 import { fetchProfile, type Profile } from '../server/profile';
+import { useHydrate, type HydrateAction } from '../server/useHydrate';
 
 export type Tab = 'home' | 'path' | 'chips' | 'you';
 
@@ -37,9 +38,29 @@ export type State = {
 
   tab: Tab;
 
+  /**
+   * The economy, as the server last reported it. None of these are written locally
+   * except optimistically — hearts, XP and the streak are server-derived (§3 rule 3).
+   */
   hearts: number;
   xp: number;
   streak: number;
+  /** when the next heart lands, or null at full; ISO, and read against `clockOffset` */
+  nextHeartAt: string | null;
+
+  /**
+   * `server_now - Date.now()` as of the last hydrate. Every countdown adds this to the
+   * device clock, so changing the phone's clock does nothing to hearts (§3 rule 8).
+   */
+  clockOffset: number;
+  /**
+   * Whether the numbers above are this player's own — from the cache or from the server.
+   * Until then the screens show skeletons: a slow network must not flash "0 day streak"
+   * at someone forty days in. It does *not* mean a sync has finished; `syncing` does.
+   */
+  hydrated: boolean;
+  syncing: boolean;
+  syncError: string | null;
 
   /** lesson ids the player has finished */
   completedLessons: string[];
@@ -81,11 +102,18 @@ const initialState: State = {
 
   tab: 'home',
 
-  hearts: 4,
-  xp: 1240,
-  streak: 7,
+  // empty, not sampled: every one of these arrives from `get_state()`
+  hearts: 0,
+  xp: 0,
+  streak: 0,
+  nextHeartAt: null,
 
-  completedLessons: SEED_COMPLETED,
+  clockOffset: 0,
+  hydrated: false,
+  syncing: false,
+  syncError: null,
+
+  completedLessons: [],
   activeLesson: null,
 
   drillOpen: false,
@@ -110,6 +138,7 @@ const initialState: State = {
 };
 
 type Action =
+  | HydrateAction
   | { type: 'reset' }
   | { type: 'setProfile'; profile: Profile }
   | { type: 'go'; tab: Tab }
@@ -151,6 +180,31 @@ function reducer(state: State, action: Action): State {
         displayName: action.profile.displayName,
         avatarId: action.profile.avatarId,
       };
+
+    case 'syncStart':
+      return { ...state, syncing: true, syncError: null };
+
+    case 'syncFailed':
+      return { ...state, syncing: false, syncError: action.message };
+
+    // The server's answer replaces whatever was on screen, cached or optimistic. The
+    // cache only ever fills a gap: it never carries a clock offset, and it never clears
+    // an error the server has not answered.
+    case 'hydrate': {
+      const fromServer = action.source === 'server';
+      return {
+        ...state,
+        hearts: action.state.hearts,
+        nextHeartAt: action.state.nextHeartAt,
+        streak: action.state.streak,
+        xp: action.state.xp,
+        completedLessons: action.state.completedLessons,
+        clockOffset: fromServer ? action.clockOffset : state.clockOffset,
+        hydrated: true,
+        syncing: fromServer ? false : state.syncing,
+        syncError: fromServer ? null : state.syncError,
+      };
+    }
 
     case 'go':
       return { ...state, tab: action.tab };
@@ -334,7 +388,11 @@ const StoreContext = createContext<Store | null>(null);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const { status } = useAuth();
+  const { status, user } = useAuth();
+
+  // Hearts, streak, XP and the lessons behind them, from the cache and then the server.
+  // Keyed on the user id so that signing in as someone else re-reads from scratch.
+  useHydrate(status === 'signedIn' ? (user?.id ?? null) : null, dispatch);
 
   // Signing out clears the store, and so does a session expiring underneath us — one
   // player's hearts and streak must never be the next one's. Resetting to the initial

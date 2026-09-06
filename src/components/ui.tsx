@@ -86,26 +86,32 @@ export function Brand() {
   );
 }
 
-export function HeartsPill({ hearts }: { hearts: number }) {
+/**
+ * A number that has not arrived from the server yet. Never a zero in its place: an empty
+ * heart row or a "0 day" streak is a claim about the player, and a slow network is not
+ * entitled to make it.
+ */
+export const PENDING = '—';
+
+export function HeartsPill({ hearts, pending = false }: { hearts: number; pending?: boolean }) {
   return (
     <View style={styles.heartsPill}>
-      {Array.from({ length: MAX_HEARTS }, (_, i) => (
-        <Suit
-          key={i}
-          glyph="♥"
-          size={11}
-          color={i < hearts ? colors.red : colors.greenSpent}
-        />
-      ))}
+      {pending ? (
+        <Text style={styles.pendingMark}>{PENDING}</Text>
+      ) : (
+        Array.from({ length: MAX_HEARTS }, (_, i) => (
+          <Suit key={i} glyph="♥" size={11} color={i < hearts ? colors.red : colors.greenSpent} />
+        ))
+      )}
     </View>
   );
 }
 
-export function StreakPill({ streak }: { streak: number }) {
+export function StreakPill({ streak, pending = false }: { streak: number; pending?: boolean }) {
   return (
     <GoldFrame radius={radius.pill} fill={colors.rewardAlt}>
       <View style={styles.streakPill}>
-        <Text style={styles.streakNumber}>{streak}</Text>
+        <Text style={styles.streakNumber}>{pending ? PENDING : streak}</Text>
         <Text style={styles.streakLabel}>day</Text>
       </View>
     </GoldFrame>
@@ -347,6 +353,14 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 9,
     alignItems: 'center',
+  },
+  /** the placeholder mark, sized to the pips it stands in for */
+  pendingMark: {
+    fontFamily: font.bold,
+    fontSize: 11,
+    lineHeight: 13,
+    color: colors.textFaint,
+    paddingHorizontal: 8,
   },
   streakPill: {
     flexDirection: 'row',

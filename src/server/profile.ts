@@ -1,9 +1,10 @@
 /**
  * The profile, read and written.
  *
- * First inhabitant of the layer §2 describes: the only place that talks to the database,
- * so screens never import `supabase` themselves. P12 grows this into the typed RPC
- * client and the offline outbox; for now it is two calls.
+ * The write is `set_profile` and lives in [[client]] with the rest of the RPCs; what is
+ * left here is the read — a plain select, which RLS scopes to the caller's own row — and
+ * the shape the app speaks in. `saveProfile` wraps the RPC into the `{ ok, message }`
+ * result the screens already expect, so a failure carries copy and never an error.
  *
  * **Writes go through `set_profile`, never through the table.** `profiles` has an update
  * policy, but RLS grants rows rather than columns — the trigger added in P2 is what
@@ -12,8 +13,8 @@
  * policy at all.
  */
 
-import { authErrorMessage } from '../auth/errors';
 import { supabase } from '../auth/supabase';
+import { serverErrorMessage, setProfile } from './client';
 
 export type Profile = {
   displayName: string | null;
@@ -51,11 +52,9 @@ export async function saveProfile(
   displayName: string | null,
   avatarId: string | null,
 ): Promise<SaveResult> {
-  const { data, error } = await supabase.rpc('set_profile', {
-    p_display_name: displayName,
-    p_avatar_id: avatarId,
-  });
-
-  if (error) return { ok: false, message: authErrorMessage(error) };
-  return { ok: true, profile: toProfile(data as ProfileRow) };
+  try {
+    return { ok: true, profile: await setProfile(displayName, avatarId) };
+  } catch (error) {
+    return { ok: false, message: serverErrorMessage(error) };
+  }
 }

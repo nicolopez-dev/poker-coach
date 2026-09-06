@@ -11,6 +11,7 @@
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "sync:content": "tsx scripts/sync-content.ts",
+    "gen:types": "supabase gen types typescript --local --schema public > src/server/database.types.ts",
     "env:local": "tsx scripts/use-local-supabase.ts",
     "env:hosted": "tsx scripts/use-local-supabase.ts --hosted"
   },

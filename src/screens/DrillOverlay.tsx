@@ -14,8 +14,18 @@ import { colors, font, ls, radius, shadows, spacing, type } from '../theme/token
 
 /** The drill: one question at a time, one answer each, locked once chosen. */
 export function DrillOverlay() {
-  const { activeLesson, qi, chosen, hearts, drillDone, gained, pick, nextQuestion, closeDrill } =
-    useStore();
+  const {
+    activeLesson,
+    qi,
+    chosen,
+    hearts,
+    hydrated,
+    drillDone,
+    gained,
+    pick,
+    nextQuestion,
+    closeDrill,
+  } = useStore();
   const insets = useSafeAreaInsets();
 
   const lesson = findLesson(COURSE, activeLesson);
@@ -61,7 +71,7 @@ export function DrillOverlay() {
                 />
               ))}
             </View>
-            <HeartsPill hearts={hearts} />
+            <HeartsPill hearts={hearts} pending={!hydrated} />
           </View>
 
           {drillDone ? (

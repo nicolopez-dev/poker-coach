@@ -9,8 +9,19 @@ import { Brand, HeartsPill, StreakPill } from './ui';
 /**
  * Persistent header. Content scrolls behind it, so it stays translucent and
  * blurred; the screens reserve 66px of top padding to clear it.
+ *
+ * `pending` is the gap before the server answers: both pills show a placeholder rather
+ * than the zeros the store starts on.
  */
-export function Header({ streak, hearts }: { streak: number; hearts: number }) {
+export function Header({
+  streak,
+  hearts,
+  pending = false,
+}: {
+  streak: number;
+  hearts: number;
+  pending?: boolean;
+}) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -22,8 +33,8 @@ export function Header({ streak, hearts }: { streak: number; hearts: number }) {
       <View style={styles.fill} />
       <Brand />
       <View style={styles.right}>
-        <StreakPill streak={streak} />
-        <HeartsPill hearts={hearts} />
+        <StreakPill streak={streak} pending={pending} />
+        <HeartsPill hearts={hearts} pending={pending} />
       </View>
     </BlurView>
   );

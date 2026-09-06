@@ -53,7 +53,7 @@ function Gate() {
  * stacked on top. Panes unmount on tab change, which resets the parallax.
  */
 function Root({ signedIn }: { signedIn: boolean }) {
-  const { tab, drillOpen, streak, hearts, go } = useStore();
+  const { tab, drillOpen, streak, hearts, hydrated, go } = useStore();
   const { screen } = useAuth();
 
   const gate = authScreenShowing(screen, signedIn);
@@ -66,7 +66,7 @@ function Root({ signedIn }: { signedIn: boolean }) {
       {tab === 'chips' && <ChipsScreen />}
       {tab === 'you' && <YouScreen />}
       <TabBar tab={tab} onSelect={go} />
-      <Header streak={streak} hearts={hearts} />
+      <Header streak={streak} hearts={hearts} pending={!hydrated} />
       {signedIn && <VerifyBanner />}
       {drillOpen && <DrillOverlay />}
       {gate && <AuthStack />}

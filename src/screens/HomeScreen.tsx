@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Rise } from '../components/anim';
 import { RewardCard } from '../components/Gold';
 import { TabScreen } from '../components/TabScreen';
-import { ProgressBar, RewardButton, StatPill, Suit, pressable } from '../components/ui';
+import { PENDING, ProgressBar, RewardButton, StatPill, Suit, pressable } from '../components/ui';
 import { currentChapter } from '../content/progress';
 import { COACH_NOTE, DAILY_GOAL, HOME_STATS, WEEK } from '../data/profile';
 import { fmt } from '../lib/balance';
@@ -12,9 +12,12 @@ import { useProgress, useStore } from '../state/store';
 import { colors, font, ls, radius, shadows, type } from '../theme/tokens';
 
 export function HomeScreen() {
-  const { xp, players, buyIn, startNextLesson, go } = useStore();
+  const { xp, players, buyIn, hydrated, startNextLesson, go } = useStore();
   const progress = useProgress();
-  const chapter = currentChapter(progress);
+  // Until the server answers, the course reads as untouched — which for a returning
+  // player is a lie about where they are. Withhold the unit rather than name the wrong
+  // one; the CTA and the card already have copy for having no chapter yet.
+  const chapter = hydrated ? currentChapter(progress) : undefined;
 
   return (
     <TabScreen>
@@ -31,7 +34,7 @@ export function HomeScreen() {
           />
           <View style={styles.heroFooter}>
             <Text style={styles.heroFooterText}>{DAILY_GOAL.label}</Text>
-            <Text style={styles.heroFooterText}>{fmt(xp)} XP</Text>
+            <Text style={styles.heroFooterText}>{hydrated ? fmt(xp) : PENDING} XP</Text>
           </View>
         </RewardCard>
       </Rise>
@@ -51,7 +54,11 @@ export function HomeScreen() {
             {chapter ? `Unit ${chapter.index + 1} · ${chapter.chapter.title}` : 'The path'}
           </Text>
           <Text style={styles.quickSub}>
-            {chapter ? `${chapter.done} of ${chapter.total} lessons` : 'No lessons yet'}
+            {chapter
+              ? `${chapter.done} of ${chapter.total} lessons`
+              : hydrated
+                ? 'No lessons yet'
+                : 'Finding your place'}
           </Text>
         </Pressable>
         <Pressable

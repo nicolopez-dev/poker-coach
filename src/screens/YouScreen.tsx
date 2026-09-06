@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { Rise } from '../components/anim';
 import { Avatar } from '../components/Avatar';
 import { TabScreen } from '../components/TabScreen';
-import { OutlineButton, ProgressBar } from '../components/ui';
+import { OutlineButton, PENDING, ProgressBar } from '../components/ui';
 import { currentChapter } from '../content/progress';
 import { GAMES, PROFILE } from '../data/profile';
 import { fmt } from '../lib/balance';
@@ -13,22 +13,36 @@ import { useProgress, useStore } from '../state/store';
 import { colors, font, ls, radius, shadows } from '../theme/tokens';
 
 export function YouScreen() {
-  const { xp, streak, gamesOpen, toggleGames, loadGame, displayName, avatarId } = useStore();
+  const { xp, streak, hydrated, gamesOpen, toggleGames, loadGame, displayName, avatarId } =
+    useStore();
   const { signOut, goTo } = useAuth();
   const progress = useProgress();
 
   // "Unit 3 · 7-day streak" — the same unit the Path and Home headers name, and the
   // streak the header pill shows, rather than the handoff's invented "Friday-night
-  // regular". A run of nothing says so instead of reading "0-day streak".
+  // regular". A run of nothing says so instead of reading "0-day streak", and a run we
+  // have not heard about yet says nothing at all.
   const unit = currentChapter(progress);
-  const subtitle = [
-    unit ? `Unit ${unit.index + 1}` : 'Yet to sit down',
-    streak > 0 ? `${streak}-day streak` : 'No streak yet',
-  ].join(' · ');
+  const subtitle = !hydrated
+    ? 'Taking your seat'
+    : [
+        unit ? `Unit ${unit.index + 1}` : 'Yet to sit down',
+        streak > 0 ? `${streak}-day streak` : 'No streak yet',
+      ].join(' · ');
 
   const stats = [
-    { value: fmt(xp), label: 'Total XP', bg: colors.greenDeep, ink: colors.text },
-    { value: String(streak), label: 'Day streak', bg: colors.rewardAlt, ink: colors.gold },
+    {
+      value: hydrated ? fmt(xp) : PENDING,
+      label: 'Total XP',
+      bg: colors.greenDeep,
+      ink: colors.text,
+    },
+    {
+      value: hydrated ? String(streak) : PENDING,
+      label: 'Day streak',
+      bg: colors.rewardAlt,
+      ink: colors.gold,
+    },
     { value: '78%', label: 'Accuracy', bg: colors.surface, ink: colors.text },
     { value: String(PROFILE.gamesTotal), label: 'Games set up', bg: colors.surface, ink: colors.text },
   ];
@@ -65,7 +79,7 @@ export function YouScreen() {
         <View key={chapter.id} style={styles.masteryRow}>
           <View style={styles.masteryHead}>
             <Text style={styles.masteryName}>{chapter.title}</Text>
-            <Text style={styles.masteryPct}>{pct}%</Text>
+            <Text style={styles.masteryPct}>{hydrated ? `${pct}%` : PENDING}</Text>
           </View>
           <ProgressBar pct={pct} height={9} />
         </View>
