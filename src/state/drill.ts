@@ -1,11 +1,14 @@
 /**
  * The drill's writes.
  *
- * The UI never waits on these: `pick` renders its feedback from the local course the
- * instant it is tapped, and what happens here catches up afterwards. What the server
- * sends back is authoritative all the same — its hearts and its `next_heart_at` replace
- * whatever the optimistic move assumed, so a client that guessed wrong corrects itself
- * within a round trip (§3 rule 3).
+ * Nothing here calls the server directly any more: an answer is put in the outbox and
+ * the outbox is flushed. Online that is a round trip with an extra disk write; offline
+ * it is the whole feature, and there is no second code path that only runs when
+ * something is broken.
+ *
+ * The UI never waits on any of it. `pick` renders its feedback from the local course the
+ * instant it is tapped, and what the server says catches up: its hearts and its
+ * `next_heart_at` replace whatever the optimistic move assumed (§3 rule 3).
  *
  * Kept out of `store.tsx` so it can be driven straight from a test with a faked server,
  * which is what `store.test.ts` does.
@@ -14,52 +17,31 @@
 import * as Crypto from 'expo-crypto';
 
 import type { LessonRef } from '../content/progress';
-import {
-  completeLesson,
-  serverErrorCode,
-  serverErrorMessage,
-  submitAnswer,
-  tzOffsetMin,
-  type AnswerOutcome,
-  type PlayerState,
-} from '../server/client';
+import { tzOffsetMin, type AnswerOutcome, type PlayerState } from '../server/client';
+import { enqueue, flush, pending, type FlushResult } from '../server/outbox';
 
-/** What the drill tells the store. The store folds these into its own `Action` union. */
+/** What the drill and the sync tell the store. */
 export type DrillAction =
   | { type: 'answerRecorded'; outcome: AnswerOutcome }
-  | { type: 'answerFailed'; message: string }
   | { type: 'outOfHearts' }
   | { type: 'completing' }
+  | { type: 'lessonDone'; queued: boolean }
   | { type: 'lessonCompleted'; state: PlayerState; clockOffset: number }
-  | { type: 'completeFailed'; message: string };
+  | { type: 'completeFailed'; message: string }
+  | { type: 'connection'; online: boolean }
+  | { type: 'unsaved'; count: number };
 
 export type DrillDispatch = (action: DrillAction) => void;
 
 /**
- * One writer at a time, in the order the player played.
- *
- * `complete_lesson` counts the answer rows it is summarising and refuses a lesson that
- * has none, so the completion must not overtake the answers it belongs to. The server
- * takes a row lock per player anyway, so nothing is lost by queueing here — and the
- * ordering is the same one P16's outbox will need.
- */
-let queue: Promise<unknown> = Promise.resolve();
-
-function serial<T>(work: () => Promise<T>): Promise<T> {
-  // both arms run `work`: one failed write must not wedge every write behind it
-  const next = queue.then(work, work);
-  queue = next.catch(() => undefined);
-  return next;
-}
-
-/**
  * Set when the server refuses an answer for want of a heart.
  *
- * The "Finish the hand" button appears the moment an answer is picked, so a completion
- * can be queued behind an answer that has not come back yet. If that answer is refused,
- * the completion must not go: the lesson is unfinished by definition, and
- * `complete_lesson` would record it happily — it asks only whether the lesson has any
- * answer rows, and the questions before this one supply those.
+ * The button to finish appears the moment an answer is picked, so a completion can be
+ * queued behind an answer whose reply has not come back. If that answer was refused, the
+ * completion must never be queued at all: `complete_lesson` asks only whether the lesson
+ * has any answer rows, and the questions before this one supply them. The outbox applies
+ * the same rule to a whole queue; this covers the live race, where the two are one flush
+ * apart.
  */
 let heartsRanOut = false;
 
@@ -78,14 +60,52 @@ function serverNow(clockOffset: number): Date {
 }
 
 /**
- * Sends what was picked — never whether it was right, which is the answer key's to say.
+ * Sends whatever is waiting and tells the store what came back.
  *
- * `clientEventId` is what makes a replay a no-op rather than a second spent heart (§3
- * rule 9); it is generated here today and will come from the outbox in P16.
+ * Called after every write, after a successful hydrate, on foreground and on reconnect —
+ * a flush with an empty queue costs one disk read, so there is no reason to be clever
+ * about when to try.
+ */
+export async function syncOutbox(
+  dispatch: DrillDispatch,
+  userId: string | null,
+): Promise<FlushResult | null> {
+  if (!userId) return null;
+
+  const result = await flush(userId);
+  dispatch({ type: 'connection', online: !result.offline });
+
+  // A completion answers with a whole state; fold it in the way hydration does, so the
+  // streak, the XP and the completed list all move together.
+  if (result.state) {
+    dispatch({
+      type: 'lessonCompleted',
+      state: result.state,
+      clockOffset: Date.parse(result.state.serverNow) - Date.now(),
+    });
+  } else if (result.answer) {
+    dispatch({ type: 'answerRecorded', outcome: result.answer });
+  }
+
+  // Anything the server refused is gone for good, and the player is told rather than
+  // shown a tick. Out of hearts is its own ending, and takes the screen.
+  if (result.dropped > 0) dispatch({ type: 'unsaved', count: result.dropped });
+  if (result.outOfHearts) {
+    heartsRanOut = true;
+    dispatch({ type: 'outOfHearts' });
+  }
+
+  return result;
+}
+
+/**
+ * Queues one answer and tries to send it. The client sends what was picked, never
+ * whether it was right — the answer key decides that (§3 rule 5).
  */
 export async function recordAnswer(
   dispatch: DrillDispatch,
   answer: {
+    userId: string | null;
     ref: LessonRef;
     questionIndex: number;
     optionId: string;
@@ -93,75 +113,78 @@ export async function recordAnswer(
     clientEventId?: string;
   },
 ): Promise<void> {
-  const clientEventId = answer.clientEventId ?? Crypto.randomUUID();
-  const occurredAt = serverNow(answer.clockOffset);
+  if (!answer.userId) return;
 
-  try {
-    const outcome = await serial(async () => {
-      try {
-        return await submitAnswer({
-          lessonId: answer.ref.lessonId,
-          questionIndex: answer.questionIndex,
-          chosenOptionId: answer.optionId,
-          clientEventId,
-          occurredAt,
-          tzOffsetMin: tzOffsetMin(),
-        });
-      } catch (error) {
-        // inside the queued work, so the flag is set before whatever is queued behind
-        // this runs. Setting it from the outer catch below would be a microtask late,
-        // and the completion could slip past.
-        if (serverErrorCode(error) === 'OUT_OF_HEARTS') heartsRanOut = true;
-        throw error;
-      }
-    });
-    dispatch({ type: 'answerRecorded', outcome });
-  } catch (error) {
-    // Out of hearts is not a failed write, it is an answer: the drill ends here and the
-    // lesson stays unfinished, so it can be replayed from the start (§6, "Zero hearts").
-    if (serverErrorCode(error) === 'OUT_OF_HEARTS') dispatch({ type: 'outOfHearts' });
-    else dispatch({ type: 'answerFailed', message: serverErrorMessage(error) });
-  }
+  const occurredAt = serverNow(answer.clockOffset);
+  await enqueue(answer.userId, {
+    kind: 'answer',
+    clientEventId: answer.clientEventId ?? Crypto.randomUUID(),
+    occurredAt: occurredAt.toISOString(),
+    payload: {
+      lessonId: answer.ref.lessonId,
+      questionIndex: answer.questionIndex,
+      chosenOptionId: answer.optionId,
+      tzOffsetMin: tzOffsetMin(occurredAt),
+    },
+  });
+
+  await syncOutbox(dispatch, answer.userId);
 }
 
 /**
- * Finishes the lesson. The reply is a whole `get_state()`, so the streak, the XP derived
- * from the answers just given and the completed list all arrive together — the client
- * never adds the lesson to that list itself.
+ * Finishes the lesson: queues the completion, sends everything, and decides what the
+ * done card says.
+ *
+ * Three endings. The server took it, and the state it replied with is already in the
+ * store. Nobody could be reached, so it is queued and the lesson counts locally until a
+ * flush says otherwise. Or it was refused — and that is said out loud rather than shown
+ * as a tick.
  */
 export async function finishLesson(
   dispatch: DrillDispatch,
-  lesson: { ref: LessonRef; clockOffset: number; clientEventId?: string },
+  lesson: {
+    userId: string | null;
+    ref: LessonRef;
+    clockOffset: number;
+    clientEventId?: string;
+  },
 ): Promise<void> {
+  if (!lesson.userId) return;
+
+  // the run is already over: queueing this would have the server record a lesson the
+  // player never finished
+  if (heartsRanOut) return;
+
   const clientEventId = lesson.clientEventId ?? Crypto.randomUUID();
   const occurredAt = serverNow(lesson.clockOffset);
+  await enqueue(lesson.userId, {
+    kind: 'completion',
+    clientEventId,
+    occurredAt: occurredAt.toISOString(),
+    payload: {
+      lessonId: lesson.ref.lessonId,
+      chapterId: lesson.ref.chapterId,
+      tzOffsetMin: tzOffsetMin(occurredAt),
+    },
+  });
 
-  try {
-    // inside the queue, not before it: whether the run survived is only known once the
-    // answers ahead of this have had their reply
-    const state = await serial(async () =>
-      heartsRanOut
-        ? null
-        : completeLesson({
-            lessonId: lesson.ref.lessonId,
-            chapterId: lesson.ref.chapterId,
-            clientEventId,
-            occurredAt,
-            tzOffsetMin: tzOffsetMin(),
-          }),
-    );
+  const result = await syncOutbox(dispatch, lesson.userId);
 
-    // the out-of-hearts ending already owns the screen, and owns it correctly
-    if (!state) return;
+  // The run ended for want of a heart — either in this flush or in the one that was
+  // already in the air when this was queued. Its screen owns what happens next.
+  if (!result || result.outOfHearts || heartsRanOut) return;
 
-    dispatch({
-      type: 'lessonCompleted',
-      state,
-      clockOffset: Date.parse(state.serverNow) - Date.now(),
-    });
-  } catch (error) {
-    // A completion that was refused is said out loud on the done card. Silently not
-    // saving a lesson the player just played is the one thing this must not do.
-    dispatch({ type: 'completeFailed', message: serverErrorMessage(error) });
+  // What matters is what became of *this* event, not what this particular flush did:
+  // an answer's flush, still running when the completion was queued, may have carried
+  // it already, leaving this one nothing to do.
+  const waiting = (await pending(lesson.userId)).some((e) => e.clientEventId === clientEventId);
+
+  if (waiting) {
+    // saved on this phone, and on its way as soon as there is a connection
+    dispatch({ type: 'lessonDone', queued: true });
+  } else if (result.refused && !result.state) {
+    dispatch({ type: 'completeFailed', message: result.refused });
+  } else {
+    dispatch({ type: 'lessonDone', queued: false });
   }
 }

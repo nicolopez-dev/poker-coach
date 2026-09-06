@@ -38,6 +38,8 @@ export type HydrateAction =
 export function useHydrate(
   userId: string | null,
   dispatch: (action: HydrateAction) => void,
+  /** run after the server answers — where the outbox gets flushed */
+  onHydrated?: () => void,
 ): () => void {
   // Whose store this is, right now. A reply that arrives after a sign-out, or after
   // somebody else signed in, is dropped: one player's streak must never land in
@@ -50,6 +52,10 @@ export function useHydrate(
   // Whether the server has answered for this user yet. The cache is usually first, but
   // a slow disk behind a fast network would otherwise let stale numbers overwrite fresh.
   const served = useRef(false);
+
+  // In a ref so that passing a fresh closure on every render does not re-run the hydrate
+  const after = useRef(onHydrated);
+  after.current = onHydrated;
 
   const sync = useCallback(async () => {
     if (!userId) return;
@@ -66,6 +72,7 @@ export function useHydrate(
         source: 'server',
       });
       await writeCachedState(userId, state);
+      after.current?.();
     } catch (error: unknown) {
       if (active.current === userId) {
         dispatch({ type: 'syncFailed', message: serverErrorMessage(error) });

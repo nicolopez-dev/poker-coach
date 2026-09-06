@@ -26,7 +26,8 @@ import { isDrill } from '../content/progress';
 import { XP_PER_ANSWER } from '../content/types';
 import { liveStreak, streakAtRisk } from '../lib/streak';
 import { ServerError, type AnswerOutcome, type PlayerState } from '../server/client';
-import { beginRun, finishLesson, recordAnswer } from './drill';
+import { clearOutbox, pending } from '../server/outbox';
+import { beginRun, finishLesson, recordAnswer, syncOutbox } from './drill';
 import { initialState, reducer } from './store';
 
 const CHAPTER = COURSE[0];
@@ -39,6 +40,8 @@ const QUESTION = LESSON.questions[0];
 const RIGHT = QUESTION.correct;
 const WRONG = QUESTION.options.find((o) => o.id !== RIGHT)!.id;
 
+const PLAYER = '99999999-9999-4999-8999-999999999999';
+const NOW = '2026-09-05T12:00:00.000Z';
 const NEXT_HEART = '2026-09-05T18:00:00.000Z';
 const SERVER_NOW = '2026-09-05T14:00:00.000Z';
 
@@ -133,12 +136,16 @@ function store(hearts = 5) {
  */
 let events = 0;
 
+const finish = (s: ReturnType<typeof store>, clientEventId = `finish-${++events}`) =>
+  finishLesson(s.dispatch, { userId: PLAYER, ref: REF, clockOffset: 0, clientEventId });
+
 const answer = (
   s: ReturnType<typeof store>,
   optionId: string,
   clientEventId = `event-${++events}`,
 ) =>
   recordAnswer(s.dispatch, {
+    userId: PLAYER,
     ref: REF,
     questionIndex: 0,
     optionId,
@@ -146,15 +153,16 @@ const answer = (
     clientEventId,
   });
 
-beforeEach(() => {
+beforeEach(async () => {
   mockServer = fakeServer();
   beginRun();
+  await clearOutbox(PLAYER);
 });
 
 describe('answering', () => {
   it('shows the verdict before the server has said anything', () => {
     const s = store();
-    s.dispatch({ type: 'pick', id: RIGHT });
+    s.dispatch({ type: 'pick', id: RIGHT, at: NOW });
 
     expect(s.state.chosen).toBe(RIGHT);
     expect(s.state.gained).toBe(XP_PER_ANSWER);
@@ -163,7 +171,7 @@ describe('answering', () => {
 
   it('keeps a correct answer’s hearts, and counts no XP locally', async () => {
     const s = store();
-    s.dispatch({ type: 'pick', id: RIGHT });
+    s.dispatch({ type: 'pick', id: RIGHT, at: NOW });
     await answer(s, RIGHT);
 
     expect(s.state.hearts).toBe(5);
@@ -175,7 +183,7 @@ describe('answering', () => {
 
   it('spends a heart on a wrong answer, optimistically and then for real', async () => {
     const s = store();
-    s.dispatch({ type: 'pick', id: WRONG });
+    s.dispatch({ type: 'pick', id: WRONG, at: NOW });
     expect(s.state.hearts).toBe(4);
 
     await answer(s, WRONG);
@@ -192,7 +200,7 @@ describe('answering', () => {
     mockServer = fakeServer({ key: WRONG });
 
     const s = store();
-    s.dispatch({ type: 'pick', id: RIGHT });
+    s.dispatch({ type: 'pick', id: RIGHT, at: NOW });
     expect(s.state.hearts).toBe(5); // optimistically, nothing was spent
 
     await answer(s, RIGHT);
@@ -203,7 +211,7 @@ describe('answering', () => {
 
   it('does not spend twice when the same event id is sent again', async () => {
     const s = store();
-    s.dispatch({ type: 'pick', id: WRONG });
+    s.dispatch({ type: 'pick', id: WRONG, at: NOW });
     await answer(s, WRONG, 'e5d0f2a1-0000-4000-8000-000000000001');
     await answer(s, WRONG, 'e5d0f2a1-0000-4000-8000-000000000001');
 
@@ -216,7 +224,7 @@ describe('answering', () => {
     mockServer = fakeServer({ hearts: 0 });
 
     const s = store(1);
-    s.dispatch({ type: 'pick', id: WRONG });
+    s.dispatch({ type: 'pick', id: WRONG, at: NOW });
     await answer(s, WRONG);
 
     expect(s.state.outOfHearts).toBe(true);
@@ -225,27 +233,54 @@ describe('answering', () => {
     expect(s.state.completedLessons).toEqual([]);
   });
 
-  it('keeps the optimistic state and the reason when the write does not land', async () => {
+  // Offline is not a failure any more: the answer is kept and the drill carries on. The
+  // heart was spent by the same arithmetic the server would have used, so the two agree
+  // when the queue finally lands.
+  it('keeps the answer, and the play, when there is no server to send it to', async () => {
     mockServer = fakeServer();
     mockServer.submitAnswer = async () => {
       throw new ServerError('UNREACHABLE', 'whatever the network said');
     };
 
     const s = store();
-    s.dispatch({ type: 'pick', id: WRONG });
-    await answer(s, WRONG);
+    s.dispatch({ type: 'pick', id: WRONG, at: NOW });
+    await answer(s, WRONG, 'queued-1');
 
     expect(s.state.hearts).toBe(4);
-    // the copy comes from the mapping, never from the error that was thrown
-    expect(s.state.syncError).toBe("We couldn't reach the table. Check your connection.");
+    expect(s.state.offline).toBe(true);
     expect(s.state.outOfHearts).toBe(false);
+    expect(s.state.unsaved).toBe(0);
+
+    // and it is still there, waiting
+    expect((await pending(PLAYER)).map((e) => e.clientEventId)).toEqual(['queued-1']);
+  });
+
+  it('sends what was waiting once the server is back', async () => {
+    const offline = fakeServer();
+    offline.submitAnswer = async () => {
+      throw new ServerError('UNREACHABLE', 'no server');
+    };
+    mockServer = offline;
+
+    const s = store();
+    s.dispatch({ type: 'pick', id: WRONG, at: NOW });
+    await answer(s, WRONG, 'queued-2');
+    expect(s.state.offline).toBe(true);
+
+    // the connection comes back, and nothing had to be replayed by hand
+    mockServer = fakeServer();
+    await syncOutbox(s.dispatch, PLAYER);
+
+    expect(mockServer.state.hearts).toBe(4);
+    expect(s.state.offline).toBe(false);
+    expect(await pending(PLAYER)).toEqual([]);
   });
 });
 
 describe('finishing', () => {
   it('adds the lesson only once the server has recorded it', async () => {
     const s = store();
-    s.dispatch({ type: 'pick', id: RIGHT });
+    s.dispatch({ type: 'pick', id: RIGHT, at: NOW });
     await answer(s, RIGHT);
 
     s.dispatch({ type: 'completing' });
@@ -253,7 +288,7 @@ describe('finishing', () => {
     expect(s.state.drillDone).toBe(false);
     expect(s.state.completedLessons).toEqual([]);
 
-    await finishLesson(s.dispatch, { ref: REF, clockOffset: 0 });
+    await finish(s);
 
     expect(s.state.drillDone).toBe(true);
     expect(s.state.completing).toBe(false);
@@ -275,15 +310,15 @@ describe('finishing', () => {
     const s = store(1);
 
     // question one is answered wrong, taking the last heart
-    s.dispatch({ type: 'pick', id: WRONG });
+    s.dispatch({ type: 'pick', id: WRONG, at: NOW });
     await answer(s, WRONG);
     expect(mockServer.state.hearts).toBe(0);
 
     // the last one is picked and finished in the same breath, neither awaited
-    s.dispatch({ type: 'pick', id: WRONG });
+    s.dispatch({ type: 'pick', id: WRONG, at: NOW });
     const answering = answer(s, WRONG);
     s.dispatch({ type: 'completing' });
-    const finishing = finishLesson(s.dispatch, { ref: REF, clockOffset: 0, clientEventId: "finish-1" });
+    const finishing = finishLesson(s.dispatch, { userId: PLAYER, ref: REF, clockOffset: 0, clientEventId: "finish-1" });
     await Promise.all([answering, finishing]);
 
     expect(mockServer.state.completions).toBe(0);
@@ -296,7 +331,7 @@ describe('finishing', () => {
     const s = store();
 
     s.dispatch({ type: 'completing' });
-    await finishLesson(s.dispatch, { ref: REF, clockOffset: 0 });
+    await finish(s);
 
     expect(s.state.drillDone).toBe(true);
     expect(s.state.completionError).toBe('That hand was never played, so there is nothing to save.');
@@ -430,6 +465,16 @@ describe('opening a lesson', () => {
     expect(s.state.drillOpen).toBe(false);
     expect(s.state.outOfHearts).toBe(true);
     expect(s.state.hearts).toBe(0);
+  });
+
+  it('lets go of what could not be saved once the player moves on', () => {
+    const s = store();
+    s.dispatch({ type: 'unsaved', count: 2 });
+    expect(s.state.unsaved).toBe(2);
+
+    // starting the next lesson is the acknowledgement; there is nothing to dismiss
+    s.dispatch({ type: 'startLesson', ref: REF });
+    expect(s.state.unsaved).toBe(0);
   });
 
   it('leaves the out-of-hearts screen for Home', () => {

@@ -122,8 +122,9 @@ Carried over from the handoff's own open items:
 - Table lessons against AI players are modelled but not built.
 - Hearts, streak, XP and finished lessons are real, in both directions: the state comes from
   the server and is cached per user for the next cold start, every answer and completion goes
-  back through the P3 functions, and running out of hearts stops play until one returns. What
-  is missing is offline — a drill played without a connection is not queued yet (P16).
+  through the outbox to the P3 functions — queued on this phone when there is no connection
+  and flushed on reconnect, on foreground and after a hydrate — and running out of hearts
+  stops play until one returns.
 - Accuracy, the week chart and the games list are still sample data.
 - Setting up a game does not append to "Your games".
 - Seat names live only in the Balance rows.
@@ -155,6 +156,11 @@ Three things differ from the hosted project, on purpose:
 
 Google sign-in works in neither: it is a native module, so it needs a dev build
 (`npx expo prebuild` and `npm run android` / `npm run ios`).
+
+`@react-native-community/netinfo`, which tells the outbox when a connection comes back, is a
+native module too — **an existing dev build has to be rebuilt once** for it to link. Without
+that the app still works, and still queues; it just waits for a foreground or the next write to
+flush instead of noticing the moment signal returns.
 
 ## Accounts
 

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
+import NetInfo from '@react-native-community/netinfo';
 import { AppState } from 'react-native';
 
 import { useAuth } from '../auth/AuthProvider';
@@ -25,13 +26,14 @@ import {
 } from '../data/chipCase';
 import { POINTS_PER_UNIT } from '../lib/balance';
 import { deal, type ChipColor, type DealResult } from '../lib/chips';
+import { MAX_HEARTS, REGEN_MS, spend, type HeartState } from '../lib/hearts';
 import { clamp, digits } from '../lib/num';
 import { NAME_MAX_LENGTH } from '../lib/names';
 import { liveStreak, localDay, nextLocalMidnight, streakAtRisk, type LocalDay } from '../lib/streak';
 import { tzOffsetMin, type PlayerState } from '../server/client';
 import { fetchProfile, type Profile } from '../server/profile';
 import { useHydrate, type HydrateAction } from '../server/useHydrate';
-import { beginRun, finishLesson, recordAnswer, type DrillAction } from './drill';
+import { beginRun, finishLesson, recordAnswer, syncOutbox, type DrillAction } from './drill';
 
 export type Tab = 'home' | 'path' | 'chips' | 'you';
 
@@ -76,6 +78,10 @@ export type State = {
   hydrated: boolean;
   syncing: boolean;
   syncError: string | null;
+  /** the last flush could not reach the server; writes are waiting on this phone */
+  offline: boolean;
+  /** writes the server refused for good — progress that is gone, and said so */
+  unsaved: number;
 
   /** lesson ids the player has finished */
   completedLessons: string[];
@@ -142,6 +148,8 @@ export const initialState: State = {
   hydrated: false,
   syncing: false,
   syncError: null,
+  offline: false,
+  unsaved: 0,
 
   completedLessons: [],
   activeLesson: null,
@@ -178,7 +186,7 @@ type Action =
   | { type: 'go'; tab: Tab }
   | { type: 'startLesson'; ref: LessonRef | undefined }
   | { type: 'closeDrill' }
-  | { type: 'pick'; id: string }
+  | { type: 'pick'; id: string; at: string }
   | { type: 'nextQuestion' }
   | { type: 'stepPlayers'; delta: number }
   | { type: 'setBet'; value: string }
@@ -203,6 +211,37 @@ const clearResult = { result: null } as const;
 function activeQuestions(state: State): Question[] {
   const lesson = findLesson(COURSE, state.activeLesson);
   return isDrill(lesson) ? lesson.questions : [];
+}
+
+/**
+ * The heart count as `src/lib/hearts.ts` wants it. `settledAt` is not stored — it is
+ * `next_heart_at` less one interval, which is the same fact seen from the other end, and
+ * `now` at full, where the regen clock idles.
+ */
+function heartsOf(state: State, at: Date): HeartState {
+  return {
+    hearts: state.hearts,
+    settledAt: state.nextHeartAt ? new Date(Date.parse(state.nextHeartAt) - REGEN_MS) : at,
+  };
+}
+
+/** The finished list with one more in it, and no duplicates. */
+function completedWith(state: State, lessonId: string): string[] {
+  return state.completedLessons.includes(lessonId)
+    ? state.completedLessons
+    : [...state.completedLessons, lessonId];
+}
+
+/** One heart spent, in the client's mirror of the server's arithmetic. */
+function spent(state: State, at: Date): Pick<State, 'hearts' | 'nextHeartAt'> {
+  const next = spend(heartsOf(state, at), at);
+  return {
+    hearts: next.hearts,
+    nextHeartAt:
+      next.hearts >= MAX_HEARTS
+        ? null
+        : new Date(next.settledAt.getTime() + REGEN_MS).toISOString(),
+  };
 }
 
 /**
@@ -283,6 +322,8 @@ export function reducer(state: State, action: Action): State {
       if (state.hydrated && state.hearts === 0) return { ...state, outOfHearts: true };
       return {
         ...state,
+        // starting the next lesson is how a player acknowledges what was lost
+        unsaved: 0,
         activeLesson: action.ref,
         drillOpen: true,
         qi: 0,
@@ -297,21 +338,31 @@ export function reducer(state: State, action: Action): State {
     case 'closeDrill':
       return { ...state, drillOpen: false, outOfHearts: false };
 
-    // Optimistic, and deliberately so: the feedback card must not wait on a round trip.
-    // Correctness for *rendering* comes from the local course; correctness for the
-    // record is decided by the answer key on the server, and `answerRecorded` below is
-    // what adopts it. XP is not touched — it is derived from `answers`, never counted
-    // here; only `gained`, which is this drill's own tally, moves.
+    // Optimistic, and deliberately so: the feedback card must not wait on a round trip,
+    // and offline there is no round trip to wait for. Correctness for *rendering* comes
+    // from the local course; correctness for the record is decided by the answer key on
+    // the server, and `answerRecorded` below is what adopts it. XP is not touched — it
+    // is derived from `answers`, never counted here; only `gained`, this drill's own
+    // tally, moves.
+    //
+    // The heart is spent through the same arithmetic the server uses, which settles
+    // first: a player who waited out a regen offline gets that heart before this one is
+    // taken, exactly as they would online.
     case 'pick': {
       if (state.chosen) return state;
       const question = activeQuestions(state)[state.qi];
       const right = !!question && action.id === question.correct;
-      return {
-        ...state,
-        chosen: action.id,
-        hearts: right ? state.hearts : Math.max(0, state.hearts - 1),
-        gained: right ? state.gained + XP_PER_ANSWER : state.gained,
-      };
+      if (right) {
+        return { ...state, chosen: action.id, gained: state.gained + XP_PER_ANSWER };
+      }
+
+      const at = new Date(action.at);
+      try {
+        return { ...state, chosen: action.id, ...spent(state, at) };
+      } catch {
+        // nothing left to spend, and no server needed to know it
+        return { ...state, chosen: action.id, hearts: 0, outOfHearts: true, drillOpen: false };
+      }
     }
 
     // The server's count wins outright. Adopting it every time rather than only on a
@@ -325,10 +376,28 @@ export function reducer(state: State, action: Action): State {
         syncError: null,
       };
 
-    // The answer did not reach the server. The optimistic state stands — P16 queues the
-    // write and replays it — and the reason is kept for the offline indicator.
-    case 'answerFailed':
-      return { ...state, syncError: action.message };
+    case 'connection':
+      return { ...state, offline: !action.online };
+
+    // Progress the server refused: it is not coming back, and the player is told rather
+    // than shown a tick. Cleared when they start the next lesson — acknowledged by
+    // moving on, rather than nagged.
+    case 'unsaved':
+      return { ...state, unsaved: state.unsaved + action.count };
+
+    case 'lessonDone':
+      return {
+        ...state,
+        drillDone: true,
+        completing: false,
+        completionError: null,
+        chosen: null,
+        // queued offline: the lesson counts here until a flush says otherwise
+        completedLessons:
+          action.queued && state.activeLesson
+            ? completedWith(state, state.activeLesson.lessonId)
+            : state.completedLessons,
+      };
 
     // No heart to spend: the drill ends here, the lesson is not completed, and it can be
     // played again from the start once one returns. The overlay closes and the
@@ -527,7 +596,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   // Hearts, streak, XP and the lessons behind them, from the cache and then the server.
   // Keyed on the user id so that signing in as someone else re-reads from scratch.
-  const refresh = useHydrate(status === 'signedIn' ? (user?.id ?? null) : null, dispatch);
+  const userId = status === 'signedIn' ? (user?.id ?? null) : null;
+
+  // Hydration, and a flush of whatever was queued while the app was away: a successful
+  // hydrate is the third thing that triggers one, beside foreground and reconnect.
+  const refresh = useHydrate(userId, dispatch, () => void syncOutbox(dispatch, userId));
 
   // Held in a ref so the foreground listener below reads the current offset without
   // being torn down and rebuilt on every state change.
@@ -557,11 +630,27 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         today: localDay(now, offset),
         expiresAt: nextLocalMidnight(now, offset).toISOString(),
       });
+      void syncOutbox(dispatch, userId);
       refresh();
     });
 
     return () => subscription.remove();
-  }, [status, refresh]);
+  }, [status, userId, refresh]);
+
+  // And the moment there is a connection again. A player who finished a lesson on the
+  // underground should find it saved by the time they look, without having to do
+  // anything — including anything as deliberate as reopening the app.
+  useEffect(() => {
+    if (!userId) return;
+
+    const unsubscribe = NetInfo.addEventListener((netState) => {
+      const online = netState.isConnected !== false;
+      dispatch({ type: 'connection', online });
+      if (online) void syncOutbox(dispatch, userId);
+    });
+
+    return unsubscribe;
+  }, [userId]);
 
   // The profile is the first thing hydrated from the server. A cancelled flag rather
   // than a bare promise, so signing out mid-flight cannot land the old player's name
@@ -594,11 +683,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       },
       closeDrill: () => dispatch({ type: 'closeDrill' }),
 
-      // The dispatch renders the feedback; the write catches up and corrects it.
+      // The dispatch renders the feedback; the write is queued and sent behind it.
       pick: (id) => {
         if (state.chosen || !state.activeLesson) return;
-        dispatch({ type: 'pick', id });
+        dispatch({ type: 'pick', id, at: new Date(Date.now() + state.clockOffset).toISOString() });
         void recordAnswer(dispatch, {
+          userId,
           ref: state.activeLesson,
           questionIndex: state.qi,
           optionId: id,
@@ -606,7 +696,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         });
       },
 
-      // The last question finishes the lesson on the server before the done card shows.
+      // The last question finishes the lesson before the done card shows — on the
+      // server if it can be reached, and in the queue if it cannot.
       nextQuestion: () => {
         if (state.completing) return;
         if (state.qi < activeQuestions(state).length - 1) {
@@ -616,6 +707,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (!state.activeLesson) return;
         dispatch({ type: 'completing' });
         void finishLesson(dispatch, {
+          userId,
           ref: state.activeLesson,
           clockOffset: state.clockOffset,
         });

@@ -4,7 +4,7 @@ import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { absoluteFill, colors, headerFill } from '../theme/tokens';
-import { Brand, HeartsPill, StreakPill } from './ui';
+import { Brand, HeartsPill, StreakPill, SyncPill } from './ui';
 
 /**
  * Persistent header. Content scrolls behind it, so it stays translucent and
@@ -21,6 +21,8 @@ export function Header({
   streakAtRisk = false,
   streakExpiresAt = null,
   clockOffset = 0,
+  offline = false,
+  unsaved = 0,
 }: {
   streak: number;
   hearts: number;
@@ -29,6 +31,8 @@ export function Header({
   streakAtRisk?: boolean;
   streakExpiresAt?: string | null;
   clockOffset?: number;
+  offline?: boolean;
+  unsaved?: number;
 }) {
   const insets = useSafeAreaInsets();
 
@@ -41,6 +45,7 @@ export function Header({
       <View style={styles.fill} />
       <Brand />
       <View style={styles.right}>
+        <SyncPill offline={offline} unsaved={unsaved} />
         <StreakPill
           streak={streak}
           pending={pending}

@@ -65,6 +65,8 @@ function Root({ signedIn }: { signedIn: boolean }) {
     hydrated,
     nextHeartAt,
     clockOffset,
+    offline,
+    unsaved,
     go,
   } = useStore();
   const { screen } = useAuth();
@@ -87,6 +89,8 @@ function Root({ signedIn }: { signedIn: boolean }) {
         streakAtRisk={streakAtRisk}
         streakExpiresAt={streakExpiresAt}
         clockOffset={clockOffset}
+        offline={offline}
+        unsaved={unsaved}
       />
       {signedIn && <VerifyBanner />}
       {drillOpen && <DrillOverlay />}

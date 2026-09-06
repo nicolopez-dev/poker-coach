@@ -179,6 +179,24 @@ export function StreakPill({
   );
 }
 
+/**
+ * What the sync is doing, when it is worth saying — the same pill the hearts sit in, at
+ * the label scale the header already uses. Nothing when everything has landed.
+ *
+ * "Not saved" is progress the server refused, which is not coming back: it is said
+ * plainly rather than hidden behind a tick, and it clears when the player starts the
+ * next lesson.
+ */
+export function SyncPill({ offline, unsaved }: { offline: boolean; unsaved: number }) {
+  if (!offline && unsaved === 0) return null;
+
+  return (
+    <View style={styles.syncPill}>
+      <Text style={styles.syncLabel}>{unsaved > 0 ? 'Not saved' : 'Offline'}</Text>
+    </View>
+  );
+}
+
 export function ProgressBar({
   pct,
   height = 8,
@@ -414,6 +432,20 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 9,
     alignItems: 'center',
+  },
+  syncPill: {
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceInput,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  syncLabel: {
+    fontFamily: font.regular,
+    fontSize: 9,
+    lineHeight: 11,
+    letterSpacing: ls(9, 0.08),
+    textTransform: 'uppercase',
+    color: colors.textMuted,
   },
   /** the wait for the next heart, at the micro scale the header uses for labels */
   heartsCountdown: {
