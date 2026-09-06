@@ -3,6 +3,7 @@ import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import { AppState } from 'react-native';
 
+import type { Database } from '../server/database.types';
 import { secureStorage } from './secureStorage';
 
 /**
@@ -24,7 +25,12 @@ const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 if (!url) throw missing('EXPO_PUBLIC_SUPABASE_URL');
 if (!anonKey) throw missing('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
-export const supabase = createClient(url, anonKey, {
+/**
+ * Typed against `src/server/database.types.ts`, which `npm run gen:types` generates from
+ * the migrations — so a renamed column or a changed RPC argument is a type error here
+ * rather than a 400 on a device.
+ */
+export const supabase = createClient<Database>(url, anonKey, {
   auth: {
     storage: secureStorage,
     autoRefreshToken: true,

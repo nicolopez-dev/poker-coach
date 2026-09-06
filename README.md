@@ -49,6 +49,7 @@ tablets and desktop.
 | `npm test` | Jest — the chip solver and Balance maths |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run sync:content` | Regenerates the server's answer key from `src/content/course.ts` |
+| `npm run gen:types` | Regenerates `src/server/database.types.ts` from the local database |
 | `npm run env:local` | Points the app at the local Supabase stack (writes `.env.local`) |
 | `npm run env:hosted` | Removes `.env.local`, back to the project in `.env` |
 | `npx supabase db reset` | Rebuilds the local database from `supabase/migrations/` |
@@ -57,6 +58,11 @@ tablets and desktop.
 The two Supabase commands need Docker running and `npx supabase start` done once. `db reset`
 drops and replays every migration, so it is the way to check a migration actually applies;
 `test db` runs `supabase/tests/*.sql` against the result.
+
+`gen:types` needs the same local stack — run it after every migration, since the generated file
+is what types `supabase` and every wrapper in `src/server/`. Swap `--local` for `--linked` to
+generate against the hosted project instead, but only once its migrations are pushed: an
+unmigrated project generates an empty schema and every call in `src/server/` stops typechecking.
 
 ## Layout
 
@@ -75,6 +81,8 @@ src/
     color.ts             chip luminance, dash and ink
     names.ts             seat-name initials rule
   data/                  chip case defaults, sample profile
+  auth/                  the session: Supabase client, secure storage, deep links
+  server/                the only module that talks to the database — RPCs, hydration
   components/            felt, gold frame, chip, ace card, header, tab bar, motion
   screens/               Login, Home, Path, Drill, Chips (+ Result, Balance), You
 docs/design-handoff/     the design bundle — read-only reference
@@ -112,8 +120,15 @@ Carried over from the handoff's own open items:
 - Content is one lesson of three questions, in Position. The other four chapters are sketched
   and read as locked until lessons are written for them.
 - Table lessons against AI players are modelled but not built.
-- Streak, XP, accuracy, the week chart and the games list are sample data.
-  Nothing persists between launches, progress included.
+- Hearts, streak, XP and finished lessons are real, in both directions: the state comes from
+  the server and is cached per user for the next cold start, every answer and completion goes
+  through the outbox to the P3 functions — queued on this phone when there is no connection
+  and flushed on reconnect, on foreground and after a hydrate — and running out of hearts
+  stops play until one returns.
+- The games list is still sample data, and the coach's note on Home is authored copy with
+  nothing computing it — both are marked as such in `src/data/profile.ts`. Everything else on
+  Home and You is real: accuracy, the week chart, the daily goal, XP, the streak and the
+  games count, all derived server-side from the answers themselves.
 - Setting up a game does not append to "Your games".
 - Seat names live only in the Balance rows.
 - Apple sign-in is not wired yet, and profile setup is a placeholder.
@@ -144,6 +159,11 @@ Three things differ from the hosted project, on purpose:
 
 Google sign-in works in neither: it is a native module, so it needs a dev build
 (`npx expo prebuild` and `npm run android` / `npm run ios`).
+
+`@react-native-community/netinfo`, which tells the outbox when a connection comes back, is a
+native module too — **an existing dev build has to be rebuilt once** for it to link. Without
+that the app still works, and still queues; it just waits for a foreground or the next write to
+flush instead of noticing the moment signal returns.
 
 ## Accounts
 

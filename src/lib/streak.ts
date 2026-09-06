@@ -48,3 +48,16 @@ export function liveStreak(
 export function streakAtRisk(streakDay: LocalDay | null, todayLocal: LocalDay): boolean {
   return streakDay !== null && daysBetween(streakDay, todayLocal) === 1;
 }
+
+/**
+ * When the local day next turns over — the deadline an at-risk run is counting down to.
+ *
+ * `get_state` sends this, but it goes stale the moment the app sits open across it, and
+ * it is wrong the moment the player changes timezone. Both are recomputed here on every
+ * foreground, from the server-corrected instant and the device's current offset — the
+ * same two things the server derives its own answer from.
+ */
+export function nextLocalMidnight(at: Date, tzOffsetMin: number): Date {
+  const local = at.getTime() + tzOffsetMin * 60_000;
+  return new Date((Math.floor(local / DAY_MS) + 1) * DAY_MS - tzOffsetMin * 60_000);
+}

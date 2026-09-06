@@ -14,8 +14,22 @@ import { colors, font, ls, radius, shadows, spacing, type } from '../theme/token
 
 /** The drill: one question at a time, one answer each, locked once chosen. */
 export function DrillOverlay() {
-  const { activeLesson, qi, chosen, hearts, drillDone, gained, pick, nextQuestion, closeDrill } =
-    useStore();
+  const {
+    activeLesson,
+    qi,
+    chosen,
+    hearts,
+    hydrated,
+    nextHeartAt,
+    clockOffset,
+    drillDone,
+    completing,
+    completionError,
+    gained,
+    pick,
+    nextQuestion,
+    closeDrill,
+  } = useStore();
   const insets = useSafeAreaInsets();
 
   const lesson = findLesson(COURSE, activeLesson);
@@ -61,19 +75,40 @@ export function DrillOverlay() {
                 />
               ))}
             </View>
-            <HeartsPill hearts={hearts} />
+            <HeartsPill
+              hearts={hearts}
+              pending={!hydrated}
+              nextHeartAt={nextHeartAt}
+              clockOffset={clockOffset}
+            />
           </View>
 
+          {/* Running out closes this overlay: `OutOfHeartsScreen` takes the screen from
+              App.tsx, so the drill never sits behind a state it cannot continue from. */}
           {drillDone ? (
             <Pop duration={400} style={styles.done}>
-              <Suit glyph="♠" size={64} color={colors.green} style={{ marginBottom: 14 }} />
-              <Text style={styles.doneKicker}>Hand played</Text>
-              <Text style={[type.bigNumber, { marginBottom: 10 }]}>+{gained} XP</Text>
-              <Text style={styles.doneNote}>
-                {gained === questions.length * XP_PER_ANSWER
-                  ? `Clean sweep. One more session and ${chapter?.title ?? 'this unit'} is yours.`
-                  : 'The ones you missed come back tomorrow.'}
-              </Text>
+              {completionError ? (
+                <>
+                  <Suit glyph="♣" size={64} color={colors.textMuted} style={{ marginBottom: 14 }} />
+                  <Text style={styles.doneKicker}>Not saved</Text>
+                  <Text style={[type.sectionHeading, { marginBottom: 10 }]}>{completionError}</Text>
+                  <Text style={styles.doneNote}>
+                    The hand you played is safe; it is this lesson's finish that did not land.
+                    Play it again when you can and it will count.
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Suit glyph="♠" size={64} color={colors.green} style={{ marginBottom: 14 }} />
+                  <Text style={styles.doneKicker}>Hand played</Text>
+                  <Text style={[type.bigNumber, { marginBottom: 10 }]}>+{gained} XP</Text>
+                  <Text style={styles.doneNote}>
+                    {gained === questions.length * XP_PER_ANSWER
+                      ? `Clean sweep. One more session and ${chapter?.title ?? 'this unit'} is yours.`
+                      : 'The ones you missed come back tomorrow.'}
+                  </Text>
+                </>
+              )}
               <RewardButton label="Back to today" glyph="♥" onPress={closeDrill} />
             </Pop>
           ) : (
@@ -213,11 +248,13 @@ export function DrillOverlay() {
 
                     <Rise duration={350} replayKey={`${qi}-${chosen}`}>
                       <Pressable
-                        onPress={nextQuestion}
+                        onPress={completing ? undefined : nextQuestion}
+                        disabled={completing}
                         accessibilityRole="button"
-                        style={pressable(styles.next, 0.99)}>
+                        accessibilityState={{ disabled: completing }}
+                        style={pressable([styles.next, completing && styles.nextSaving], 0.99)}>
                         <Text style={styles.nextLabel}>
-                          {last ? 'Finish the hand' : 'Next one'}
+                          {completing ? 'Saving…' : last ? 'Finish the hand' : 'Next one'}
                         </Text>
                         <View style={styles.nextCircle}>
                           <Suit glyph="♣" size={15} color={colors.text} />
@@ -390,6 +427,8 @@ const styles = StyleSheet.create({
     paddingRight: 12,
   },
   nextLabel: { fontFamily: font.bold, fontSize: 15, lineHeight: 18, color: colors.text },
+  /** in flight: dimmed and inert, the same treatment the auth buttons use */
+  nextSaving: { opacity: 0.55 },
   nextCircle: {
     width: 38,
     height: 38,

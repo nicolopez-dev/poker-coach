@@ -11,7 +11,7 @@
  *   S5  the local-midnight boundary either side — one instant, two offsets, two verdicts
  */
 
-import { liveStreak, localDay, streakAtRisk } from './streak';
+import { liveStreak, localDay, nextLocalMidnight, streakAtRisk } from './streak';
 
 const TODAY = '2026-08-30';
 
@@ -71,5 +71,25 @@ describe('S5 · the local-midnight boundary', () => {
 
   it('lapses it on the far side', () => {
     expect(liveStreak(7, '2026-08-29', localDay(at, 60))).toBe(0);
+  });
+});
+
+describe('nextLocalMidnight', () => {
+  it('is the next turn of the local day, not of UTC', () => {
+    const at = new Date('2026-08-30T23:30:00.000Z');
+    // two hours east it is already the 31st, so midnight is 22:00 UTC that evening
+    expect(nextLocalMidnight(at, 120).toISOString()).toBe('2026-08-31T22:00:00.000Z');
+    expect(nextLocalMidnight(at, 0).toISOString()).toBe('2026-08-31T00:00:00.000Z');
+  });
+
+  it('is a whole day away when the day has only just turned', () => {
+    const at = new Date('2026-08-30T00:00:00.000Z');
+    expect(nextLocalMidnight(at, 0).toISOString()).toBe('2026-08-31T00:00:00.000Z');
+  });
+
+  it('is always the deadline the at-risk countdown is measured to', () => {
+    const at = new Date('2026-08-30T12:00:00.000Z');
+    const midnight = nextLocalMidnight(at, -300); // −05:00
+    expect(midnight.getTime() - at.getTime()).toBe(17 * 60 * 60 * 1000);
   });
 });

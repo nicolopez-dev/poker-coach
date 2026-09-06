@@ -1,36 +1,18 @@
 /**
- * Sample profile data. Nothing here is persisted or written by the app yet —
- * see "Open items" in docs/design-handoff/README.md.
+ * What is left of the handoff's sample data.
+ *
+ * The name, the avatar, the streak, the XP, the accuracy, the week chart and the daily
+ * goal are all real now — they come from `get_state()` through the store. Two things
+ * are not, and both are marked as such rather than quietly passing for data:
+ *
+ *   · `COACH_NOTE` — **authored copy with nothing behind it.** There is no model that
+ *     reads a player's answers and notices they fold too much from the button, and
+ *     assembling one out of the numbers we do have would be inventing an insight. It
+ *     stays as writing until something can actually say it.
+ *   · `GAMES` — sample games, until P19 records real ones.
  */
-import { colors } from '../theme/tokens';
 
-/**
- * The name, the avatar and the subtitle are real now — they come from `profiles`
- * through the store. What is left here is the games count, which stays sample data
- * until games are recorded for real (P18).
- */
-export const PROFILE = {
-  gamesTotal: 11,
-} as const;
-
-export const HOME_STATS = [
-  { value: '78%', label: 'Sharp' },
-  { value: '42', label: 'Drills' },
-  { value: '7', label: 'Streak' },
-  { value: 'L4', label: 'Level' },
-];
-
-/** Bar heights in points, tallest 74. */
-export const WEEK = [
-  { label: 'M', height: 46, fill: colors.text },
-  { label: 'T', height: 62, fill: colors.text },
-  { label: 'W', height: 30, fill: colors.text },
-  { label: 'T', height: 70, fill: colors.text },
-  { label: 'F', height: 54, fill: colors.text },
-  { label: 'S', height: 18, fill: colors.greenSpent },
-  { label: 'S', height: 26, fill: colors.red },
-];
-
+/** Sample. Replaced in P19, when dealing a stack starts writing a `games` row. */
 export type Game = {
   date: string;
   detail: string;
@@ -66,13 +48,12 @@ export const GAMES: Game[] = [
   },
 ];
 
+/**
+ * **Authored copy, not a finding.** Shown as the coach's note on Home; nothing computes
+ * it, and nothing should pretend to until the app can genuinely read a habit out of a
+ * player's answers.
+ */
 export const COACH_NOTE = {
   title: 'You fold too much from the button.',
   body: "Last seat to act, best seat at the table. Tomorrow's drill is all yours.",
-};
-
-export const DAILY_GOAL = {
-  title: 'Three more drills and the streak is yours',
-  pct: 40,
-  label: '2 of 5 drills',
 };

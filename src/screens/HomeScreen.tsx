@@ -4,17 +4,75 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Rise } from '../components/anim';
 import { RewardCard } from '../components/Gold';
 import { TabScreen } from '../components/TabScreen';
-import { ProgressBar, RewardButton, StatPill, Suit, pressable } from '../components/ui';
+import { PENDING, ProgressBar, RewardButton, StatPill, Suit, pressable } from '../components/ui';
+import { useCountdown } from '../components/useCountdown';
 import { currentChapter } from '../content/progress';
-import { COACH_NOTE, DAILY_GOAL, HOME_STATS, WEEK } from '../data/profile';
+import { COACH_NOTE } from '../data/profile';
 import { fmt } from '../lib/balance';
+import { formatCountdown } from '../lib/hearts';
+import { barHeights, dayLetter } from '../lib/week';
+import { StreakLapseCard } from './home/StreakLapseCard';
 import { useProgress, useStore } from '../state/store';
 import { colors, font, ls, radius, shadows, type } from '../theme/tokens';
 
+/** Three drills is the day's work — the goal the hero counts towards. */
+const DAILY_GOAL = 3;
+
+/** The hero's line, from what has actually been played today. */
+function goalCopy(done: number): { title: string; label: string } {
+  const left = DAILY_GOAL - done;
+
+  if (done === 0) return { title: 'Three drills and the day is yours', label: 'None yet today' };
+  if (left === 1) return { title: 'One more drill and the day is yours', label: '2 of 3 drills' };
+  if (left > 0) {
+    return { title: `${left} more drills and the day is yours`, label: `${done} of 3 drills` };
+  }
+  return {
+    title: "Today's three are done. Anything now is a bonus",
+    label: `${done} of 3 drills`,
+  };
+}
+
 export function HomeScreen() {
-  const { xp, players, buyIn, startNextLesson, go } = useStore();
+  const {
+    xp,
+    players,
+    buyIn,
+    hydrated,
+    canPlay,
+    streak,
+    streakAtRisk,
+    streakExpiresAt,
+    clockOffset,
+    accuracy,
+    week,
+    lessonsToday,
+    completedLessons,
+    startNextLesson,
+    go,
+  } = useStore();
+  // The hero is the one place the at-risk state is a sentence rather than a pill: a run
+  // alive but untouched today has a deadline, and saying it is more use than the
+  // generic daily goal.
+  const untilMidnight = useCountdown(streakAtRisk ? streakExpiresAt : null, clockOffset);
+  const atRisk = streakAtRisk && untilMidnight > 0;
   const progress = useProgress();
-  const chapter = currentChapter(progress);
+  // Until the server answers, the course reads as untouched — which for a returning
+  // player is a lie about where they are. Withhold the unit rather than name the wrong
+  // one; the CTA and the card already have copy for having no chapter yet.
+  const chapter = hydrated ? currentChapter(progress) : undefined;
+
+  const goal = goalCopy(lessonsToday);
+  const heights = barHeights(week.map((d) => d.answers));
+  const played = week.reduce((n, d) => n + d.answers, 0);
+
+  // Three pills, all of them real. The handoff's fourth was a "Level", which nothing in
+  // the app has ever computed — inventing one from this data would be making it up.
+  const stats = [
+    { value: hydrated ? `${Math.round(accuracy * 100)}%` : PENDING, label: 'Sharp' },
+    { value: hydrated ? String(completedLessons.length) : PENDING, label: 'Drills' },
+    { value: hydrated ? String(streak) : PENDING, label: 'Streak' },
+  ];
 
   return (
     <TabScreen>
@@ -22,25 +80,42 @@ export function HomeScreen() {
         <RewardCard radius={radius.hero} innerStyle={styles.hero}>
           <Suit glyph="♠" size={150} color="rgba(240,239,233,.08)" style={styles.heroSuit} />
           <Text style={styles.heroKicker}>Today's hand</Text>
-          <Text style={[type.heroTitle, styles.heroTitle]}>{DAILY_GOAL.title}</Text>
+          <Text style={[type.heroTitle, styles.heroTitle]}>
+            {atRisk
+              ? `Your ${streak}-day streak ends in ${formatCountdown(untilMidnight)}`
+              : goal.title}
+          </Text>
           <ProgressBar
-            pct={DAILY_GOAL.pct}
+            pct={Math.min(100, (lessonsToday / DAILY_GOAL) * 100)}
             height={12}
             track="rgba(240,239,233,.18)"
             style={styles.heroBar}
           />
           <View style={styles.heroFooter}>
-            <Text style={styles.heroFooterText}>{DAILY_GOAL.label}</Text>
-            <Text style={styles.heroFooterText}>{fmt(xp)} XP</Text>
+            <Text style={styles.heroFooterText}>
+              {atRisk ? 'One hand keeps it' : goal.label}
+            </Text>
+            <Text style={styles.heroFooterText}>{hydrated ? fmt(xp) : PENDING} XP</Text>
           </View>
         </RewardCard>
       </Rise>
 
+      <StreakLapseCard />
+
+      {/* Out of hearts the CTA stays pressable — it is how you get to the countdown —
+          but it stops glowing and stops promising a lesson it cannot open. */}
       <RewardButton
-        label={chapter ? `Deal me in — ${chapter.chapter.title}` : 'Deal me in'}
-        glyph="♠"
+        label={
+          !canPlay
+            ? 'Out of hearts'
+            : chapter
+              ? `Deal me in — ${chapter.chapter.title}`
+              : 'Deal me in'
+        }
+        glyph={canPlay ? '♠' : '♥'}
+        glyphColor={canPlay ? colors.textOnReward : colors.red}
         onPress={startNextLesson}
-        glow
+        glow={canPlay}
         style={styles.cta}
       />
 
@@ -51,7 +126,11 @@ export function HomeScreen() {
             {chapter ? `Unit ${chapter.index + 1} · ${chapter.chapter.title}` : 'The path'}
           </Text>
           <Text style={styles.quickSub}>
-            {chapter ? `${chapter.done} of ${chapter.total} lessons` : 'No lessons yet'}
+            {chapter
+              ? `${chapter.done} of ${chapter.total} lessons`
+              : hydrated
+                ? 'No lessons yet'
+                : 'Finding your place'}
           </Text>
         </Pressable>
         <Pressable
@@ -66,7 +145,7 @@ export function HomeScreen() {
       </View>
 
       <View style={styles.stats}>
-        {HOME_STATS.map((s) => (
+        {stats.map((s) => (
           <StatPill key={s.label} value={s.value} label={s.label} />
         ))}
       </View>
@@ -76,13 +155,30 @@ export function HomeScreen() {
         <Text style={styles.coachBody}>{COACH_NOTE.body}</Text>
       </View>
 
+      {/* Seven local days ending today, scaled to the player's own busiest one. A quiet
+          week keeps its columns and sits on the baseline rather than reading as broken. */}
       <View style={styles.weekCard}>
-        <Text style={styles.weekLabel}>This week</Text>
+        <View style={styles.weekHead}>
+          <Text style={styles.weekLabel}>This week</Text>
+          <Text style={styles.weekTotal}>
+            {!hydrated ? PENDING : played === 1 ? '1 hand' : `${played} hands`}
+          </Text>
+        </View>
         <View style={styles.weekChart}>
-          {WEEK.map((d, i) => (
-            <View key={i} style={styles.weekColumn}>
-              <View style={[styles.weekBar, { height: d.height, backgroundColor: d.fill }]} />
-              <Text style={styles.weekDay}>{d.label}</Text>
+          {week.map((d, i) => (
+            <View key={d.day} style={styles.weekColumn}>
+              <View
+                style={[
+                  styles.weekBar,
+                  {
+                    height: heights[i],
+                    backgroundColor: d.answers > 0 ? colors.text : colors.greenSpent,
+                  },
+                ]}
+              />
+              <Text style={[styles.weekDay, i === week.length - 1 && styles.weekToday]}>
+                {dayLetter(d.day)}
+              </Text>
             </View>
           ))}
         </View>
@@ -164,6 +260,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     ...shadows.row,
   },
+  weekHead: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
   weekLabel: {
     fontFamily: font.regular,
     fontSize: 10,
@@ -171,10 +273,19 @@ const styles = StyleSheet.create({
     letterSpacing: ls(10, 0.12),
     textTransform: 'uppercase',
     color: colors.textMuted,
-    marginBottom: 10,
+  },
+  weekTotal: {
+    fontFamily: font.regular,
+    fontSize: 10,
+    lineHeight: 12,
+    letterSpacing: ls(10, 0.06),
+    textTransform: 'uppercase',
+    color: colors.textFaint,
   },
   weekChart: { flexDirection: 'row', alignItems: 'flex-end', gap: 7, height: 74 },
   weekColumn: { flex: 1, alignItems: 'center', gap: 6 },
   weekBar: { width: '100%', borderRadius: 8 },
   weekDay: { fontFamily: font.regular, fontSize: 9, lineHeight: 11, color: colors.textMuted },
+  /** today, so the row reads left-to-right towards now */
+  weekToday: { color: colors.text },
 });

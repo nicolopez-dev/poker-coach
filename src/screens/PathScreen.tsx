@@ -18,7 +18,7 @@ const BADGE: Record<ChapterProgress['state'], string> = {
 
 /** The course. Chapters with no lessons written yet are locked, and inert. */
 export function PathScreen() {
-  const { completedLessons, startLesson } = useStore();
+  const { completedLessons, canPlay, startLesson } = useStore();
   const progress = useProgress();
 
   return (
@@ -29,6 +29,7 @@ export function PathScreen() {
         <ChapterRow
           key={chapter.chapter.id}
           progress={chapter}
+          blocked={!canPlay}
           onPress={() => startLesson(nextLessonOf(chapter.chapter, completedLessons))}
         />
       ))}
@@ -38,13 +39,22 @@ export function PathScreen() {
 
 function ChapterRow({
   progress,
+  blocked,
   onPress,
 }: {
   progress: ChapterProgress;
+  /** out of hearts: nothing here can be played until one comes back */
+  blocked: boolean;
   onPress: () => void;
 }) {
-  const { chapter, state, pct } = progress;
-  const open = isPlayable(state) && chapter.lessons.length > 0;
+  const { chapter, pct } = progress;
+
+  // No new state, and no new badge: a unit you cannot open right now reads exactly like
+  // one you have not reached. A mastered unit keeps saying so, because it still is —
+  // it simply cannot be replayed until a heart returns.
+  const state = blocked && progress.state !== 'done' ? 'locked' : progress.state;
+
+  const open = isPlayable(state) && chapter.lessons.length > 0 && !blocked;
   const current = state === 'now';
   const faceUp = state === 'done' || current;
   const red = chapter.glyph === '♥' || chapter.glyph === '♦';

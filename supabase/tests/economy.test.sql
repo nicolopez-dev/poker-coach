@@ -27,7 +27,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(48);
+select plan(53);
 
 
 -- ──────────────────────────────────────────────────────────── H · settle_hearts
@@ -319,6 +319,27 @@ select is(
   'accuracy is correct over total'
 );
 
+-- The week always has seven columns, whether or not anything was played on them: a chart
+-- drawn only from the days with data would change shape as the week went on.
+select is(
+  (select json_array_length(public.get_state() -> 'week')),
+  7,
+  'the week is seven local days, quiet ones included'
+);
+
+select is(
+  (public.get_state() -> 'chapters' ->> 'c1')::int,
+  1,
+  'completions come back counted by chapter'
+);
+
+select is(
+  (public.get_state() ->> 'games')::int,
+  0,
+  'and no games, which is the honest answer until they are recorded'
+);
+
+
 -- A lapse is derived on read and never written back.
 reset role;
 update public.player_state
@@ -336,6 +357,18 @@ select is(
     where user_id = 'aaaaaaaa-0000-4000-8000-000000000001'),
   7,
   'but the stored count is never zeroed — the lapse is derived, not written'
+);
+
+-- Both of these are what the client needs to say "your seven-day run ended", once:
+-- the resolved count is zero by then, and longest_streak is a different fact.
+select is(
+  (public.get_state() ->> 'stored_streak_count')::int, 7,
+  'the state carries the number that ended, not just the zero it resolves to'
+);
+
+select is(
+  (public.get_state() ->> 'streak_day')::date, current_date - 5,
+  'and the day it ended on, which is what the acknowledgement is keyed to'
 );
 
 

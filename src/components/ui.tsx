@@ -11,10 +11,11 @@ import {
   ViewStyle,
 } from 'react-native';
 
-import { MAX_HEARTS } from '../lib/hearts';
+import { MAX_HEARTS, formatCountdown } from '../lib/hearts';
 import { colors, font, ls, radius, shadows, TOUCH } from '../theme/tokens';
 import { Glow } from './anim';
 import { GoldFrame } from './Gold';
+import { useCountdown } from './useCountdown';
 
 /**
  * Suit pips render in the platform font: Archivo ships no card glyphs, and a
@@ -86,29 +87,113 @@ export function Brand() {
   );
 }
 
-export function HeartsPill({ hearts }: { hearts: number }) {
+/**
+ * A number that has not arrived from the server yet. Never a zero in its place: an empty
+ * heart row or a "0 day" streak is a claim about the player, and a slow network is not
+ * entitled to make it.
+ */
+export const PENDING = '—';
+
+/**
+ * The hearts, and how long until the next one. The countdown only appears below max —
+ * at full there is nothing to wait for — and it ticks inside this component, so the
+ * header counts down without re-rendering the screen behind it.
+ */
+export function HeartsPill({
+  hearts,
+  pending = false,
+  nextHeartAt = null,
+  clockOffset = 0,
+}: {
+  hearts: number;
+  pending?: boolean;
+  nextHeartAt?: string | null;
+  clockOffset?: number;
+}) {
+  const waiting = !pending && hearts < MAX_HEARTS ? nextHeartAt : null;
+  const remaining = useCountdown(waiting, clockOffset);
+
   return (
     <View style={styles.heartsPill}>
-      {Array.from({ length: MAX_HEARTS }, (_, i) => (
-        <Suit
-          key={i}
-          glyph="♥"
-          size={11}
-          color={i < hearts ? colors.red : colors.greenSpent}
-        />
-      ))}
+      {pending ? (
+        <Text style={styles.pendingMark}>{PENDING}</Text>
+      ) : (
+        Array.from({ length: MAX_HEARTS }, (_, i) => (
+          <Suit key={i} glyph="♥" size={11} color={i < hearts ? colors.red : colors.greenSpent} />
+        ))
+      )}
+      {waiting && remaining > 0 ? (
+        <Text style={styles.heartsCountdown}>{formatCountdown(remaining)}</Text>
+      ) : null}
     </View>
   );
 }
 
-export function StreakPill({ streak }: { streak: number }) {
+/**
+ * The streak, in the three states §6 specifies.
+ *
+ *   · **Alive** — the gold frame, unchanged: the reward treatment the design gives it.
+ *   · **At risk** — the count stands, but the gold goes hollow: a plain hairline and
+ *     the time left until local midnight. Being one day from losing a run is not an
+ *     error, so there is no red here; red belongs to the chip action, hearts, the
+ *     "Playing" badge and the chip tool's focus rings.
+ *   · **Lapsed** — a muted zero with no frame at all. Nothing to celebrate, nothing to
+ *     alarm; the card on Home is what actually says the run ended.
+ */
+export function StreakPill({
+  streak,
+  pending = false,
+  atRisk = false,
+  expiresAt = null,
+  clockOffset = 0,
+}: {
+  streak: number;
+  pending?: boolean;
+  atRisk?: boolean;
+  /** local midnight, when an at-risk run ends */
+  expiresAt?: string | null;
+  clockOffset?: number;
+}) {
+  const remaining = useCountdown(atRisk ? expiresAt : null, clockOffset);
+  const lapsed = !pending && streak === 0;
+
+  const body = (
+    <View style={styles.streakPill}>
+      <Text style={[styles.streakNumber, lapsed && styles.streakNumberLapsed]}>
+        {pending ? PENDING : streak}
+      </Text>
+      <Text style={styles.streakLabel}>day</Text>
+      {atRisk && remaining > 0 ? (
+        <Text style={styles.streakLeft}>{formatCountdown(remaining)} left</Text>
+      ) : null}
+    </View>
+  );
+
+  if (lapsed) return <View style={styles.streakPillLapsed}>{body}</View>;
+  if (atRisk) return <View style={styles.streakPillAtRisk}>{body}</View>;
+
   return (
     <GoldFrame radius={radius.pill} fill={colors.rewardAlt}>
-      <View style={styles.streakPill}>
-        <Text style={styles.streakNumber}>{streak}</Text>
-        <Text style={styles.streakLabel}>day</Text>
-      </View>
+      {body}
     </GoldFrame>
+  );
+}
+
+/**
+ * What the sync is doing, when it is worth saying — the same pill the hearts sit in, at
+ * the label scale the header already uses. Nothing when everything has landed.
+ *
+ * "Not saved" is progress the server refused, which is not coming back: it is said
+ * plainly rather than hidden behind a tick, and it clears when the player starts the
+ * next lesson.
+ */
+export function SyncPill({ offline, unsaved }: { offline: boolean; unsaved: number }) {
+  if (!offline && unsaved === 0) return null;
+
+  return (
+    <View style={styles.syncPill}>
+      <Text style={styles.syncLabel}>{unsaved > 0 ? 'Not saved' : 'Offline'}</Text>
+    </View>
   );
 }
 
@@ -348,6 +433,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     alignItems: 'center',
   },
+  syncPill: {
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceInput,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  syncLabel: {
+    fontFamily: font.regular,
+    fontSize: 9,
+    lineHeight: 11,
+    letterSpacing: ls(9, 0.08),
+    textTransform: 'uppercase',
+    color: colors.textMuted,
+  },
+  /** the wait for the next heart, at the micro scale the header uses for labels */
+  heartsCountdown: {
+    fontFamily: font.regular,
+    fontSize: 9,
+    lineHeight: 11,
+    letterSpacing: ls(9, 0.06),
+    textTransform: 'uppercase',
+    color: colors.textMuted,
+    marginLeft: 4,
+  },
+  /** the placeholder mark, sized to the pips it stands in for */
+  pendingMark: {
+    fontFamily: font.bold,
+    fontSize: 11,
+    lineHeight: 13,
+    color: colors.textFaint,
+    paddingHorizontal: 8,
+  },
   streakPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -355,7 +472,29 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 11,
   },
+  /** at risk: the gold hairline goes hollow — the frame's shape without its fill */
+  streakPillAtRisk: {
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.goldRule,
+    backgroundColor: 'transparent',
+  },
+  /** lapsed: no frame at all, the same surface every other muted pill sits on */
+  streakPillLapsed: {
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceInput,
+  },
   streakNumber: { fontFamily: font.bold, fontSize: 12, lineHeight: 14, color: colors.gold },
+  streakNumberLapsed: { color: colors.textMuted },
+  /** the time left before local midnight takes the run */
+  streakLeft: {
+    fontFamily: font.regular,
+    fontSize: 9,
+    lineHeight: 11,
+    letterSpacing: ls(9, 0.06),
+    textTransform: 'uppercase',
+    color: colors.textMuted,
+  },
   streakLabel: {
     fontFamily: font.regular,
     fontSize: 10,

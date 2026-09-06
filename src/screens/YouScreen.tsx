@@ -5,32 +5,69 @@ import { useAuth } from '../auth/AuthProvider';
 import { Rise } from '../components/anim';
 import { Avatar } from '../components/Avatar';
 import { TabScreen } from '../components/TabScreen';
-import { OutlineButton, ProgressBar } from '../components/ui';
+import { OutlineButton, PENDING, ProgressBar } from '../components/ui';
 import { currentChapter } from '../content/progress';
-import { GAMES, PROFILE } from '../data/profile';
+import { GAMES } from '../data/profile';
 import { fmt } from '../lib/balance';
 import { useProgress, useStore } from '../state/store';
 import { colors, font, ls, radius, shadows } from '../theme/tokens';
 
 export function YouScreen() {
-  const { xp, streak, gamesOpen, toggleGames, loadGame, displayName, avatarId } = useStore();
+  const {
+    xp,
+    streak,
+    longestStreak,
+    accuracy,
+    games,
+    hydrated,
+    gamesOpen,
+    toggleGames,
+    loadGame,
+    displayName,
+    avatarId,
+  } = useStore();
   const { signOut, goTo } = useAuth();
   const progress = useProgress();
 
   // "Unit 3 · 7-day streak" — the same unit the Path and Home headers name, and the
   // streak the header pill shows, rather than the handoff's invented "Friday-night
-  // regular". A run of nothing says so instead of reading "0-day streak".
+  // regular". A run of nothing says so instead of reading "0-day streak", and a run we
+  // have not heard about yet says nothing at all.
   const unit = currentChapter(progress);
-  const subtitle = [
-    unit ? `Unit ${unit.index + 1}` : 'Yet to sit down',
-    streak > 0 ? `${streak}-day streak` : 'No streak yet',
-  ].join(' · ');
+  const subtitle = !hydrated
+    ? 'Taking your seat'
+    : [
+        unit ? `Unit ${unit.index + 1}` : 'Yet to sit down',
+        streak > 0 ? `${streak}-day streak` : 'No streak yet',
+      ].join(' · ');
 
   const stats = [
-    { value: fmt(xp), label: 'Total XP', bg: colors.greenDeep, ink: colors.text },
-    { value: String(streak), label: 'Day streak', bg: colors.rewardAlt, ink: colors.gold },
-    { value: '78%', label: 'Accuracy', bg: colors.surface, ink: colors.text },
-    { value: String(PROFILE.gamesTotal), label: 'Games set up', bg: colors.surface, ink: colors.text },
+    {
+      value: hydrated ? fmt(xp) : PENDING,
+      label: 'Total XP',
+      bg: colors.greenDeep,
+      ink: colors.text,
+    },
+    {
+      value: hydrated ? String(streak) : PENDING,
+      label: 'Day streak',
+      bg: colors.rewardAlt,
+      ink: colors.gold,
+      // a lost run is still a run that happened; the best one keeps its place here
+      note: hydrated && longestStreak > 0 ? `Best ${longestStreak}` : undefined,
+    },
+    {
+      value: hydrated ? `${Math.round(accuracy * 100)}%` : PENDING,
+      label: 'Accuracy',
+      bg: colors.surface,
+      ink: colors.text,
+    },
+    {
+      value: hydrated ? String(games) : PENDING,
+      label: 'Games set up',
+      bg: colors.surface,
+      ink: colors.text,
+    },
   ];
 
   return (
@@ -56,6 +93,7 @@ export function YouScreen() {
           <View key={s.label} style={[styles.statCard, { backgroundColor: s.bg }]}>
             <Text style={[styles.statValue, { color: s.ink }]}>{s.value}</Text>
             <Text style={styles.statLabel}>{s.label}</Text>
+            {s.note ? <Text style={styles.statNote}>{s.note}</Text> : null}
           </View>
         ))}
       </View>
@@ -65,7 +103,7 @@ export function YouScreen() {
         <View key={chapter.id} style={styles.masteryRow}>
           <View style={styles.masteryHead}>
             <Text style={styles.masteryName}>{chapter.title}</Text>
-            <Text style={styles.masteryPct}>{pct}%</Text>
+            <Text style={styles.masteryPct}>{hydrated ? `${pct}%` : PENDING}</Text>
           </View>
           <ProgressBar pct={pct} height={9} />
         </View>
@@ -82,7 +120,7 @@ export function YouScreen() {
       {gamesOpen && (
         <Rise duration={300} style={styles.gamesPanel}>
           <View style={styles.gamesHead}>
-            <Text style={styles.gamesCount}>Last {GAMES.length} of {PROFILE.gamesTotal}</Text>
+            <Text style={styles.gamesCount}>Last {GAMES.length} of {games}</Text>
             <Text style={styles.gamesUnits}>Balance in units</Text>
           </View>
           <View style={{ gap: 8 }}>
@@ -174,6 +212,16 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors.textMuted,
     marginTop: 5,
+  },
+  /** the longest run, under its stat at the same micro scale */
+  statNote: {
+    fontFamily: font.regular,
+    fontSize: 10,
+    lineHeight: 12,
+    letterSpacing: ls(10, 0.08),
+    textTransform: 'uppercase',
+    color: colors.textFaint,
+    marginTop: 3,
   },
   sectionLabel: {
     fontFamily: font.regular,

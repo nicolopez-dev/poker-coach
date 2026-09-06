@@ -59,6 +59,25 @@ export function spend(state: HeartState, at: Date): HeartState {
   };
 }
 
+/**
+ * A wait, as the app says it: "3:41" for hours and minutes once there is an hour or
+ * more left, "41:20" for minutes and seconds under it. The regen interval is four
+ * hours, so the first form never runs past a single digit of hours.
+ *
+ * Rounded up, so the last second reads "0:01" rather than "0:00" — a countdown that
+ * sits on zero while the heart is still coming is a small lie.
+ */
+export function formatCountdown(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, '0')}`
+    : `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
 /** When the next heart lands, or null at full — there is no countdown to show. */
 export function nextHeartAt(state: HeartState, at: Date): Date | null {
   const settled = settle(state, at);
