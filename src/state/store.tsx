@@ -29,7 +29,7 @@ import { NAME_MAX_LENGTH } from '../lib/names';
 import type { PlayerState } from '../server/client';
 import { fetchProfile, type Profile } from '../server/profile';
 import { useHydrate, type HydrateAction } from '../server/useHydrate';
-import { finishLesson, recordAnswer, type DrillAction } from './drill';
+import { beginRun, finishLesson, recordAnswer, type DrillAction } from './drill';
 
 export type Tab = 'home' | 'path' | 'chips' | 'you';
 
@@ -495,9 +495,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     () => ({
       ...state,
       go: (tab) => dispatch({ type: 'go', tab }),
-      startLesson: (ref) => dispatch({ type: 'startLesson', ref }),
-      startNextLesson: () =>
-        dispatch({ type: 'startLesson', ref: nextLesson(COURSE, state.completedLessons) }),
+      startLesson: (ref) => {
+        beginRun();
+        dispatch({ type: 'startLesson', ref });
+      },
+      startNextLesson: () => {
+        beginRun();
+        dispatch({ type: 'startLesson', ref: nextLesson(COURSE, state.completedLessons) });
+      },
       closeDrill: () => dispatch({ type: 'closeDrill' }),
 
       // The dispatch renders the feedback; the write catches up and corrects it.

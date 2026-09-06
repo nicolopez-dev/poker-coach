@@ -25,7 +25,7 @@ import { COURSE } from '../content/course';
 import { isDrill } from '../content/progress';
 import { XP_PER_ANSWER } from '../content/types';
 import { ServerError, type AnswerOutcome, type PlayerState } from '../server/client';
-import { finishLesson, recordAnswer } from './drill';
+import { beginRun, finishLesson, recordAnswer } from './drill';
 import { initialState, reducer } from './store';
 
 const CHAPTER = COURSE[0];
@@ -45,13 +45,16 @@ const SERVER_NOW = '2026-09-05T14:00:00.000Z';
 function fakeServer({ hearts = 5, key = RIGHT }: { hearts?: number; key?: string } = {}) {
   const seen = new Map<string, AnswerOutcome>();
   const answered: { lessonId: string; correct: boolean }[] = [];
-  const state = { hearts, calls: 0 };
+  const state = { hearts, calls: 0, completions: 0 };
 
   return {
     state,
     answered,
     async submitAnswer(input: { chosenOptionId: string; clientEventId: string; lessonId: string }) {
       state.calls++;
+      // the real function keys its idempotency on this, so a missing one would make
+      // every answer look like a replay of the last
+      if (!input.clientEventId) throw new Error('submit_answer needs a client_event_id');
       const replay = seen.get(input.clientEventId);
       if (replay) return replay;
       if (state.hearts === 0) throw new ServerError('OUT_OF_HEARTS', 'out of hearts');
@@ -69,6 +72,10 @@ function fakeServer({ hearts = 5, key = RIGHT }: { hearts?: number; key?: string
       return outcome;
     },
     async completeLesson(input: { lessonId: string }): Promise<PlayerState> {
+      state.completions++;
+      // exactly what the real function checks: that the lesson has answer rows at all.
+      // It knows nothing about hearts, which is why the client must not send this after
+      // an answer was refused for want of one.
       if (!answered.some((a) => a.lessonId === input.lessonId)) {
         throw new ServerError('NO_ANSWERS', 'that hand was never played');
       }
@@ -116,7 +123,18 @@ function store(hearts = 5) {
   };
 }
 
-const answer = (s: ReturnType<typeof store>, optionId: string, clientEventId?: string) =>
+/**
+ * Ids are passed explicitly rather than left to `Crypto.randomUUID()`, which has no
+ * implementation under jest — and a missing id would quietly make every answer look
+ * like a replay of the one before it.
+ */
+let events = 0;
+
+const answer = (
+  s: ReturnType<typeof store>,
+  optionId: string,
+  clientEventId = `event-${++events}`,
+) =>
   recordAnswer(s.dispatch, {
     ref: REF,
     questionIndex: 0,
@@ -127,6 +145,7 @@ const answer = (s: ReturnType<typeof store>, optionId: string, clientEventId?: s
 
 beforeEach(() => {
   mockServer = fakeServer();
+  beginRun();
 });
 
 describe('answering', () => {
@@ -239,6 +258,35 @@ describe('finishing', () => {
     // the whole state comes back with the completion, XP included
     expect(s.state.xp).toBe(XP_PER_ANSWER);
     expect(s.state.streak).toBe(12);
+  });
+
+  // The button to finish appears as soon as an answer is picked, so a player on a slow
+  // connection can tap it while that answer is still in the air. If the answer comes
+  // back refused, the completion queued behind it must never be sent: `complete_lesson`
+  // asks only whether the lesson has answer rows — the earlier questions have them — so
+  // the server would record a lesson the player did not finish, and advance the streak.
+  it('does not finish a lesson whose last answer ran out of hearts', async () => {
+    mockServer = fakeServer({ hearts: 1 });
+    beginRun();
+
+    const s = store(1);
+
+    // question one is answered wrong, taking the last heart
+    s.dispatch({ type: 'pick', id: WRONG });
+    await answer(s, WRONG);
+    expect(mockServer.state.hearts).toBe(0);
+
+    // the last one is picked and finished in the same breath, neither awaited
+    s.dispatch({ type: 'pick', id: WRONG });
+    const answering = answer(s, WRONG);
+    s.dispatch({ type: 'completing' });
+    const finishing = finishLesson(s.dispatch, { ref: REF, clockOffset: 0, clientEventId: "finish-1" });
+    await Promise.all([answering, finishing]);
+
+    expect(mockServer.state.completions).toBe(0);
+    expect(s.state.outOfHearts).toBe(true);
+    expect(s.state.drillDone).toBe(false);
+    expect(s.state.completedLessons).toEqual([]);
   });
 
   it('says why on the done card when the completion is refused', async () => {

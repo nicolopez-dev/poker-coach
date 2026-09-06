@@ -53,6 +53,22 @@ function serial<T>(work: () => Promise<T>): Promise<T> {
 }
 
 /**
+ * Set when the server refuses an answer for want of a heart.
+ *
+ * The "Finish the hand" button appears the moment an answer is picked, so a completion
+ * can be queued behind an answer that has not come back yet. If that answer is refused,
+ * the completion must not go: the lesson is unfinished by definition, and
+ * `complete_lesson` would record it happily — it asks only whether the lesson has any
+ * answer rows, and the questions before this one supply those.
+ */
+let heartsRanOut = false;
+
+/** Opening a lesson clears it. The flag belongs to the run, not to the app. */
+export function beginRun(): void {
+  heartsRanOut = false;
+}
+
+/**
  * The instant to send. Derived from the offset captured at hydration rather than the
  * device clock (§3 rule 8), so a wound-forward phone cannot backdate or postdate a
  * streak; the server clamps it to the last seven days regardless.
@@ -81,16 +97,24 @@ export async function recordAnswer(
   const occurredAt = serverNow(answer.clockOffset);
 
   try {
-    const outcome = await serial(() =>
-      submitAnswer({
-        lessonId: answer.ref.lessonId,
-        questionIndex: answer.questionIndex,
-        chosenOptionId: answer.optionId,
-        clientEventId,
-        occurredAt,
-        tzOffsetMin: tzOffsetMin(),
-      }),
-    );
+    const outcome = await serial(async () => {
+      try {
+        return await submitAnswer({
+          lessonId: answer.ref.lessonId,
+          questionIndex: answer.questionIndex,
+          chosenOptionId: answer.optionId,
+          clientEventId,
+          occurredAt,
+          tzOffsetMin: tzOffsetMin(),
+        });
+      } catch (error) {
+        // inside the queued work, so the flag is set before whatever is queued behind
+        // this runs. Setting it from the outer catch below would be a microtask late,
+        // and the completion could slip past.
+        if (serverErrorCode(error) === 'OUT_OF_HEARTS') heartsRanOut = true;
+        throw error;
+      }
+    });
     dispatch({ type: 'answerRecorded', outcome });
   } catch (error) {
     // Out of hearts is not a failed write, it is an answer: the drill ends here and the
@@ -113,15 +137,23 @@ export async function finishLesson(
   const occurredAt = serverNow(lesson.clockOffset);
 
   try {
-    const state = await serial(() =>
-      completeLesson({
-        lessonId: lesson.ref.lessonId,
-        chapterId: lesson.ref.chapterId,
-        clientEventId,
-        occurredAt,
-        tzOffsetMin: tzOffsetMin(),
-      }),
+    // inside the queue, not before it: whether the run survived is only known once the
+    // answers ahead of this have had their reply
+    const state = await serial(async () =>
+      heartsRanOut
+        ? null
+        : completeLesson({
+            lessonId: lesson.ref.lessonId,
+            chapterId: lesson.ref.chapterId,
+            clientEventId,
+            occurredAt,
+            tzOffsetMin: tzOffsetMin(),
+          }),
     );
+
+    // the out-of-hearts ending already owns the screen, and owns it correctly
+    if (!state) return;
+
     dispatch({
       type: 'lessonCompleted',
       state,
