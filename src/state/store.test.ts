@@ -95,6 +95,10 @@ function fakeServer({ hearts = 5, key = RIGHT }: { hearts?: number; key?: string
         xp: answered.filter((a) => a.correct).length * XP_PER_ANSWER,
         accuracy: 1,
         completedLessons: [input.lessonId],
+        week: [],
+        lessonsToday: 0,
+        chapters: {},
+        games: 0,
         serverNow: SERVER_NOW,
       };
     },
@@ -364,6 +368,10 @@ describe('the streak', () => {
     xp: 0,
     accuracy: 1,
     completedLessons: [],
+    week: [],
+    lessonsToday: 0,
+    chapters: {},
+    games: 0,
     serverNow: `${today}T09:00:00.000Z`,
   });
 

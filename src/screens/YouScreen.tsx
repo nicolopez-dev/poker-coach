@@ -7,7 +7,7 @@ import { Avatar } from '../components/Avatar';
 import { TabScreen } from '../components/TabScreen';
 import { OutlineButton, PENDING, ProgressBar } from '../components/ui';
 import { currentChapter } from '../content/progress';
-import { GAMES, PROFILE } from '../data/profile';
+import { GAMES } from '../data/profile';
 import { fmt } from '../lib/balance';
 import { useProgress, useStore } from '../state/store';
 import { colors, font, ls, radius, shadows } from '../theme/tokens';
@@ -17,6 +17,8 @@ export function YouScreen() {
     xp,
     streak,
     longestStreak,
+    accuracy,
+    games,
     hydrated,
     gamesOpen,
     toggleGames,
@@ -54,8 +56,18 @@ export function YouScreen() {
       // a lost run is still a run that happened; the best one keeps its place here
       note: hydrated && longestStreak > 0 ? `Best ${longestStreak}` : undefined,
     },
-    { value: '78%', label: 'Accuracy', bg: colors.surface, ink: colors.text },
-    { value: String(PROFILE.gamesTotal), label: 'Games set up', bg: colors.surface, ink: colors.text },
+    {
+      value: hydrated ? `${Math.round(accuracy * 100)}%` : PENDING,
+      label: 'Accuracy',
+      bg: colors.surface,
+      ink: colors.text,
+    },
+    {
+      value: hydrated ? String(games) : PENDING,
+      label: 'Games set up',
+      bg: colors.surface,
+      ink: colors.text,
+    },
   ];
 
   return (
@@ -108,7 +120,7 @@ export function YouScreen() {
       {gamesOpen && (
         <Rise duration={300} style={styles.gamesPanel}>
           <View style={styles.gamesHead}>
-            <Text style={styles.gamesCount}>Last {GAMES.length} of {PROFILE.gamesTotal}</Text>
+            <Text style={styles.gamesCount}>Last {GAMES.length} of {games}</Text>
             <Text style={styles.gamesUnits}>Balance in units</Text>
           </View>
           <View style={{ gap: 8 }}>

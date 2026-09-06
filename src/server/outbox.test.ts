@@ -54,6 +54,10 @@ const playerState = (): PlayerState => ({
   xp: 16,
   accuracy: 1,
   completedLessons: ['l1'],
+  week: [],
+  lessonsToday: 0,
+  chapters: {},
+  games: 0,
   serverNow: '2026-09-06T12:00:00.000Z',
 });
 

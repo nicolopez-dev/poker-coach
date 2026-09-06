@@ -16,7 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { PlayerState } from './client';
 
 /** Bumped whenever `PlayerState` changes shape; an older blob is dropped, not migrated. */
-const VERSION = 2;
+const VERSION = 3;
 
 const key = (userId: string) => `pokerCoach.state.v${VERSION}.${userId}`;
 
@@ -66,13 +66,25 @@ function parse(raw: string): PlayerState | null {
   if (typeof value !== 'object' || value === null) return null;
   const state = value as Record<string, unknown>;
 
-  const numbers = ['hearts', 'streak', 'storedStreak', 'longestStreak', 'xp', 'accuracy'] as const;
+  const numbers = [
+    'hearts',
+    'streak',
+    'storedStreak',
+    'longestStreak',
+    'xp',
+    'accuracy',
+    'lessonsToday',
+    'games',
+  ] as const;
   if (numbers.some((field) => typeof state[field] !== 'number')) return null;
   if (typeof state.streakAtRisk !== 'boolean') return null;
   if (typeof state.serverNow !== 'string') return null;
 
   const dates = ['nextHeartAt', 'streakExpiresAt', 'streakDay'] as const;
   if (dates.some((f) => state[f] !== null && typeof state[f] !== 'string')) return null;
+
+  if (!Array.isArray(state.week)) return null;
+  if (typeof state.chapters !== 'object' || state.chapters === null) return null;
 
   if (
     !Array.isArray(state.completedLessons) ||

@@ -7,12 +7,31 @@ import { TabScreen } from '../components/TabScreen';
 import { PENDING, ProgressBar, RewardButton, StatPill, Suit, pressable } from '../components/ui';
 import { useCountdown } from '../components/useCountdown';
 import { currentChapter } from '../content/progress';
-import { COACH_NOTE, DAILY_GOAL, HOME_STATS, WEEK } from '../data/profile';
+import { COACH_NOTE } from '../data/profile';
 import { fmt } from '../lib/balance';
 import { formatCountdown } from '../lib/hearts';
+import { barHeights, dayLetter } from '../lib/week';
 import { StreakLapseCard } from './home/StreakLapseCard';
 import { useProgress, useStore } from '../state/store';
 import { colors, font, ls, radius, shadows, type } from '../theme/tokens';
+
+/** Three drills is the day's work — the goal the hero counts towards. */
+const DAILY_GOAL = 3;
+
+/** The hero's line, from what has actually been played today. */
+function goalCopy(done: number): { title: string; label: string } {
+  const left = DAILY_GOAL - done;
+
+  if (done === 0) return { title: 'Three drills and the day is yours', label: 'None yet today' };
+  if (left === 1) return { title: 'One more drill and the day is yours', label: '2 of 3 drills' };
+  if (left > 0) {
+    return { title: `${left} more drills and the day is yours`, label: `${done} of 3 drills` };
+  }
+  return {
+    title: "Today's three are done. Anything now is a bonus",
+    label: `${done} of 3 drills`,
+  };
+}
 
 export function HomeScreen() {
   const {
@@ -25,6 +44,10 @@ export function HomeScreen() {
     streakAtRisk,
     streakExpiresAt,
     clockOffset,
+    accuracy,
+    week,
+    lessonsToday,
+    completedLessons,
     startNextLesson,
     go,
   } = useStore();
@@ -39,6 +62,18 @@ export function HomeScreen() {
   // one; the CTA and the card already have copy for having no chapter yet.
   const chapter = hydrated ? currentChapter(progress) : undefined;
 
+  const goal = goalCopy(lessonsToday);
+  const heights = barHeights(week.map((d) => d.answers));
+  const played = week.reduce((n, d) => n + d.answers, 0);
+
+  // Three pills, all of them real. The handoff's fourth was a "Level", which nothing in
+  // the app has ever computed — inventing one from this data would be making it up.
+  const stats = [
+    { value: hydrated ? `${Math.round(accuracy * 100)}%` : PENDING, label: 'Sharp' },
+    { value: hydrated ? String(completedLessons.length) : PENDING, label: 'Drills' },
+    { value: hydrated ? String(streak) : PENDING, label: 'Streak' },
+  ];
+
   return (
     <TabScreen>
       <Rise duration={450}>
@@ -48,17 +83,17 @@ export function HomeScreen() {
           <Text style={[type.heroTitle, styles.heroTitle]}>
             {atRisk
               ? `Your ${streak}-day streak ends in ${formatCountdown(untilMidnight)}`
-              : DAILY_GOAL.title}
+              : goal.title}
           </Text>
           <ProgressBar
-            pct={atRisk ? 0 : DAILY_GOAL.pct}
+            pct={Math.min(100, (lessonsToday / DAILY_GOAL) * 100)}
             height={12}
             track="rgba(240,239,233,.18)"
             style={styles.heroBar}
           />
           <View style={styles.heroFooter}>
             <Text style={styles.heroFooterText}>
-              {atRisk ? 'One hand keeps it' : DAILY_GOAL.label}
+              {atRisk ? 'One hand keeps it' : goal.label}
             </Text>
             <Text style={styles.heroFooterText}>{hydrated ? fmt(xp) : PENDING} XP</Text>
           </View>
@@ -110,7 +145,7 @@ export function HomeScreen() {
       </View>
 
       <View style={styles.stats}>
-        {HOME_STATS.map((s) => (
+        {stats.map((s) => (
           <StatPill key={s.label} value={s.value} label={s.label} />
         ))}
       </View>
@@ -120,13 +155,30 @@ export function HomeScreen() {
         <Text style={styles.coachBody}>{COACH_NOTE.body}</Text>
       </View>
 
+      {/* Seven local days ending today, scaled to the player's own busiest one. A quiet
+          week keeps its columns and sits on the baseline rather than reading as broken. */}
       <View style={styles.weekCard}>
-        <Text style={styles.weekLabel}>This week</Text>
+        <View style={styles.weekHead}>
+          <Text style={styles.weekLabel}>This week</Text>
+          <Text style={styles.weekTotal}>
+            {!hydrated ? PENDING : played === 1 ? '1 hand' : `${played} hands`}
+          </Text>
+        </View>
         <View style={styles.weekChart}>
-          {WEEK.map((d, i) => (
-            <View key={i} style={styles.weekColumn}>
-              <View style={[styles.weekBar, { height: d.height, backgroundColor: d.fill }]} />
-              <Text style={styles.weekDay}>{d.label}</Text>
+          {week.map((d, i) => (
+            <View key={d.day} style={styles.weekColumn}>
+              <View
+                style={[
+                  styles.weekBar,
+                  {
+                    height: heights[i],
+                    backgroundColor: d.answers > 0 ? colors.text : colors.greenSpent,
+                  },
+                ]}
+              />
+              <Text style={[styles.weekDay, i === week.length - 1 && styles.weekToday]}>
+                {dayLetter(d.day)}
+              </Text>
             </View>
           ))}
         </View>
@@ -208,6 +260,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     ...shadows.row,
   },
+  weekHead: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
   weekLabel: {
     fontFamily: font.regular,
     fontSize: 10,
@@ -215,10 +273,19 @@ const styles = StyleSheet.create({
     letterSpacing: ls(10, 0.12),
     textTransform: 'uppercase',
     color: colors.textMuted,
-    marginBottom: 10,
+  },
+  weekTotal: {
+    fontFamily: font.regular,
+    fontSize: 10,
+    lineHeight: 12,
+    letterSpacing: ls(10, 0.06),
+    textTransform: 'uppercase',
+    color: colors.textFaint,
   },
   weekChart: { flexDirection: 'row', alignItems: 'flex-end', gap: 7, height: 74 },
   weekColumn: { flex: 1, alignItems: 'center', gap: 6 },
   weekBar: { width: '100%', borderRadius: 8 },
   weekDay: { fontFamily: font.regular, fontSize: 9, lineHeight: 11, color: colors.textMuted },
+  /** today, so the row reads left-to-right towards now */
+  weekToday: { color: colors.text },
 });

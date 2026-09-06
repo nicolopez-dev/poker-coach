@@ -27,7 +27,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(50);
+select plan(53);
 
 
 -- ──────────────────────────────────────────────────────────── H · settle_hearts
@@ -318,6 +318,27 @@ select is(
   (public.get_state() ->> 'accuracy')::numeric, 0.3333::numeric,
   'accuracy is correct over total'
 );
+
+-- The week always has seven columns, whether or not anything was played on them: a chart
+-- drawn only from the days with data would change shape as the week went on.
+select is(
+  (select json_array_length(public.get_state() -> 'week')),
+  7,
+  'the week is seven local days, quiet ones included'
+);
+
+select is(
+  (public.get_state() -> 'chapters' ->> 'c1')::int,
+  1,
+  'completions come back counted by chapter'
+);
+
+select is(
+  (public.get_state() ->> 'games')::int,
+  0,
+  'and no games, which is the honest answer until they are recorded'
+);
+
 
 -- A lapse is derived on read and never written back.
 reset role;

@@ -125,7 +125,10 @@ Carried over from the handoff's own open items:
   through the outbox to the P3 functions — queued on this phone when there is no connection
   and flushed on reconnect, on foreground and after a hydrate — and running out of hearts
   stops play until one returns.
-- Accuracy, the week chart and the games list are still sample data.
+- The games list is still sample data, and the coach's note on Home is authored copy with
+  nothing computing it — both are marked as such in `src/data/profile.ts`. Everything else on
+  Home and You is real: accuracy, the week chart, the daily goal, XP, the streak and the
+  games count, all derived server-side from the answers themselves.
 - Setting up a game does not append to "Your games".
 - Seat names live only in the Balance rows.
 - Apple sign-in is not wired yet, and profile setup is a placeholder.

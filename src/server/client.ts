@@ -75,6 +75,9 @@ const MESSAGES: Record<ServerErrorCode, string> = {
   UNKNOWN: 'Something went wrong on our side.',
 };
 
+/** One column of the week chart. */
+export type WeekDay = { day: string; answers: number };
+
 /** What the app shows: hearts, streak, XP and the lessons behind them. */
 export type PlayerState = {
   hearts: number;
@@ -97,6 +100,14 @@ export type PlayerState = {
   /** correct over total, 0–1 */
   accuracy: number;
   completedLessons: string[];
+  /** answers per local day, seven days ending today, oldest first */
+  week: WeekDay[];
+  /** lessons finished on the local day, against the goal of three */
+  lessonsToday: number;
+  /** completions per chapter id — the server's own count of what the Path derives */
+  chapters: Record<string, number>;
+  /** games recorded; zero for everyone until P19 writes them */
+  games: number;
   /**
    * The server's clock when it answered. Countdowns are measured against this and the
    * offset it implies, never against the device clock (§3 rule 8).
@@ -271,6 +282,30 @@ function strings(row: Row, field: string): string[] {
   return value as string[];
 }
 
+/** The week, one row per day, validated so a malformed chart cannot reach the screen. */
+function week(row: Row, field: string): WeekDay[] {
+  const value = row[field];
+  if (!Array.isArray(value)) throw wrong(field);
+
+  return value.map((entry) => {
+    const day = record(entry as Json);
+    return { day: str(day, 'day'), answers: num(day, 'answers') };
+  });
+}
+
+/** `{ "hand-ranks": 8 }` — completions per chapter, or nothing at all. */
+function counts(row: Row, field: string): Record<string, number> {
+  const value = row[field];
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw wrong(field);
+
+  const out: Record<string, number> = {};
+  for (const [chapter, finished] of Object.entries(value)) {
+    if (typeof finished !== 'number') throw wrong(field);
+    out[chapter] = finished;
+  }
+  return out;
+}
+
 /** `get_state` and `complete_lesson` both answer with this shape. */
 export function toPlayerState(data: Json): PlayerState {
   const row = record(data);
@@ -286,6 +321,10 @@ export function toPlayerState(data: Json): PlayerState {
     xp: num(row, 'xp'),
     accuracy: num(row, 'accuracy'),
     completedLessons: strings(row, 'completed_lesson_ids'),
+    week: week(row, 'week'),
+    lessonsToday: num(row, 'lessons_today'),
+    chapters: counts(row, 'chapters'),
+    games: num(row, 'games'),
     serverNow: str(row, 'server_now'),
   };
 }

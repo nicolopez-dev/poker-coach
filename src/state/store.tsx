@@ -30,7 +30,7 @@ import { MAX_HEARTS, REGEN_MS, spend, type HeartState } from '../lib/hearts';
 import { clamp, digits } from '../lib/num';
 import { NAME_MAX_LENGTH } from '../lib/names';
 import { liveStreak, localDay, nextLocalMidnight, streakAtRisk, type LocalDay } from '../lib/streak';
-import { tzOffsetMin, type PlayerState } from '../server/client';
+import { tzOffsetMin, type PlayerState, type WeekDay } from '../server/client';
 import { fetchProfile, type Profile } from '../server/profile';
 import { useHydrate, type HydrateAction } from '../server/useHydrate';
 import { beginRun, finishLesson, recordAnswer, syncOutbox, type DrillAction } from './drill';
@@ -82,6 +82,15 @@ export type State = {
   offline: boolean;
   /** writes the server refused for good — progress that is gone, and said so */
   unsaved: number;
+
+  /** correct over total, as the server derives it from every answer ever given */
+  accuracy: number;
+  /** answers per local day, seven days ending today, oldest first */
+  week: WeekDay[];
+  /** lessons finished today, against the goal of three */
+  lessonsToday: number;
+  /** games recorded — real, and zero for everyone until P19 writes them */
+  games: number;
 
   /** lesson ids the player has finished */
   completedLessons: string[];
@@ -150,6 +159,11 @@ export const initialState: State = {
   syncError: null,
   offline: false,
   unsaved: 0,
+
+  accuracy: 0,
+  week: [],
+  lessonsToday: 0,
+  games: 0,
 
   completedLessons: [],
   activeLesson: null,
@@ -261,6 +275,10 @@ function fromServer(state: State, player: PlayerState, clockOffset: number): Sta
     storedStreak: player.storedStreak,
     streakDay: player.streakDay,
     xp: player.xp,
+    accuracy: player.accuracy,
+    week: player.week,
+    lessonsToday: player.lessonsToday,
+    games: player.games,
     completedLessons: player.completedLessons,
     clockOffset,
     hydrated: true,

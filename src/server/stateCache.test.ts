@@ -22,6 +22,10 @@ const STATE: PlayerState = {
   xp: 1240,
   accuracy: 0.78,
   completedLessons: ['felt-1', 'felt-2'],
+  week: [],
+  lessonsToday: 0,
+  chapters: {},
+  games: 0,
   serverNow: '2026-09-05T14:00:00.000Z',
 };
 
