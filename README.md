@@ -82,7 +82,7 @@ src/
     names.ts             seat-name initials rule
   data/                  chip case defaults, sample profile
   auth/                  the session: Supabase client, secure storage, deep links
-  server/                the only module that talks to the database — RPCs, hydration
+  server/                the only module that talks to the database — RPCs, hydration, chip case
   components/            felt, gold frame, chip, ace card, header, tab bar, motion
   screens/               Login, Home, Path, Drill, Chips (+ Result, Balance), You
 docs/design-handoff/     the design bundle — read-only reference
@@ -129,6 +129,8 @@ Carried over from the handoff's own open items:
   nothing computing it — both are marked as such in `src/data/profile.ts`. Everything else on
   Home and You is real: accuracy, the week chart, the daily goal, XP, the streak and the
   games count, all derived server-side from the answers themselves.
+- The chip case follows the account — read on sign-in and written back debounced as it is
+  edited, last write wins. A case nobody has touched has no row at all.
 - Setting up a game does not append to "Your games".
 - Seat names live only in the Balance rows.
 - Apple sign-in is not wired yet, and profile setup is a placeholder.

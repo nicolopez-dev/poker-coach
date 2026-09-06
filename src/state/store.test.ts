@@ -25,10 +25,11 @@ import { COURSE } from '../content/course';
 import { isDrill } from '../content/progress';
 import { XP_PER_ANSWER } from '../content/types';
 import { liveStreak, streakAtRisk } from '../lib/streak';
+import type { ChipCase } from '../server/chipCase';
 import { ServerError, type AnswerOutcome, type PlayerState } from '../server/client';
 import { clearOutbox, pending } from '../server/outbox';
 import { beginRun, finishLesson, recordAnswer, syncOutbox } from './drill';
-import { initialState, reducer } from './store';
+import { caseOf, initialState, reducer } from './store';
 
 const CHAPTER = COURSE[0];
 const LESSON = CHAPTER.lessons[0];
@@ -492,5 +493,45 @@ describe('opening a lesson', () => {
 
     expect(s.state.outOfHearts).toBe(false);
     expect(s.state.tab).toBe('home');
+  });
+});
+
+describe('the chip case the server sends back', () => {
+  const MINE: ChipCase = {
+    colors: [
+      { name: 'Bone', swatch: '#f4f1e6', count: 25, value: 1 },
+      { name: 'Clay', swatch: '#ff7a63', count: 25, value: 5 },
+      { name: 'Slate', swatch: '#1a1a1a', count: 25, value: 25 },
+    ],
+    players: 4,
+    buyIn: 1000,
+    autoValues: false,
+  };
+
+  it('replaces a case still sitting at the defaults', () => {
+    const state = reducer(initialState, { type: 'chipCaseLoaded', chipCase: MINE });
+
+    expect(caseOf(state)).toEqual(MINE);
+  });
+
+  it('leaves an edit made while it was in flight alone', () => {
+    // last write wins, and the phone in the player's hand is the last writer
+    const edited = reducer(initialState, { type: 'stepPlayers', delta: 1 });
+    const state = reducer(edited, { type: 'chipCaseLoaded', chipCase: MINE });
+
+    expect(state.players).toBe(initialState.players + 1);
+    expect(state.colors).toBe(initialState.colors);
+  });
+
+  it('never voids a deal already on screen', () => {
+    // the case itself is untouched — it is the dealt stacks, and only those, that make
+    // this one worth refusing
+    const dealt = { ...initialState, result: reducer(initialState, { type: 'deal' }).result };
+    expect(dealt.result).not.toBeNull();
+
+    const state = reducer(dealt, { type: 'chipCaseLoaded', chipCase: MINE });
+
+    expect(state.result).toBe(dealt.result);
+    expect(caseOf(state)).toEqual(caseOf(initialState));
   });
 });

@@ -14,7 +14,8 @@ import {
 } from '../content/progress';
 import { XP_PER_ANSWER, type Question } from '../content/types';
 import {
-  DEFAULT_COLORS,
+  DEFAULT_CASE,
+  MAX_BUY_IN_UNITS,
   MAX_CHIP_COUNT,
   MAX_CHIP_VALUE,
   MAX_COLORS,
@@ -30,6 +31,13 @@ import { MAX_HEARTS, REGEN_MS, spend, type HeartState } from '../lib/hearts';
 import { clamp, digits } from '../lib/num';
 import { NAME_MAX_LENGTH } from '../lib/names';
 import { liveStreak, localDay, nextLocalMidnight, streakAtRisk, type LocalDay } from '../lib/streak';
+import {
+  forgetChipCase,
+  loadChipCase,
+  sameCase,
+  saveChipCase,
+  type ChipCase,
+} from '../server/chipCase';
 import { tzOffsetMin, type PlayerState, type WeekDay } from '../server/client';
 import { fetchProfile, type Profile } from '../server/profile';
 import { useHydrate, type HydrateAction } from '../server/useHydrate';
@@ -177,10 +185,8 @@ export const initialState: State = {
   chosen: null,
   gained: 0,
 
-  players: 6,
-  buyIn: 500,
-  autoValues: true,
-  colors: DEFAULT_COLORS,
+  // the case an account starts with, until the server sends one of its own
+  ...DEFAULT_CASE,
   result: null,
 
   ends: [],
@@ -197,6 +203,7 @@ type Action =
   | DrillAction
   | { type: 'reset' }
   | { type: 'setProfile'; profile: Profile }
+  | { type: 'chipCaseLoaded'; chipCase: ChipCase }
   | { type: 'go'; tab: Tab }
   | { type: 'startLesson'; ref: LessonRef | undefined }
   | { type: 'closeDrill' }
@@ -220,6 +227,12 @@ type Action =
 
 /** Any edit to the case invalidates the deal — the user has to deal again. */
 const clearResult = { result: null } as const;
+
+/** The case on its own, which is what the server stores and what `deal()` takes. */
+export function caseOf(state: State): ChipCase {
+  const { colors, players, buyIn, autoValues } = state;
+  return { colors, players, buyIn, autoValues };
+}
 
 /** Questions of the lesson currently running, or none for other lesson kinds. */
 function activeQuestions(state: State): Question[] {
@@ -298,6 +311,14 @@ export function reducer(state: State, action: Action): State {
         displayName: action.profile.displayName,
         avatarId: action.profile.avatarId,
       };
+
+    // The case the server had, adopted only if there is nothing of the player's own to
+    // lose by it. An edit made while the read was in flight keeps the tool — that edit
+    // is on its way to the server already, and last write wins — and a case that has
+    // been dealt from is left alone, because replacing it would void the deal on screen.
+    case 'chipCaseLoaded':
+      if (state.result || !sameCase(caseOf(state), DEFAULT_CASE)) return state;
+      return { ...state, ...action.chipCase };
 
     // The same arithmetic the server does, run against the day the device is actually
     // in. A phone left open across local midnight must not go on showing yesterday's
@@ -476,7 +497,7 @@ export function reducer(state: State, action: Action): State {
     case 'setBet':
       return {
         ...state,
-        buyIn: Math.max(1, digits(action.value, 1000)) * POINTS_PER_UNIT,
+        buyIn: Math.max(1, digits(action.value, MAX_BUY_IN_UNITS)) * POINTS_PER_UNIT,
         ...clearResult,
       };
 
@@ -629,7 +650,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // player's hearts and streak must never be the next one's. Resetting to the initial
   // state is idempotent, so a cold start that is already signed out costs nothing.
   useEffect(() => {
-    if (status === 'signedOut') dispatch({ type: 'reset' });
+    if (status !== 'signedOut') return;
+    // the case waiting to be written belongs to the player leaving, and so does the
+    // knowledge of what the server had; both go with them
+    forgetChipCase();
+    dispatch({ type: 'reset' });
   }, [status]);
 
   // Coming back to the app is when a streak is most likely to have gone stale: the
@@ -685,6 +710,31 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       live = false;
     };
   }, [status]);
+
+  // The chip case, read once per sign-in. Whether it is adopted is the reducer's call:
+  // an edit made while this was in flight keeps the tool it is holding.
+  useEffect(() => {
+    if (!userId) return;
+    let live = true;
+
+    loadChipCase(userId).then((chipCase) => {
+      if (live && chipCase) dispatch({ type: 'chipCaseLoaded', chipCase });
+    });
+
+    return () => {
+      live = false;
+    };
+  }, [userId]);
+
+  // And written back after every edit to it, debounced and forgotten: nothing on screen
+  // waits on this, an untouched case never creates a row, and a failure is silent (see
+  // [[chipCase]]). Dealing counts as an edit — in Auto mode it writes the chosen
+  // denominations back into the case, and those are worth keeping too.
+  const { colors, players, buyIn, autoValues } = state;
+  useEffect(() => {
+    if (!userId) return;
+    saveChipCase(userId, { colors, players, buyIn, autoValues });
+  }, [userId, colors, players, buyIn, autoValues]);
 
   const value = useMemo<Store>(
     () => ({
