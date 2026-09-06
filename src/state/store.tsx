@@ -26,8 +26,10 @@ import { POINTS_PER_UNIT } from '../lib/balance';
 import { deal, type ChipColor, type DealResult } from '../lib/chips';
 import { clamp, digits } from '../lib/num';
 import { NAME_MAX_LENGTH } from '../lib/names';
+import type { PlayerState } from '../server/client';
 import { fetchProfile, type Profile } from '../server/profile';
 import { useHydrate, type HydrateAction } from '../server/useHydrate';
+import { finishLesson, recordAnswer, type DrillAction } from './drill';
 
 export type Tab = 'home' | 'path' | 'chips' | 'you';
 
@@ -69,11 +71,20 @@ export type State = {
 
   drillOpen: boolean;
   drillDone: boolean;
+  /** the completion is in flight — the last question's button says so and locks */
+  completing: boolean;
+  /** why the completion was refused, said out loud on the done card rather than swallowed */
+  completionError: string | null;
+  /** the server ended the drill: the lesson is unfinished and replayable (§6) */
+  outOfHearts: boolean;
   /** current question index */
   qi: number;
   /** the option picked for the current question, or null */
   chosen: string | null;
-  /** XP earned in this drill */
+  /**
+   * XP earned in this drill, counted locally for the "+N XP" on the done card. The
+   * total is not: it is derived from `answers` server-side and arrives with the state.
+   */
   gained: number;
 
   players: number;
@@ -96,7 +107,8 @@ export type State = {
   verifyDismissed: boolean;
 };
 
-const initialState: State = {
+/** Exported for `store.test.ts`, which drives the reducer without mounting React. */
+export const initialState: State = {
   displayName: null,
   avatarId: null,
 
@@ -118,6 +130,9 @@ const initialState: State = {
 
   drillOpen: false,
   drillDone: false,
+  completing: false,
+  completionError: null,
+  outOfHearts: false,
   qi: 0,
   chosen: null,
   gained: 0,
@@ -139,6 +154,7 @@ const initialState: State = {
 
 type Action =
   | HydrateAction
+  | DrillAction
   | { type: 'reset' }
   | { type: 'setProfile'; profile: Profile }
   | { type: 'go'; tab: Tab }
@@ -169,7 +185,27 @@ function activeQuestions(state: State): Question[] {
   return isDrill(lesson) ? lesson.questions : [];
 }
 
-function reducer(state: State, action: Action): State {
+/**
+ * A state the server sent, folded in — the one place `get_state()` lands, whether it
+ * came from hydration or from finishing a lesson. The completed list is the server's
+ * too: the client never appends to it.
+ */
+function fromServer(state: State, player: PlayerState, clockOffset: number): State {
+  return {
+    ...state,
+    hearts: player.hearts,
+    nextHeartAt: player.nextHeartAt,
+    streak: player.streak,
+    xp: player.xp,
+    completedLessons: player.completedLessons,
+    clockOffset,
+    hydrated: true,
+    syncing: false,
+    syncError: null,
+  };
+}
+
+export function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'reset':
       return initialState;
@@ -191,19 +227,13 @@ function reducer(state: State, action: Action): State {
     // cache only ever fills a gap: it never carries a clock offset, and it never clears
     // an error the server has not answered.
     case 'hydrate': {
-      const fromServer = action.source === 'server';
-      return {
-        ...state,
-        hearts: action.state.hearts,
-        nextHeartAt: action.state.nextHeartAt,
-        streak: action.state.streak,
-        xp: action.state.xp,
-        completedLessons: action.state.completedLessons,
-        clockOffset: fromServer ? action.clockOffset : state.clockOffset,
-        hydrated: true,
-        syncing: fromServer ? false : state.syncing,
-        syncError: fromServer ? null : state.syncError,
-      };
+      const served = action.source === 'server';
+      const next = fromServer(
+        state,
+        action.state,
+        served ? action.clockOffset : state.clockOffset,
+      );
+      return served ? next : { ...next, syncing: state.syncing, syncError: state.syncError };
     }
 
     case 'go':
@@ -218,12 +248,20 @@ function reducer(state: State, action: Action): State {
         qi: 0,
         chosen: null,
         drillDone: false,
+        completing: false,
+        completionError: null,
+        outOfHearts: false,
         gained: 0,
       };
 
     case 'closeDrill':
-      return { ...state, drillOpen: false };
+      return { ...state, drillOpen: false, outOfHearts: false };
 
+    // Optimistic, and deliberately so: the feedback card must not wait on a round trip.
+    // Correctness for *rendering* comes from the local course; correctness for the
+    // record is decided by the answer key on the server, and `answerRecorded` below is
+    // what adopts it. XP is not touched — it is derived from `answers`, never counted
+    // here; only `gained`, which is this drill's own tally, moves.
     case 'pick': {
       if (state.chosen) return state;
       const question = activeQuestions(state)[state.qi];
@@ -233,26 +271,62 @@ function reducer(state: State, action: Action): State {
         chosen: action.id,
         hearts: right ? state.hearts : Math.max(0, state.hearts - 1),
         gained: right ? state.gained + XP_PER_ANSWER : state.gained,
-        xp: right ? state.xp + XP_PER_ANSWER : state.xp,
       };
     }
 
-    case 'nextQuestion': {
-      const questions = activeQuestions(state);
-      if (state.qi < questions.length - 1) {
-        return { ...state, qi: state.qi + 1, chosen: null };
-      }
-      const lessonId = state.activeLesson?.lessonId;
+    // The server's count wins outright. Adopting it every time rather than only on a
+    // disagreement is what makes a replayed event a no-op: the reply to the second call
+    // carries the same hearts as the first, so nothing is spent twice.
+    case 'answerRecorded':
       return {
         ...state,
-        drillDone: true,
-        chosen: null,
-        completedLessons:
-          lessonId && !state.completedLessons.includes(lessonId)
-            ? [...state.completedLessons, lessonId]
-            : state.completedLessons,
+        hearts: action.outcome.hearts,
+        nextHeartAt: action.outcome.nextHeartAt,
+        syncError: null,
       };
+
+    // The answer did not reach the server. The optimistic state stands — P16 queues the
+    // write and replays it — and the reason is kept for the offline indicator.
+    case 'answerFailed':
+      return { ...state, syncError: action.message };
+
+    // No heart to spend: the drill ends here, the lesson is not completed, and it can be
+    // played again from the start once one returns.
+    case 'outOfHearts':
+      return { ...state, hearts: 0, outOfHearts: true, completing: false, drillDone: false };
+
+    // Advancing only. The last question does not end the drill by itself any more — the
+    // done card waits on `complete_lesson`, so that a lesson the server refused is never
+    // shown as finished.
+    case 'nextQuestion': {
+      const questions = activeQuestions(state);
+      if (state.qi >= questions.length - 1) return state;
+      return { ...state, qi: state.qi + 1, chosen: null };
     }
+
+    case 'completing':
+      return { ...state, completing: true, completionError: null };
+
+    // The reply is a whole `get_state()`: the streak, the XP the answers just earned and
+    // the completed list all arrive together, so the lesson joins that list because the
+    // server put it there.
+    case 'lessonCompleted':
+      return {
+        ...fromServer(state, action.state, action.clockOffset),
+        completing: false,
+        drillDone: true,
+        completionError: null,
+        chosen: null,
+      };
+
+    case 'completeFailed':
+      return {
+        ...state,
+        completing: false,
+        drillDone: true,
+        completionError: action.message,
+        chosen: null,
+      };
 
     case 'stepPlayers':
       return {
@@ -425,8 +499,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       startNextLesson: () =>
         dispatch({ type: 'startLesson', ref: nextLesson(COURSE, state.completedLessons) }),
       closeDrill: () => dispatch({ type: 'closeDrill' }),
-      pick: (id) => dispatch({ type: 'pick', id }),
-      nextQuestion: () => dispatch({ type: 'nextQuestion' }),
+
+      // The dispatch renders the feedback; the write catches up and corrects it.
+      pick: (id) => {
+        if (state.chosen || !state.activeLesson) return;
+        dispatch({ type: 'pick', id });
+        void recordAnswer(dispatch, {
+          ref: state.activeLesson,
+          questionIndex: state.qi,
+          optionId: id,
+          clockOffset: state.clockOffset,
+        });
+      },
+
+      // The last question finishes the lesson on the server before the done card shows.
+      nextQuestion: () => {
+        if (state.completing) return;
+        if (state.qi < activeQuestions(state).length - 1) {
+          dispatch({ type: 'nextQuestion' });
+          return;
+        }
+        if (!state.activeLesson) return;
+        dispatch({ type: 'completing' });
+        void finishLesson(dispatch, {
+          ref: state.activeLesson,
+          clockOffset: state.clockOffset,
+        });
+      },
       stepPlayers: (delta) => dispatch({ type: 'stepPlayers', delta }),
       setBet: (value) => dispatch({ type: 'setBet', value }),
       setAutoValues: (auto) => dispatch({ type: 'setAutoValues', auto }),

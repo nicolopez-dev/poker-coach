@@ -21,6 +21,9 @@ export function DrillOverlay() {
     hearts,
     hydrated,
     drillDone,
+    completing,
+    completionError,
+    outOfHearts,
     gained,
     pick,
     nextQuestion,
@@ -74,16 +77,46 @@ export function DrillOverlay() {
             <HeartsPill hearts={hearts} pending={!hydrated} />
           </View>
 
-          {drillDone ? (
+          {outOfHearts ? (
+            /* P14 replaces this with OutOfHeartsScreen and its countdown to the next
+               heart; what matters here is that the drill stops rather than carrying on
+               against a server that has already refused the answer. */
             <Pop duration={400} style={styles.done}>
-              <Suit glyph="♠" size={64} color={colors.green} style={{ marginBottom: 14 }} />
-              <Text style={styles.doneKicker}>Hand played</Text>
-              <Text style={[type.bigNumber, { marginBottom: 10 }]}>+{gained} XP</Text>
-              <Text style={styles.doneNote}>
-                {gained === questions.length * XP_PER_ANSWER
-                  ? `Clean sweep. One more session and ${chapter?.title ?? 'this unit'} is yours.`
-                  : 'The ones you missed come back tomorrow.'}
+              <Suit glyph="♥" size={64} color={colors.red} style={{ marginBottom: 14 }} />
+              <Text style={styles.doneKicker}>Out of hearts</Text>
+              <Text style={[type.sectionHeading, { marginBottom: 10 }]}>
+                That was your last one.
               </Text>
+              <Text style={styles.doneNote}>
+                Hearts come back one at a time. This lesson stays unfinished, so you can play
+                it from the top when the next one lands.
+              </Text>
+              <RewardButton label="Back to today" glyph="♠" onPress={closeDrill} />
+            </Pop>
+          ) : drillDone ? (
+            <Pop duration={400} style={styles.done}>
+              {completionError ? (
+                <>
+                  <Suit glyph="♣" size={64} color={colors.textMuted} style={{ marginBottom: 14 }} />
+                  <Text style={styles.doneKicker}>Not saved</Text>
+                  <Text style={[type.sectionHeading, { marginBottom: 10 }]}>{completionError}</Text>
+                  <Text style={styles.doneNote}>
+                    The hand you played is safe; it is this lesson's finish that did not land.
+                    Play it again when you can and it will count.
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Suit glyph="♠" size={64} color={colors.green} style={{ marginBottom: 14 }} />
+                  <Text style={styles.doneKicker}>Hand played</Text>
+                  <Text style={[type.bigNumber, { marginBottom: 10 }]}>+{gained} XP</Text>
+                  <Text style={styles.doneNote}>
+                    {gained === questions.length * XP_PER_ANSWER
+                      ? `Clean sweep. One more session and ${chapter?.title ?? 'this unit'} is yours.`
+                      : 'The ones you missed come back tomorrow.'}
+                  </Text>
+                </>
+              )}
               <RewardButton label="Back to today" glyph="♥" onPress={closeDrill} />
             </Pop>
           ) : (
@@ -223,11 +256,13 @@ export function DrillOverlay() {
 
                     <Rise duration={350} replayKey={`${qi}-${chosen}`}>
                       <Pressable
-                        onPress={nextQuestion}
+                        onPress={completing ? undefined : nextQuestion}
+                        disabled={completing}
                         accessibilityRole="button"
-                        style={pressable(styles.next, 0.99)}>
+                        accessibilityState={{ disabled: completing }}
+                        style={pressable([styles.next, completing && styles.nextSaving], 0.99)}>
                         <Text style={styles.nextLabel}>
-                          {last ? 'Finish the hand' : 'Next one'}
+                          {completing ? 'Saving…' : last ? 'Finish the hand' : 'Next one'}
                         </Text>
                         <View style={styles.nextCircle}>
                           <Suit glyph="♣" size={15} color={colors.text} />
@@ -400,6 +435,8 @@ const styles = StyleSheet.create({
     paddingRight: 12,
   },
   nextLabel: { fontFamily: font.bold, fontSize: 15, lineHeight: 18, color: colors.text },
+  /** in flight: dimmed and inert, the same treatment the auth buttons use */
+  nextSaving: { opacity: 0.55 },
   nextCircle: {
     width: 38,
     height: 38,

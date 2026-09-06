@@ -1,0 +1,265 @@
+/**
+ * The drill against a faked server.
+ *
+ * The fake stands in for `submit_answer` and `complete_lesson` with the two behaviours
+ * that matter: it decides correctness from its *own* answer key, so a client that
+ * disagrees can be seen losing the argument, and it is idempotent on
+ * `client_event_id`, so a replay cannot spend a second heart (§3 rules 5 and 9).
+ *
+ * The reducer is driven directly — no React — with `recordAnswer` and `finishLesson`
+ * dispatching into it exactly as the provider has them do.
+ */
+
+// No client, and no environment to build one from: every server call is faked below.
+jest.mock('../auth/supabase', () => ({ supabase: { auth: {} } }));
+
+// The reducer is the subject, not the provider — so the session layer stays out, along
+// with the native modules (Google sign-in, secure storage) it would drag in.
+jest.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ status: 'signedOut', user: null }) }));
+
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);
+
+import { COURSE } from '../content/course';
+import { isDrill } from '../content/progress';
+import { XP_PER_ANSWER } from '../content/types';
+import { ServerError, type AnswerOutcome, type PlayerState } from '../server/client';
+import { finishLesson, recordAnswer } from './drill';
+import { initialState, reducer } from './store';
+
+const CHAPTER = COURSE[0];
+const LESSON = CHAPTER.lessons[0];
+if (!isDrill(LESSON)) throw new Error('the first lesson is expected to be a drill');
+
+const REF = { chapterId: CHAPTER.id, lessonId: LESSON.id };
+const QUESTION = LESSON.questions[0];
+/** The option the local course calls correct, and one it does not. */
+const RIGHT = QUESTION.correct;
+const WRONG = QUESTION.options.find((o) => o.id !== RIGHT)!.id;
+
+const NEXT_HEART = '2026-09-05T18:00:00.000Z';
+const SERVER_NOW = '2026-09-05T14:00:00.000Z';
+
+/** A server that holds the hearts, the answer key and every event id it has seen. */
+function fakeServer({ hearts = 5, key = RIGHT }: { hearts?: number; key?: string } = {}) {
+  const seen = new Map<string, AnswerOutcome>();
+  const answered: { lessonId: string; correct: boolean }[] = [];
+  const state = { hearts, calls: 0 };
+
+  return {
+    state,
+    answered,
+    async submitAnswer(input: { chosenOptionId: string; clientEventId: string; lessonId: string }) {
+      state.calls++;
+      const replay = seen.get(input.clientEventId);
+      if (replay) return replay;
+      if (state.hearts === 0) throw new ServerError('OUT_OF_HEARTS', 'out of hearts');
+
+      const correct = input.chosenOptionId === key;
+      if (!correct) state.hearts--;
+
+      const outcome: AnswerOutcome = {
+        correct,
+        hearts: state.hearts,
+        nextHeartAt: state.hearts < 5 ? NEXT_HEART : null,
+      };
+      seen.set(input.clientEventId, outcome);
+      answered.push({ lessonId: input.lessonId, correct });
+      return outcome;
+    },
+    async completeLesson(input: { lessonId: string }): Promise<PlayerState> {
+      if (!answered.some((a) => a.lessonId === input.lessonId)) {
+        throw new ServerError('NO_ANSWERS', 'that hand was never played');
+      }
+      return {
+        hearts: state.hearts,
+        nextHeartAt: state.hearts < 5 ? NEXT_HEART : null,
+        streak: 12,
+        streakAtRisk: false,
+        streakExpiresAt: null,
+        longestStreak: 41,
+        xp: answered.filter((a) => a.correct).length * XP_PER_ANSWER,
+        accuracy: 1,
+        completedLessons: [input.lessonId],
+        serverNow: SERVER_NOW,
+      };
+    },
+  };
+}
+
+/** `mock`-prefixed so the factory below may reach it — babel hoists that above imports. */
+let mockServer: ReturnType<typeof fakeServer>;
+
+// Only the two writes are faked. `ServerError` and the error-to-copy mapping stay real,
+// so the done card's message in these tests is the one a player would actually read.
+jest.mock('../server/client', () => ({
+  ...(jest.requireActual('../server/client') as object),
+  submitAnswer: (input: { chosenOptionId: string; clientEventId: string; lessonId: string }) =>
+    mockServer.submitAnswer(input),
+  completeLesson: (input: { lessonId: string }) => mockServer.completeLesson(input),
+}));
+
+/** The reducer with a dispatch, which is all the provider adds to it. */
+function store(hearts = 5) {
+  let state = reducer(
+    { ...initialState, hearts, hydrated: true },
+    { type: 'startLesson', ref: REF },
+  );
+  return {
+    get state() {
+      return state;
+    },
+    dispatch: (action: Parameters<typeof reducer>[1]) => {
+      state = reducer(state, action);
+    },
+  };
+}
+
+const answer = (s: ReturnType<typeof store>, optionId: string, clientEventId?: string) =>
+  recordAnswer(s.dispatch, {
+    ref: REF,
+    questionIndex: 0,
+    optionId,
+    clockOffset: 0,
+    clientEventId,
+  });
+
+beforeEach(() => {
+  mockServer = fakeServer();
+});
+
+describe('answering', () => {
+  it('shows the verdict before the server has said anything', () => {
+    const s = store();
+    s.dispatch({ type: 'pick', id: RIGHT });
+
+    expect(s.state.chosen).toBe(RIGHT);
+    expect(s.state.gained).toBe(XP_PER_ANSWER);
+    expect(mockServer.state.calls).toBe(0);
+  });
+
+  it('keeps a correct answer’s hearts, and counts no XP locally', async () => {
+    const s = store();
+    s.dispatch({ type: 'pick', id: RIGHT });
+    await answer(s, RIGHT);
+
+    expect(s.state.hearts).toBe(5);
+    expect(s.state.nextHeartAt).toBeNull();
+    // the "+N XP" tally is local; the total is derived from `answers` server-side
+    expect(s.state.gained).toBe(XP_PER_ANSWER);
+    expect(s.state.xp).toBe(0);
+  });
+
+  it('spends a heart on a wrong answer, optimistically and then for real', async () => {
+    const s = store();
+    s.dispatch({ type: 'pick', id: WRONG });
+    expect(s.state.hearts).toBe(4);
+
+    await answer(s, WRONG);
+
+    expect(mockServer.state.hearts).toBe(4);
+    expect(s.state.hearts).toBe(4);
+    expect(s.state.nextHeartAt).toBe(NEXT_HEART);
+    expect(s.state.gained).toBe(0);
+  });
+
+  it('adopts the server’s verdict when it disagrees with the optimistic one', async () => {
+    // the answer key has moved on under a stale client: what the course calls right,
+    // the server calls wrong
+    mockServer = fakeServer({ key: WRONG });
+
+    const s = store();
+    s.dispatch({ type: 'pick', id: RIGHT });
+    expect(s.state.hearts).toBe(5); // optimistically, nothing was spent
+
+    await answer(s, RIGHT);
+
+    expect(s.state.hearts).toBe(4);
+    expect(s.state.nextHeartAt).toBe(NEXT_HEART);
+  });
+
+  it('does not spend twice when the same event id is sent again', async () => {
+    const s = store();
+    s.dispatch({ type: 'pick', id: WRONG });
+    await answer(s, WRONG, 'e5d0f2a1-0000-4000-8000-000000000001');
+    await answer(s, WRONG, 'e5d0f2a1-0000-4000-8000-000000000001');
+
+    expect(mockServer.state.calls).toBe(2);
+    expect(mockServer.state.hearts).toBe(4);
+    expect(s.state.hearts).toBe(4);
+  });
+
+  it('ends the drill when the server says there was no heart to spend', async () => {
+    mockServer = fakeServer({ hearts: 0 });
+
+    const s = store(1);
+    s.dispatch({ type: 'pick', id: WRONG });
+    await answer(s, WRONG);
+
+    expect(s.state.outOfHearts).toBe(true);
+    expect(s.state.hearts).toBe(0);
+    expect(s.state.drillDone).toBe(false);
+    expect(s.state.completedLessons).toEqual([]);
+  });
+
+  it('keeps the optimistic state and the reason when the write does not land', async () => {
+    mockServer = fakeServer();
+    mockServer.submitAnswer = async () => {
+      throw new ServerError('UNREACHABLE', 'whatever the network said');
+    };
+
+    const s = store();
+    s.dispatch({ type: 'pick', id: WRONG });
+    await answer(s, WRONG);
+
+    expect(s.state.hearts).toBe(4);
+    // the copy comes from the mapping, never from the error that was thrown
+    expect(s.state.syncError).toBe("We couldn't reach the table. Check your connection.");
+    expect(s.state.outOfHearts).toBe(false);
+  });
+});
+
+describe('finishing', () => {
+  it('adds the lesson only once the server has recorded it', async () => {
+    const s = store();
+    s.dispatch({ type: 'pick', id: RIGHT });
+    await answer(s, RIGHT);
+
+    s.dispatch({ type: 'completing' });
+    expect(s.state.completing).toBe(true);
+    expect(s.state.drillDone).toBe(false);
+    expect(s.state.completedLessons).toEqual([]);
+
+    await finishLesson(s.dispatch, { ref: REF, clockOffset: 0 });
+
+    expect(s.state.drillDone).toBe(true);
+    expect(s.state.completing).toBe(false);
+    expect(s.state.completedLessons).toEqual([LESSON.id]);
+    // the whole state comes back with the completion, XP included
+    expect(s.state.xp).toBe(XP_PER_ANSWER);
+    expect(s.state.streak).toBe(12);
+  });
+
+  it('says why on the done card when the completion is refused', async () => {
+    const s = store();
+
+    s.dispatch({ type: 'completing' });
+    await finishLesson(s.dispatch, { ref: REF, clockOffset: 0 });
+
+    expect(s.state.drillDone).toBe(true);
+    expect(s.state.completionError).toBe('That hand was never played, so there is nothing to save.');
+    expect(s.state.completedLessons).toEqual([]);
+  });
+
+  it('never lets the last question finish the drill on its own', () => {
+    const s = store();
+    let state = s.state;
+    for (let i = 0; i < LESSON.questions.length + 2; i++) {
+      state = reducer(state, { type: 'nextQuestion' });
+    }
+
+    expect(state.qi).toBe(LESSON.questions.length - 1);
+    expect(state.drillDone).toBe(false);
+  });
+});
