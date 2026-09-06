@@ -18,12 +18,16 @@ export function Header({
   hearts,
   pending = false,
   nextHeartAt = null,
+  streakAtRisk = false,
+  streakExpiresAt = null,
   clockOffset = 0,
 }: {
   streak: number;
   hearts: number;
   pending?: boolean;
   nextHeartAt?: string | null;
+  streakAtRisk?: boolean;
+  streakExpiresAt?: string | null;
   clockOffset?: number;
 }) {
   const insets = useSafeAreaInsets();
@@ -37,7 +41,13 @@ export function Header({
       <View style={styles.fill} />
       <Brand />
       <View style={styles.right}>
-        <StreakPill streak={streak} pending={pending} />
+        <StreakPill
+          streak={streak}
+          pending={pending}
+          atRisk={streakAtRisk}
+          expiresAt={streakExpiresAt}
+          clockOffset={clockOffset}
+        />
         <HeartsPill
           hearts={hearts}
           pending={pending}

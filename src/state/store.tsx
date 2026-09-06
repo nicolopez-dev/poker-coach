@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
+import { AppState } from 'react-native';
 
 import { useAuth } from '../auth/AuthProvider';
 import { COURSE } from '../content/course';
@@ -26,7 +27,8 @@ import { POINTS_PER_UNIT } from '../lib/balance';
 import { deal, type ChipColor, type DealResult } from '../lib/chips';
 import { clamp, digits } from '../lib/num';
 import { NAME_MAX_LENGTH } from '../lib/names';
-import type { PlayerState } from '../server/client';
+import { liveStreak, localDay, nextLocalMidnight, streakAtRisk, type LocalDay } from '../lib/streak';
+import { tzOffsetMin, type PlayerState } from '../server/client';
 import { fetchProfile, type Profile } from '../server/profile';
 import { useHydrate, type HydrateAction } from '../server/useHydrate';
 import { beginRun, finishLesson, recordAnswer, type DrillAction } from './drill';
@@ -46,7 +48,18 @@ export type State = {
    */
   hearts: number;
   xp: number;
+  /** the run as it stands today: zero once it has lapsed (§6, "Losing a streak") */
   streak: number;
+  /** alive, but last extended yesterday — it ends at local midnight unless played */
+  streakAtRisk: boolean;
+  /** that midnight, as an instant */
+  streakExpiresAt: string | null;
+  /** the best run ever had; losing one should not erase that it happened */
+  longestStreak: number;
+  /** the run as stored — the number that ended, once `streak` has resolved to zero */
+  storedStreak: number;
+  /** the local day the run was last extended; the lapse card is keyed on it */
+  streakDay: string | null;
   /** when the next heart lands, or null at full; ISO, and read against `clockOffset` */
   nextHeartAt: string | null;
 
@@ -118,6 +131,11 @@ export const initialState: State = {
   hearts: 0,
   xp: 0,
   streak: 0,
+  streakAtRisk: false,
+  streakExpiresAt: null,
+  longestStreak: 0,
+  storedStreak: 0,
+  streakDay: null,
   nextHeartAt: null,
 
   clockOffset: 0,
@@ -172,6 +190,7 @@ type Action =
   | { type: 'setEnd'; index: number; value: string }
   | { type: 'setName'; index: number; value: string }
   | { type: 'setEditingName'; index: number | null }
+  | { type: 'recomputeStreak'; today: LocalDay; expiresAt: string | null }
   | { type: 'toggleGames' }
   | { type: 'dismissHearts' }
   | { type: 'dismissVerify' }
@@ -197,6 +216,11 @@ function fromServer(state: State, player: PlayerState, clockOffset: number): Sta
     hearts: player.hearts,
     nextHeartAt: player.nextHeartAt,
     streak: player.streak,
+    streakAtRisk: player.streakAtRisk,
+    streakExpiresAt: player.streakExpiresAt,
+    longestStreak: player.longestStreak,
+    storedStreak: player.storedStreak,
+    streakDay: player.streakDay,
     xp: player.xp,
     completedLessons: player.completedLessons,
     clockOffset,
@@ -216,6 +240,17 @@ export function reducer(state: State, action: Action): State {
         ...state,
         displayName: action.profile.displayName,
         avatarId: action.profile.avatarId,
+      };
+
+    // The same arithmetic the server does, run against the day the device is actually
+    // in. A phone left open across local midnight must not go on showing yesterday's
+    // run as safe, and the stored count is never touched — the lapse stays derived.
+    case 'recomputeStreak':
+      return {
+        ...state,
+        streak: liveStreak(state.storedStreak, state.streakDay, action.today),
+        streakAtRisk: streakAtRisk(state.streakDay, action.today),
+        streakExpiresAt: action.expiresAt,
       };
 
     case 'syncStart':
@@ -494,12 +529,39 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // Keyed on the user id so that signing in as someone else re-reads from scratch.
   const refresh = useHydrate(status === 'signedIn' ? (user?.id ?? null) : null, dispatch);
 
+  // Held in a ref so the foreground listener below reads the current offset without
+  // being torn down and rebuilt on every state change.
+  const clockOffset = useRef(state.clockOffset);
+  clockOffset.current = state.clockOffset;
+
   // Signing out clears the store, and so does a session expiring underneath us — one
   // player's hearts and streak must never be the next one's. Resetting to the initial
   // state is idempotent, so a cold start that is already signed out costs nothing.
   useEffect(() => {
     if (status === 'signedOut') dispatch({ type: 'reset' });
   }, [status]);
+
+  // Coming back to the app is when a streak is most likely to have gone stale: the
+  // count on screen was worked out on a day that may since have ended. Recompute it
+  // from the device's own day first — instant, and right even with no signal — and ask
+  // the server after, which also brings back whatever hearts regenerated while away.
+  useEffect(() => {
+    if (status !== 'signedIn') return;
+
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') return;
+      const now = new Date(Date.now() + clockOffset.current);
+      const offset = tzOffsetMin(now);
+      dispatch({
+        type: 'recomputeStreak',
+        today: localDay(now, offset),
+        expiresAt: nextLocalMidnight(now, offset).toISOString(),
+      });
+      refresh();
+    });
+
+    return () => subscription.remove();
+  }, [status, refresh]);
 
   // The profile is the first thing hydrated from the server. A cancelled flag rather
   // than a bare promise, so signing out mid-flight cannot land the old player's name

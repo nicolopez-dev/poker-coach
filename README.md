@@ -120,9 +120,10 @@ Carried over from the handoff's own open items:
 - Content is one lesson of three questions, in Position. The other four chapters are sketched
   and read as locked until lessons are written for them.
 - Table lessons against AI players are modelled but not built.
-- Hearts, streak, XP and finished lessons are real: they come from the server on sign-in and
-  are cached per user for the next cold start. Answers and completions do not go back to the
-  server yet, so playing a drill moves the numbers only until the next hydrate.
+- Hearts, streak, XP and finished lessons are real, in both directions: the state comes from
+  the server and is cached per user for the next cold start, every answer and completion goes
+  back through the P3 functions, and running out of hearts stops play until one returns. What
+  is missing is offline — a drill played without a connection is not queued yet (P16).
 - Accuracy, the week chart and the games list are still sample data.
 - Setting up a game does not append to "Your games".
 - Seat names live only in the Balance rows.

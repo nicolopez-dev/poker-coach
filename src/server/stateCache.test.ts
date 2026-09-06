@@ -17,6 +17,8 @@ const STATE: PlayerState = {
   streakAtRisk: true,
   streakExpiresAt: '2026-09-05T22:00:00.000Z',
   longestStreak: 41,
+  storedStreak: 40,
+  streakDay: '2026-09-04',
   xp: 1240,
   accuracy: 0.78,
   completedLessons: ['felt-1', 'felt-2'],

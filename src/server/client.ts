@@ -86,6 +86,13 @@ export type PlayerState = {
   /** the caller's next local midnight */
   streakExpiresAt: string | null;
   longestStreak: number;
+  /**
+   * The run as stored: the same as `streak` while it is alive, and the number that
+   * ended once it is not. Never zeroed on the server — a lapse is derived (§6).
+   */
+  storedStreak: number;
+  /** the local day the run was last extended, or null for a player who never had one */
+  streakDay: string | null;
   xp: number;
   /** correct over total, 0–1 */
   accuracy: number;
@@ -274,6 +281,8 @@ export function toPlayerState(data: Json): PlayerState {
     streakAtRisk: bool(row, 'streak_at_risk'),
     streakExpiresAt: nullableStr(row, 'streak_expires_at'),
     longestStreak: num(row, 'longest_streak'),
+    storedStreak: num(row, 'stored_streak_count'),
+    streakDay: nullableStr(row, 'streak_day'),
     xp: num(row, 'xp'),
     accuracy: num(row, 'accuracy'),
     completedLessons: strings(row, 'completed_lesson_ids'),

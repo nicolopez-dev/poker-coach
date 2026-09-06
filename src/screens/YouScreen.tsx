@@ -13,8 +13,17 @@ import { useProgress, useStore } from '../state/store';
 import { colors, font, ls, radius, shadows } from '../theme/tokens';
 
 export function YouScreen() {
-  const { xp, streak, hydrated, gamesOpen, toggleGames, loadGame, displayName, avatarId } =
-    useStore();
+  const {
+    xp,
+    streak,
+    longestStreak,
+    hydrated,
+    gamesOpen,
+    toggleGames,
+    loadGame,
+    displayName,
+    avatarId,
+  } = useStore();
   const { signOut, goTo } = useAuth();
   const progress = useProgress();
 
@@ -42,6 +51,8 @@ export function YouScreen() {
       label: 'Day streak',
       bg: colors.rewardAlt,
       ink: colors.gold,
+      // a lost run is still a run that happened; the best one keeps its place here
+      note: hydrated && longestStreak > 0 ? `Best ${longestStreak}` : undefined,
     },
     { value: '78%', label: 'Accuracy', bg: colors.surface, ink: colors.text },
     { value: String(PROFILE.gamesTotal), label: 'Games set up', bg: colors.surface, ink: colors.text },
@@ -70,6 +81,7 @@ export function YouScreen() {
           <View key={s.label} style={[styles.statCard, { backgroundColor: s.bg }]}>
             <Text style={[styles.statValue, { color: s.ink }]}>{s.value}</Text>
             <Text style={styles.statLabel}>{s.label}</Text>
+            {s.note ? <Text style={styles.statNote}>{s.note}</Text> : null}
           </View>
         ))}
       </View>
@@ -188,6 +200,16 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors.textMuted,
     marginTop: 5,
+  },
+  /** the longest run, under its stat at the same micro scale */
+  statNote: {
+    fontFamily: font.regular,
+    fontSize: 10,
+    lineHeight: 12,
+    letterSpacing: ls(10, 0.08),
+    textTransform: 'uppercase',
+    color: colors.textFaint,
+    marginTop: 3,
   },
   sectionLabel: {
     fontFamily: font.regular,

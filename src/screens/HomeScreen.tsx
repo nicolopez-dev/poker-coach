@@ -5,14 +5,34 @@ import { Rise } from '../components/anim';
 import { RewardCard } from '../components/Gold';
 import { TabScreen } from '../components/TabScreen';
 import { PENDING, ProgressBar, RewardButton, StatPill, Suit, pressable } from '../components/ui';
+import { useCountdown } from '../components/useCountdown';
 import { currentChapter } from '../content/progress';
 import { COACH_NOTE, DAILY_GOAL, HOME_STATS, WEEK } from '../data/profile';
 import { fmt } from '../lib/balance';
+import { formatCountdown } from '../lib/hearts';
+import { StreakLapseCard } from './home/StreakLapseCard';
 import { useProgress, useStore } from '../state/store';
 import { colors, font, ls, radius, shadows, type } from '../theme/tokens';
 
 export function HomeScreen() {
-  const { xp, players, buyIn, hydrated, canPlay, startNextLesson, go } = useStore();
+  const {
+    xp,
+    players,
+    buyIn,
+    hydrated,
+    canPlay,
+    streak,
+    streakAtRisk,
+    streakExpiresAt,
+    clockOffset,
+    startNextLesson,
+    go,
+  } = useStore();
+  // The hero is the one place the at-risk state is a sentence rather than a pill: a run
+  // alive but untouched today has a deadline, and saying it is more use than the
+  // generic daily goal.
+  const untilMidnight = useCountdown(streakAtRisk ? streakExpiresAt : null, clockOffset);
+  const atRisk = streakAtRisk && untilMidnight > 0;
   const progress = useProgress();
   // Until the server answers, the course reads as untouched — which for a returning
   // player is a lie about where they are. Withhold the unit rather than name the wrong
@@ -25,19 +45,27 @@ export function HomeScreen() {
         <RewardCard radius={radius.hero} innerStyle={styles.hero}>
           <Suit glyph="♠" size={150} color="rgba(240,239,233,.08)" style={styles.heroSuit} />
           <Text style={styles.heroKicker}>Today's hand</Text>
-          <Text style={[type.heroTitle, styles.heroTitle]}>{DAILY_GOAL.title}</Text>
+          <Text style={[type.heroTitle, styles.heroTitle]}>
+            {atRisk
+              ? `Your ${streak}-day streak ends in ${formatCountdown(untilMidnight)}`
+              : DAILY_GOAL.title}
+          </Text>
           <ProgressBar
-            pct={DAILY_GOAL.pct}
+            pct={atRisk ? 0 : DAILY_GOAL.pct}
             height={12}
             track="rgba(240,239,233,.18)"
             style={styles.heroBar}
           />
           <View style={styles.heroFooter}>
-            <Text style={styles.heroFooterText}>{DAILY_GOAL.label}</Text>
+            <Text style={styles.heroFooterText}>
+              {atRisk ? 'One hand keeps it' : DAILY_GOAL.label}
+            </Text>
             <Text style={styles.heroFooterText}>{hydrated ? fmt(xp) : PENDING} XP</Text>
           </View>
         </RewardCard>
       </Rise>
+
+      <StreakLapseCard />
 
       {/* Out of hearts the CTA stays pressable — it is how you get to the countdown —
           but it stops glowing and stops promising a lesson it cannot open. */}

@@ -24,6 +24,7 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 import { COURSE } from '../content/course';
 import { isDrill } from '../content/progress';
 import { XP_PER_ANSWER } from '../content/types';
+import { liveStreak, streakAtRisk } from '../lib/streak';
 import { ServerError, type AnswerOutcome, type PlayerState } from '../server/client';
 import { beginRun, finishLesson, recordAnswer } from './drill';
 import { initialState, reducer } from './store';
@@ -86,6 +87,8 @@ function fakeServer({ hearts = 5, key = RIGHT }: { hearts?: number; key?: string
         streakAtRisk: false,
         streakExpiresAt: null,
         longestStreak: 41,
+        storedStreak: 12,
+        streakDay: '2026-09-05',
         xp: answered.filter((a) => a.correct).length * XP_PER_ANSWER,
         accuracy: 1,
         completedLessons: [input.lessonId],
@@ -309,6 +312,87 @@ describe('finishing', () => {
 
     expect(state.qi).toBe(LESSON.questions.length - 1);
     expect(state.drillDone).toBe(false);
+  });
+});
+
+describe('the streak', () => {
+  /** A state the server would send, with the streak resolved as `live_streak` resolves it. */
+  const served = (streakDay: string | null, stored: number, today: string): PlayerState => ({
+    hearts: 5,
+    nextHeartAt: null,
+    streak: streakDay === null ? 0 : liveStreak(stored, streakDay, today),
+    streakAtRisk: streakAtRisk(streakDay, today),
+    streakExpiresAt: `${today}T22:00:00.000Z`,
+    longestStreak: 41,
+    storedStreak: stored,
+    streakDay,
+    xp: 0,
+    accuracy: 1,
+    completedLessons: [],
+    serverNow: `${today}T09:00:00.000Z`,
+  });
+
+  const hydrate = (state: PlayerState) =>
+    reducer(initialState, { type: 'hydrate', state, clockOffset: 0, source: 'server' });
+
+  it('shows zero for a lapsed run, and keeps the number that ended', () => {
+    const state = hydrate(served('2026-09-01', 40, '2026-09-06'));
+
+    expect(state.streak).toBe(0);
+    expect(state.streakAtRisk).toBe(false);
+    // nothing was written to get there: the stored count is still forty, which is what
+    // the lapse card has to show
+    expect(state.storedStreak).toBe(40);
+    expect(state.longestStreak).toBe(41);
+    expect(state.streakDay).toBe('2026-09-01');
+  });
+
+  it('sets the flag for a run last extended yesterday', () => {
+    const state = hydrate(served('2026-09-05', 13, '2026-09-06'));
+
+    expect(state.streak).toBe(13);
+    expect(state.streakAtRisk).toBe(true);
+    expect(state.streakExpiresAt).toBe('2026-09-06T22:00:00.000Z');
+  });
+
+  it('is neither at risk nor lapsed on the day it was played', () => {
+    const state = hydrate(served('2026-09-06', 13, '2026-09-06'));
+
+    expect(state.streak).toBe(13);
+    expect(state.streakAtRisk).toBe(false);
+  });
+
+  it('has nothing to show a player who has never had one', () => {
+    const state = hydrate(served(null, 0, '2026-09-06'));
+
+    expect(state.streak).toBe(0);
+    expect(state.storedStreak).toBe(0);
+    expect(state.streakDay).toBeNull();
+  });
+
+  // The case the whole prompt exists for: an app left open while the days go by. Nothing
+  // is fetched here — the recompute is local, and the stored count never moves.
+  it('walks alive → at risk → lapsed as local midnight passes', () => {
+    let state = hydrate(served('2026-09-06', 13, '2026-09-06'));
+    expect(state.streak).toBe(13);
+    expect(state.streakAtRisk).toBe(false);
+
+    const midnight = (day: string) => ({
+      type: 'recomputeStreak' as const,
+      today: day,
+      expiresAt: `${day}T22:00:00.000Z`,
+    });
+
+    state = reducer(state, midnight('2026-09-07'));
+    expect(state.streak).toBe(13);
+    expect(state.streakAtRisk).toBe(true);
+    expect(state.streakExpiresAt).toBe('2026-09-07T22:00:00.000Z');
+
+    state = reducer(state, midnight('2026-09-08'));
+    expect(state.streak).toBe(0);
+    expect(state.streakAtRisk).toBe(false);
+    expect(state.storedStreak).toBe(13);
+    expect(state.streakDay).toBe('2026-09-06');
   });
 });
 

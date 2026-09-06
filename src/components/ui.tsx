@@ -129,13 +129,52 @@ export function HeartsPill({
   );
 }
 
-export function StreakPill({ streak, pending = false }: { streak: number; pending?: boolean }) {
+/**
+ * The streak, in the three states §6 specifies.
+ *
+ *   · **Alive** — the gold frame, unchanged: the reward treatment the design gives it.
+ *   · **At risk** — the count stands, but the gold goes hollow: a plain hairline and
+ *     the time left until local midnight. Being one day from losing a run is not an
+ *     error, so there is no red here; red belongs to the chip action, hearts, the
+ *     "Playing" badge and the chip tool's focus rings.
+ *   · **Lapsed** — a muted zero with no frame at all. Nothing to celebrate, nothing to
+ *     alarm; the card on Home is what actually says the run ended.
+ */
+export function StreakPill({
+  streak,
+  pending = false,
+  atRisk = false,
+  expiresAt = null,
+  clockOffset = 0,
+}: {
+  streak: number;
+  pending?: boolean;
+  atRisk?: boolean;
+  /** local midnight, when an at-risk run ends */
+  expiresAt?: string | null;
+  clockOffset?: number;
+}) {
+  const remaining = useCountdown(atRisk ? expiresAt : null, clockOffset);
+  const lapsed = !pending && streak === 0;
+
+  const body = (
+    <View style={styles.streakPill}>
+      <Text style={[styles.streakNumber, lapsed && styles.streakNumberLapsed]}>
+        {pending ? PENDING : streak}
+      </Text>
+      <Text style={styles.streakLabel}>day</Text>
+      {atRisk && remaining > 0 ? (
+        <Text style={styles.streakLeft}>{formatCountdown(remaining)} left</Text>
+      ) : null}
+    </View>
+  );
+
+  if (lapsed) return <View style={styles.streakPillLapsed}>{body}</View>;
+  if (atRisk) return <View style={styles.streakPillAtRisk}>{body}</View>;
+
   return (
     <GoldFrame radius={radius.pill} fill={colors.rewardAlt}>
-      <View style={styles.streakPill}>
-        <Text style={styles.streakNumber}>{pending ? PENDING : streak}</Text>
-        <Text style={styles.streakLabel}>day</Text>
-      </View>
+      {body}
     </GoldFrame>
   );
 }
@@ -401,7 +440,29 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 11,
   },
+  /** at risk: the gold hairline goes hollow — the frame's shape without its fill */
+  streakPillAtRisk: {
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.goldRule,
+    backgroundColor: 'transparent',
+  },
+  /** lapsed: no frame at all, the same surface every other muted pill sits on */
+  streakPillLapsed: {
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceInput,
+  },
   streakNumber: { fontFamily: font.bold, fontSize: 12, lineHeight: 14, color: colors.gold },
+  streakNumberLapsed: { color: colors.textMuted },
+  /** the time left before local midnight takes the run */
+  streakLeft: {
+    fontFamily: font.regular,
+    fontSize: 9,
+    lineHeight: 11,
+    letterSpacing: ls(9, 0.06),
+    textTransform: 'uppercase',
+    color: colors.textMuted,
+  },
   streakLabel: {
     fontFamily: font.regular,
     fontSize: 10,
