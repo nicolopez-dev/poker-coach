@@ -1,7 +1,12 @@
 /**
  * Chip-fitting solver, ported from the design prototype
  * (docs/design-handoff/Poker Coach v3 felt.dc.html) and documented under
- * "Algorithms" in the handoff README. Behaviour is deliberately identical.
+ * "Algorithms" in the handoff README.
+ *
+ * The fitting is the prototype's, unchanged. What the denominations *are* is not: the
+ * prototype tried four ladders and kept whichever fitted best, and this deals one fixed
+ * ladder ({@link AUTO_VALUES}) so a colour is worth the same tonight as it was last week.
+ * Values set by hand follow the same rule in fives ({@link snapValue}).
  */
 
 export type ChipColor = {
@@ -36,13 +41,53 @@ export type DealResult = {
   total: number;
 };
 
-/** Denomination ladders tried in Auto mode, truncated to the colour count. */
-export const LADDERS: readonly (readonly number[])[] = [
-  [1, 2, 5, 10, 25, 50, 100, 250],
-  [1, 5, 10, 25, 50, 100, 500, 1000],
-  [5, 10, 25, 50, 100, 500, 1000, 2500],
-  [1, 2, 5, 20, 50, 100, 200, 500],
-];
+/**
+ * The denominations Auto values uses, smallest first and truncated to the colour count.
+ *
+ * One ladder, not the prototype's four. A player who owns these chips should find the
+ * same value on the same colour every night — a solver free to pick a different ladder
+ * for the same case, because the entry moved by a unit, is a tool nobody can learn.
+ */
+export const AUTO_VALUES: readonly number[] = [5, 10, 25, 50, 100, 500, 1000, 2000, 5000];
+
+/**
+ * Values are set in fives, by hand as well as automatically: every denomination above
+ * divides by five, and a blind or a bet that cannot be paid in the chips on the table is
+ * the one thing a chip tool must not produce.
+ */
+export const VALUE_STEP = 5;
+
+/** The nearest value a chip is allowed to carry — never nothing, always a multiple. */
+export function snapValue(value: number): number {
+  return Math.max(VALUE_STEP, Math.round(value / VALUE_STEP) * VALUE_STEP);
+}
+
+/**
+ * The ladder laid over a case: the cheapest colour takes the first rung, the next the
+ * second, and so on.
+ *
+ * This is what Auto values *means*, so the case carries it the moment the mode is
+ * switched on rather than only after a deal. The values on the disabled fields are then
+ * the values that will be dealt — the alternative is a case showing one thing and the
+ * stacks another, which is the tool lying about itself.
+ */
+export function autoValued(colors: ChipColor[]): ChipColor[] {
+  const order = colors.map((_, i) => i).sort((a, b) => colors[a].value - colors[b].value);
+  const next = colors.slice();
+  let moved = false;
+
+  order.forEach((ci, k) => {
+    // a case deeper than the ladder keeps what it had on the rungs past its end
+    const value = AUTO_VALUES[k] ?? colors[ci].value;
+    if (value === colors[ci].value) return;
+    next[ci] = { ...colors[ci], value };
+    moved = true;
+  });
+
+  // a case already on the ladder comes back as itself, so nothing downstream reads an
+  // identity change as an edit
+  return moved ? next : colors;
+}
 
 /** Chips per player below which a stack is considered unplayable, so the
  *  exact-fit result gets broken down into smaller denominations. */
@@ -217,9 +262,6 @@ function greedyFit(denoms: number[], avail: number[], buyIn: number): FitResult 
   return { denoms, qty, val, ok: val === buyIn, total, spread: qty.filter((q) => q > 0).length };
 }
 
-/** Chips per player the Auto picker aims for when everything else ties. */
-const IDEAL_STACK = 24;
-
 export type DealInput = {
   players: number;
   /** entry in points (units × 100) */
@@ -236,40 +278,33 @@ export type Deal = {
 
 /**
  * Deals an equal stack to every player.
- * In Auto mode each ladder is tried and the friendliest fit wins: exact fits
- * with at least 8 chips first, then more distinct denominations, then a total
- * nearest {@link IDEAL_STACK}, then the smallest error.
+ *
+ * Auto mode assigns {@link AUTO_VALUES} in order, smallest colour first. My values uses
+ * what the player typed, snapped to {@link VALUE_STEP} — which is also what goes back
+ * into the case, so the values on screen are the values that were dealt.
  */
 export function deal({ players, buyIn, colors, autoValues }: DealInput): Deal {
-  const order = colors.map((_, i) => i).sort((a, b) => colors[a].value - colors[b].value);
-  const avail = order.map((i) => Math.floor(colors[i].count / players));
-  const n = colors.length;
+  // Snapping cannot reorder anything: rounding to the nearest five is monotonic, so a
+  // case sorted by value stays sorted.
+  const cased = autoValues ? colors : colors.map((c) => ({ ...c, value: snapValue(c.value) }));
+  const order = cased.map((_, i) => i).sort((a, b) => cased[a].value - cased[b].value);
+  const avail = order.map((i) => Math.floor(cased[i].count / players));
+  const n = cased.length;
 
-  let pick: FitResult;
-  if (autoValues) {
-    const cands = LADDERS.map((l) => fit(l.slice(0, n) as number[], avail, buyIn));
-    const ok = cands.filter((c) => c.ok && c.total >= 8);
-    const pool = ok.length ? ok : cands.filter((c) => c.ok);
-    pick = (pool.length ? pool : cands).sort(
-      (a, b) =>
-        b.spread - a.spread ||
-        Math.abs(a.total - IDEAL_STACK) - Math.abs(b.total - IDEAL_STACK) ||
-        Math.abs(a.val - buyIn) - Math.abs(b.val - buyIn),
-    )[0];
-  } else {
-    pick = fit(
-      order.map((i) => colors[i].value),
-      avail,
-      buyIn,
-    );
-  }
+  const pick: FitResult = autoValues
+    ? fit(AUTO_VALUES.slice(0, n) as number[], avail, buyIn)
+    : fit(
+        order.map((i) => cased[i].value),
+        avail,
+        buyIn,
+      );
 
   const nextColors = autoValues
-    ? colors.map((c, i) => {
+    ? cased.map((c, i) => {
         const k = order.indexOf(i);
         return k < 0 ? c : { ...c, value: pick.denoms[k] };
       })
-    : colors;
+    : cased;
 
   return {
     result: {

@@ -1,13 +1,26 @@
 import type { ChipColor } from '../lib/chips';
 
-/** The case a new player starts with. */
+/** The case a new player starts with — the first five of `AUTO_VALUES`, in fives. */
 export const DEFAULT_COLORS: ChipColor[] = [
-  { name: 'White', swatch: '#f4f1e6', count: 40, value: 1 },
-  { name: 'Red', swatch: '#ff7a63', count: 40, value: 5 },
+  { name: 'White', swatch: '#f4f1e6', count: 40, value: 5 },
+  { name: 'Red', swatch: '#ff7a63', count: 40, value: 10 },
   { name: 'Green', swatch: '#4a6b52', count: 40, value: 25 },
   { name: 'Blue', swatch: '#3a4f6b', count: 40, value: 50 },
   { name: 'Black', swatch: '#1a1a1a', count: 40, value: 100 },
 ];
+
+/**
+ * The whole case a new player starts with — the colours above, six seats and five units
+ * in. This is the shape `src/server/chipCase.ts` compares against to decide that a case
+ * has not been touched, so it is the one place these numbers are written down.
+ */
+export const DEFAULT_CASE = {
+  colors: DEFAULT_COLORS,
+  players: 6,
+  /** entry in points (units × 100) */
+  buyIn: 500,
+  autoValues: true,
+};
 
 /** Offered in order when the user adds a colour. */
 export const SPARE_COLORS: { name: string; swatch: string }[] = [
@@ -32,3 +45,5 @@ export const MAX_PLAYERS = 10;
 export const MAX_CHIP_COUNT = 500;
 export const MAX_CHIP_VALUE = 10000;
 export const MAX_NAME_LENGTH = 14;
+/** The entry field's own ceiling, in units — `buy_in` is that many points × 100. */
+export const MAX_BUY_IN_UNITS = 1000;

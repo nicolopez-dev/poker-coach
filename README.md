@@ -80,9 +80,9 @@ src/
     balance.ts           point-to-unit conversion and the tally
     color.ts             chip luminance, dash and ink
     names.ts             seat-name initials rule
-  data/                  chip case defaults, sample profile
+  data/                  chip case defaults, the coach's note
   auth/                  the session: Supabase client, secure storage, deep links
-  server/                the only module that talks to the database — RPCs, hydration
+  server/                the only module that talks to the database — RPCs, hydration, case, games
   components/            felt, gold frame, chip, ace card, header, tab bar, motion
   screens/               Login, Home, Path, Drill, Chips (+ Result, Balance), You
 docs/design-handoff/     the design bundle — read-only reference
@@ -109,7 +109,9 @@ Both are ported closely from the prototype and covered by tests:
 - **Chip assignment** (`src/lib/chips.ts`) — sort colours by value, work out per-player
   availability, then seed a weighted spread and repair it chip by chip. If that misses, a bounded
   DP finds an exact stack and breaks the big chips down until the stack is playable (≥ 20 chips).
-  In Auto mode four denomination ladders are tried and the friendliest fit wins.
+  Auto values deals one fixed ladder — 5, 10, 25, 50, 100, 500, 1,000, 2,000, 5,000 — truncated to
+  the colour count, and values set by hand are rounded to the nearest five, so every denomination
+  can pay a blind.
 - **Balance** (`src/lib/balance.ts`) — `scale = entry / dealtStack`; a seat's end count converts
   at that rate, and the difference against the entry is their balance in points and units.
 
@@ -125,12 +127,18 @@ Carried over from the handoff's own open items:
   through the outbox to the P3 functions — queued on this phone when there is no connection
   and flushed on reconnect, on foreground and after a hydrate — and running out of hearts
   stops play until one returns.
-- The games list is still sample data, and the coach's note on Home is authored copy with
-  nothing computing it — both are marked as such in `src/data/profile.ts`. Everything else on
-  Home and You is real: accuracy, the week chart, the daily goal, XP, the streak and the
-  games count, all derived server-side from the answers themselves.
-- Setting up a game does not append to "Your games".
-- Seat names live only in the Balance rows.
+- The coach's note on Home is authored copy with nothing computing it, and is marked as such
+  in `src/data/profile.ts` — the last of the sample data. Everything else on Home and You is
+  real: accuracy, the week chart, the daily goal, XP, the streak and the games count, all
+  derived server-side from the answers themselves.
+- The chip case follows the account — read on sign-in and written back debounced as it is
+  edited, last write wins. A case nobody has touched has no row at all.
+- "Your games" is the real record. Dealing the stacks writes a game — with the case it was
+  played with, values and all — and editing the case and dealing again updates that same row, so
+  one evening is one row; entering the end-of-game counts records a seat each with its balance.
+  **Reuse** puts that whole setup back, overwriting the case currently in the tool. An account
+  with no games says so.
+- Seat names are stored with the seats they were typed into, and nothing reads them back yet.
 - Apple sign-in is not wired yet, and profile setup is a placeholder.
 
 ## Running against the local stack
@@ -238,6 +246,13 @@ Sign In / Providers, on the hosted project before release. `supabase/config.toml
   played to river combinatorics, so the row titles and one-liners are the course's rather than the
   handoff's sample copy. The tiers and the format are set out at the top of
   [`src/content/course.ts`](src/content/course.ts).
+- **The first seat on the Balance card is yours**, and says "You" where the others say P2, P3.
+  The handoff's games list shows one signed balance per evening without saying whose; rather
+  than invent an answer, the tool names the seat it reads.
+- **One denomination ladder, not four.** The prototype tried four and kept whichever fitted
+  best, so the same case could be worth different amounts on different nights. Auto values now
+  deals a single fixed ladder, and hand-set values round to the nearest five — a chip that
+  cannot pay a blind is worse than a slightly worse fit.
 - **The solver retries for full spread.** Where the prototype could silently deal zero of a
   colour, a fit that leaves one out is retried with one of every denomination reserved, and any
   colour that still can't be dealt is named on the result card.
