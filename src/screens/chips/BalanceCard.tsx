@@ -94,12 +94,15 @@ export function BalanceCard({
                 onChangeText={(v) => setName(i, v)}
                 onFocus={() => setEditingName(i)}
                 onBlur={() => setEditingName(null)}
-                placeholder={`P${i + 1}`}
+                // The first seat is the player's own: the balance "Your games" shows for
+                // an evening is this row's, so the card says so rather than leaving it
+                // to be guessed at.
+                placeholder={i === 0 ? 'You' : `P${i + 1}`}
                 placeholderTextColor={colors.textFaint}
                 maxLength={NAME_MAX_LENGTH}
                 numberOfLines={1}
                 selectionColor={colors.gold}
-                accessibilityLabel={full || `Seat ${i + 1}`}
+                accessibilityLabel={full || (i === 0 ? 'Your seat' : `Seat ${i + 1}`)}
                 style={[styles.nameField, editingName === i && styles.nameFieldFocused]}
               />
               <NumberField

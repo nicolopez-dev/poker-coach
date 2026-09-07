@@ -232,7 +232,7 @@ function toChipCase(row: CaseRow | null): ChipCase | null {
   if (typeof row.auto_values !== 'boolean') return null;
   if (!isNumber(row.players) || !isNumber(row.buy_in)) return null;
 
-  const colors = toColors(row.colors);
+  const colors = toChipColors(row.colors);
   if (!colors) return null;
 
   return {
@@ -243,7 +243,16 @@ function toChipCase(row: CaseRow | null): ChipCase | null {
   };
 }
 
-function toColors(value: Json): ChipColor[] | null {
+/**
+ * A colours blob, validated wherever it is stored — the case here, and the case a game
+ * was played with in [[games]]. One validator, so a row that would break the solver is
+ * caught the same way whichever table it came out of.
+ *
+ * Values are range-clamped but never rounded into fives: what is stored is a record of
+ * what was set, and a game played with odd values is a fact about that night. The
+ * rounding belongs where a value is chosen — the case editor and `deal()`.
+ */
+export function toChipColors(value: Json): ChipColor[] | null {
   if (!Array.isArray(value)) return null;
   if (value.length < MIN_COLORS || value.length > MAX_COLORS) return null;
 

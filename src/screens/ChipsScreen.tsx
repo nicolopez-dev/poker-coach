@@ -6,6 +6,7 @@ import { SwatchPicker } from '../components/SwatchPicker';
 import { TabScreen } from '../components/TabScreen';
 import { NumberField, RedButton } from '../components/ui';
 import {
+  MAX_CHIP_VALUE,
   MAX_COLORS,
   MAX_NAME_LENGTH,
   MAX_PLAYERS,
@@ -13,7 +14,8 @@ import {
   MIN_PLAYERS,
 } from '../data/chipCase';
 import { fmt, POINTS_PER_UNIT } from '../lib/balance';
-import { availablePoints, dealtRows, totalChips, type ChipColor } from '../lib/chips';
+import { availablePoints, dealtRows, snapValue, totalChips, type ChipColor } from '../lib/chips';
+import { digits } from '../lib/num';
 import { useStore } from '../state/store';
 import { colors, font, ls, radius, shadows, type } from '../theme/tokens';
 import { BalanceCard } from './chips/BalanceCard';
@@ -165,6 +167,59 @@ function EntryBetField() {
   );
 }
 
+/**
+ * What a chip is worth, in fives.
+ *
+ * Typing is not fought — the digits stay as they are entered, so 15 can be reached
+ * through 1 — and the value lands on the nearest five when the field is left. Dealing
+ * rounds too (`snapValue` in `src/lib/chips.ts`), so a stack is never dealt in
+ * denominations that cannot pay a blind, whether or not the field was ever blurred.
+ */
+function ValueField({
+  index,
+  color,
+  locked,
+}: {
+  index: number;
+  color: ChipColor;
+  locked: boolean;
+}) {
+  const { setColorValue } = useStore();
+  const [text, setText] = useState(String(color.value));
+  const focused = useRef(false);
+
+  // Keep in step with the store when the case is written from elsewhere: switching to
+  // Auto values, dealing, or reusing a game. A locked field never keeps a typed draft —
+  // it is showing the ladder's answer, not an edit in progress.
+  useEffect(() => {
+    if (!focused.current || locked) setText(String(color.value));
+  }, [color.value, locked]);
+
+  return (
+    <NumberField
+      value={text}
+      onChangeText={(v) => {
+        const digitsOnly = v.replace(/[^0-9]/g, '');
+        setText(digitsOnly);
+        setColorValue(index, digitsOnly);
+      }}
+      onFocus={() => {
+        focused.current = true;
+      }}
+      onBlur={() => {
+        focused.current = false;
+        const value = snapValue(digits(text, MAX_CHIP_VALUE));
+        setText(String(value));
+        setColorValue(index, String(value));
+      }}
+      editable={!locked}
+      width={56}
+      accessibilityLabel={`${color.name} value`}
+      style={locked ? { backgroundColor: colors.valueLocked, color: colors.textFaint } : undefined}
+    />
+  );
+}
+
 function Segment({
   label,
   active,
@@ -228,18 +283,7 @@ function ChipRow({ index, color }: { index: number; color: ChipColor }) {
       </View>
 
       <View style={styles.field}>
-        <NumberField
-          value={String(color.value)}
-          onChangeText={(v) => store.setColorValue(index, v)}
-          editable={!locked}
-          width={56}
-          accessibilityLabel={`${color.name} value`}
-          style={
-            locked
-              ? { backgroundColor: colors.valueLocked, color: colors.textFaint }
-              : undefined
-          }
-        />
+        <ValueField index={index} color={color} locked={locked} />
         <Text style={styles.fieldCaption}>value</Text>
       </View>
 

@@ -496,6 +496,142 @@ describe('opening a lesson', () => {
   });
 });
 
+describe('the chip case', () => {
+  /** The case in My values, with values nobody would deal. */
+  const MANUAL = [15, 60, 200, 300, 400];
+
+  const mine = () =>
+    MANUAL.reduce(
+      (state, value, index) => reducer(state, { type: 'patchColor', index, patch: { value } }),
+      reducer(initialState, { type: 'setAutoValues', auto: false }),
+    );
+
+  it('shows the ladder the moment Auto values is switched on', () => {
+    const manual = mine();
+    expect(manual.colors.map((c) => c.value)).toEqual(MANUAL);
+
+    const auto = reducer(manual, { type: 'setAutoValues', auto: true });
+
+    // the fields are not waiting on a deal to tell the truth any more
+    expect(auto.colors.map((c) => c.value)).toEqual([5, 10, 25, 50, 100]);
+  });
+
+  it('leaves the values alone when My values is switched back on', () => {
+    const auto = reducer(initialState, { type: 'setAutoValues', auto: true });
+    const manual = reducer(auto, { type: 'setAutoValues', auto: false });
+
+    expect(manual.colors).toBe(auto.colors);
+  });
+
+  it('re-rungs the case when a colour is added or dropped in Auto values', () => {
+    const added = reducer(initialState, { type: 'addColor' });
+    expect(added.colors.map((c) => c.value)).toEqual([5, 10, 25, 50, 100, 500]);
+
+    const dropped = reducer(added, { type: 'removeColor', index: 0 });
+    expect(dropped.colors.map((c) => c.value)).toEqual([5, 10, 25, 50, 100]);
+  });
+
+  it('does not touch a hand-set case when a colour is added', () => {
+    const added = reducer(mine(), { type: 'addColor' });
+    expect(added.colors.slice(0, MANUAL.length).map((c) => c.value)).toEqual(MANUAL);
+  });
+});
+
+describe('the game being set up', () => {
+  const dealt = (state = initialState, gameId = 'evening-1') =>
+    reducer(state, { type: 'deal', gameId });
+
+  it('keeps its row while the case is still being edited', () => {
+    const first = dealt();
+    // a colour changed, the stacks dealt again: the same evening, and the same row
+    const edited = reducer(first, { type: 'stepPlayers', delta: 1 });
+    const again = dealt(edited, 'evening-2');
+
+    expect(first.gameId).toBe('evening-1');
+    expect(again.gameId).toBe('evening-1');
+    expect(again.gameSettled).toBe(false);
+  });
+
+  it('is settled by the first count typed into the Balance card', () => {
+    const state = reducer(dealt(), { type: 'setEnd', index: 0, value: '1200' });
+
+    expect(state.gameSettled).toBe(true);
+    expect(state.ends[0]).toBe(1200);
+  });
+
+  it('is settled by a seat name too — that is a seat row as much as a count is', () => {
+    expect(reducer(dealt(), { type: 'setName', index: 1, value: 'Ana' }).gameSettled).toBe(true);
+  });
+
+  it('starts a new row once the counts are in', () => {
+    const settled = reducer(dealt(), { type: 'setEnd', index: 0, value: '1200' });
+    const next = dealt(settled, 'evening-2');
+
+    expect(next.gameId).toBe('evening-2');
+    expect(next.gameSettled).toBe(false);
+  });
+
+  it('sets the whole case back up when a game is reused', () => {
+    const game = {
+      id: 'g1',
+      playedAt: '2026-08-21T20:00:00.000Z',
+      players: 4,
+      buyIn: 2000,
+      dealtStack: 1900,
+      netPoints: 200,
+      colors: [
+        { name: 'Bone', swatch: '#f4f1e6', count: 25, value: 5 },
+        { name: 'Clay', swatch: '#ff7a63', count: 25, value: 25 },
+      ],
+      autoValues: false,
+    };
+
+    // a case of the player's own, mid-count, that reuse is expected to sweep away
+    const busy = reducer(
+      reducer(dealt(), { type: 'setEnd', index: 0, value: '1200' }),
+      { type: 'addColor' },
+    );
+    const state = reducer(busy, { type: 'loadGame', game });
+
+    expect(caseOf(state)).toEqual({
+      colors: game.colors,
+      players: 4,
+      buyIn: 2000,
+      autoValues: false,
+    });
+    expect(state.tab).toBe('chips');
+    expect(state.result).toBeNull();
+    expect(state.ends).toEqual([]);
+    expect(state.names).toEqual([]);
+  });
+
+  it('keeps the colours on screen when the game never stored any', () => {
+    const state = reducer(initialState, {
+      type: 'loadGame',
+      game: {
+        id: 'g0',
+        playedAt: '2026-08-21T20:00:00.000Z',
+        players: 4,
+        buyIn: 2000,
+        dealtStack: 1900,
+        netPoints: null,
+        colors: null,
+        autoValues: true,
+      },
+    });
+
+    expect(state.colors).toBe(initialState.colors);
+    expect(state.players).toBe(4);
+  });
+
+  it('reads the list again after a write, but only after one', () => {
+    const loaded = reducer(initialState, { type: 'gamesLoaded', games: [] });
+    expect(loaded.gamesLoaded).toBe(true);
+
+    expect(reducer(loaded, { type: 'gamesStale' }).gamesLoaded).toBe(false);
+  });
+});
+
 describe('the chip case the server sends back', () => {
   const MINE: ChipCase = {
     colors: [
@@ -526,7 +662,10 @@ describe('the chip case the server sends back', () => {
   it('never voids a deal already on screen', () => {
     // the case itself is untouched — it is the dealt stacks, and only those, that make
     // this one worth refusing
-    const dealt = { ...initialState, result: reducer(initialState, { type: 'deal' }).result };
+    const dealt = {
+      ...initialState,
+      result: reducer(initialState, { type: 'deal', gameId: 'game-1' }).result,
+    };
     expect(dealt.result).not.toBeNull();
 
     const state = reducer(dealt, { type: 'chipCaseLoaded', chipCase: MINE });

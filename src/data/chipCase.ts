@@ -1,9 +1,9 @@
 import type { ChipColor } from '../lib/chips';
 
-/** The case a new player starts with. */
+/** The case a new player starts with — the first five of `AUTO_VALUES`, in fives. */
 export const DEFAULT_COLORS: ChipColor[] = [
-  { name: 'White', swatch: '#f4f1e6', count: 40, value: 1 },
-  { name: 'Red', swatch: '#ff7a63', count: 40, value: 5 },
+  { name: 'White', swatch: '#f4f1e6', count: 40, value: 5 },
+  { name: 'Red', swatch: '#ff7a63', count: 40, value: 10 },
   { name: 'Green', swatch: '#4a6b52', count: 40, value: 25 },
   { name: 'Blue', swatch: '#3a4f6b', count: 40, value: 50 },
   { name: 'Black', swatch: '#1a1a1a', count: 40, value: 100 },

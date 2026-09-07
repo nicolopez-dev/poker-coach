@@ -7,8 +7,8 @@ import { Avatar } from '../components/Avatar';
 import { TabScreen } from '../components/TabScreen';
 import { OutlineButton, PENDING, ProgressBar } from '../components/ui';
 import { currentChapter } from '../content/progress';
-import { GAMES } from '../data/profile';
-import { fmt } from '../lib/balance';
+import { fmt, POINTS_PER_UNIT } from '../lib/balance';
+import { gameDate, gameDetail } from '../lib/games';
 import { useProgress, useStore } from '../state/store';
 import { colors, font, ls, radius, shadows } from '../theme/tokens';
 
@@ -19,6 +19,8 @@ export function YouScreen() {
     longestStreak,
     accuracy,
     games,
+    recentGames,
+    gamesLoaded,
     hydrated,
     gamesOpen,
     toggleGames,
@@ -40,6 +42,12 @@ export function YouScreen() {
         unit ? `Unit ${unit.index + 1}` : 'Yet to sit down',
         streak > 0 ? `${streak}-day streak` : 'No streak yet',
       ].join(' · ');
+
+  // An account with none says so straight away, without waiting on a read that has
+  // nothing to find — and a panel that has been read and came back empty says the same.
+  const noGames =
+    (hydrated && games === 0 && recentGames.length === 0) ||
+    (gamesLoaded && recentGames.length === 0);
 
   const stats = [
     {
@@ -120,36 +128,59 @@ export function YouScreen() {
       {gamesOpen && (
         <Rise duration={300} style={styles.gamesPanel}>
           <View style={styles.gamesHead}>
-            <Text style={styles.gamesCount}>Last {GAMES.length} of {games}</Text>
+            <Text style={styles.gamesCount}>
+              {gamesLoaded ? `Last ${recentGames.length} of ${games}` : PENDING}
+            </Text>
             <Text style={styles.gamesUnits}>Balance in units</Text>
           </View>
-          <View style={{ gap: 8 }}>
-            {GAMES.map((g) => (
-              <View key={g.date} style={styles.gameRow}>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.gameDate}>{g.date}</Text>
-                  <Text style={styles.gameDetail}>{g.detail}</Text>
-                </View>
-                <View>
-                  <Text
-                    style={[
-                      styles.gameNet,
-                      { color: g.net > 0 ? colors.greenLight : colors.textSecondary },
-                    ]}>
-                    {g.net > 0 ? '+' : g.net < 0 ? '−' : ''}
-                    {Math.abs(g.net).toFixed(2)}
-                  </Text>
-                  <Text style={styles.gameNetLabel}>units</Text>
-                </View>
-                <OutlineButton
-                  label="Reuse"
-                  height={44}
-                  onPress={() => loadGame(g.players, g.buyIn)}
-                  style={styles.reuse}
-                />
-              </View>
-            ))}
-          </View>
+          {noGames ? (
+            <Text style={styles.gamesEmpty}>
+              No games yet. Set a table up under Chips and the evening lands here.
+            </Text>
+          ) : !gamesLoaded ? (
+            <Text style={styles.gamesEmpty}>Looking them up…</Text>
+          ) : (
+            <View style={{ gap: 8 }}>
+              {recentGames.map((g) => {
+                // null until somebody counts the chips; an uncounted evening says so
+                // rather than showing a nought it has not earned
+                const net = g.netPoints === null ? null : g.netPoints / POINTS_PER_UNIT;
+                return (
+                  <View key={g.id} style={styles.gameRow}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.gameDate}>{gameDate(g.playedAt)}</Text>
+                      <Text style={styles.gameDetail}>{gameDetail(g)}</Text>
+                    </View>
+                    <View>
+                      <Text
+                        style={[
+                          styles.gameNet,
+                          {
+                            color:
+                              net === null
+                                ? colors.textFaint
+                                : net > 0
+                                  ? colors.greenLight
+                                  : colors.textSecondary,
+                          },
+                        ]}>
+                        {net === null
+                          ? '—'
+                          : `${net > 0 ? '+' : net < 0 ? '−' : ''}${Math.abs(net).toFixed(2)}`}
+                      </Text>
+                      <Text style={styles.gameNetLabel}>{net === null ? 'not counted' : 'units'}</Text>
+                    </View>
+                    <OutlineButton
+                      label="Reuse"
+                      height={44}
+                      onPress={() => loadGame(g)}
+                      style={styles.reuse}
+                    />
+                  </View>
+                );
+              })}
+            </View>
+          )}
         </Rise>
       )}
 
@@ -280,6 +311,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     ...shadows.row,
+  },
+  gamesEmpty: {
+    fontFamily: font.regular,
+    fontSize: 12,
+    lineHeight: 12 * 1.45,
+    color: colors.textMuted,
+    paddingHorizontal: 2,
+    paddingBottom: 2,
   },
   gameDate: { fontFamily: font.bold, fontSize: 13, lineHeight: 15, color: colors.text },
   gameDetail: {
