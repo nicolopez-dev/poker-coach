@@ -29,7 +29,7 @@ import type { ChipCase } from '../server/chipCase';
 import { ServerError, type AnswerOutcome, type PlayerState } from '../server/client';
 import { clearOutbox, pending } from '../server/outbox';
 import { beginRun, finishLesson, recordAnswer, syncOutbox } from './drill';
-import { caseOf, initialState, reducer } from './store';
+import { FOREGROUND_REFRESH_MS, caseOf, initialState, onForeground, reducer } from './store';
 
 const CHAPTER = COURSE[0];
 const LESSON = CHAPTER.lessons[0];
@@ -493,6 +493,48 @@ describe('opening a lesson', () => {
 
     expect(s.state.outOfHearts).toBe(false);
     expect(s.state.tab).toBe('home');
+  });
+});
+
+describe('coming back to the app', () => {
+  const LONG = FOREGROUND_REFRESH_MS + 1;
+
+  it('is a transition into active, not every mention of it', () => {
+    // react-native-web reads app state off document visibility, which on some hosts
+    // flaps active → background → active about once a second; each of those used to
+    // cost a whole get_state()
+    expect(onForeground('active', 'active', LONG)).toBe('none');
+    expect(onForeground('active', 'background', LONG)).toBe('none');
+    expect(onForeground('background', 'active', LONG)).toBe('sync');
+    expect(onForeground('inactive', 'active', LONG)).toBe('sync');
+  });
+
+  it('recomputes the day but spares the server when the last return was moments ago', () => {
+    expect(onForeground('background', 'active', 0)).toBe('day');
+    expect(onForeground('background', 'active', FOREGROUND_REFRESH_MS - 1)).toBe('day');
+    expect(onForeground('background', 'active', FOREGROUND_REFRESH_MS)).toBe('sync');
+  });
+
+  it('leaves the state untouched when the day has not turned', () => {
+    const state = reducer(initialState, {
+      type: 'recomputeStreak',
+      today: '2026-09-07',
+      expiresAt: null,
+    });
+
+    // the same object, so a return React need not re-render is not one it does
+    expect(reducer(state, { type: 'recomputeStreak', today: '2026-09-07', expiresAt: null })).toBe(
+      state,
+    );
+  });
+
+  it('leaves the state untouched when the connection has not moved', () => {
+    const online = reducer(initialState, { type: 'connection', online: true });
+    expect(reducer(online, { type: 'connection', online: true })).toBe(online);
+
+    const offline = reducer(online, { type: 'connection', online: false });
+    expect(offline.offline).toBe(true);
+    expect(reducer(offline, { type: 'connection', online: false })).toBe(offline);
   });
 });
 

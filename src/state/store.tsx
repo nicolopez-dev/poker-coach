@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import * as Crypto from 'expo-crypto';
-import { AppState } from 'react-native';
+import { AppState, type AppStateStatus } from 'react-native';
 
 import { useAuth } from '../auth/AuthProvider';
 import { COURSE } from '../content/course';
@@ -257,6 +257,46 @@ type Action =
 const clearResult = { result: null } as const;
 
 /**
+ * How long a return has to be from the last one to be worth asking the server again.
+ *
+ * Nothing on screen can go stale inside half a minute: hearts regenerate over hours and
+ * a streak turns at local midnight.
+ */
+export const FOREGROUND_REFRESH_MS = 30_000;
+
+/** What a change in app state is worth. */
+export type ForegroundWork =
+  /** not a return at all */
+  | 'none'
+  /** a return, but too soon after the last to be worth a round trip */
+  | 'day'
+  /** a real return: recompute the day and ask the server */
+  | 'sync';
+
+/**
+ * Whether the app has genuinely just been come back to.
+ *
+ * Two things make this more than `next === 'active'`. A platform can report active twice
+ * without ever having left — so a return is a *transition* into active, from something
+ * else. And it can flap: react-native-web reads app state off document visibility, which
+ * on some hosts goes active → background → active about once a second, and the app was
+ * answering every one of those with a whole `get_state()`. The same flapping happens on a
+ * phone, more slowly, whenever the app switcher or a notification shade passes over.
+ *
+ * The local day is recomputed on every genuine return, because it costs nothing and is
+ * the thing that actually changes while away. The server is asked at most once every
+ * {@link FOREGROUND_REFRESH_MS}.
+ */
+export function onForeground(
+  previous: AppStateStatus,
+  next: AppStateStatus,
+  sinceLastSync: number,
+): ForegroundWork {
+  if (next !== 'active' || previous === 'active') return 'none';
+  return sinceLastSync < FOREGROUND_REFRESH_MS ? 'day' : 'sync';
+}
+
+/**
  * Colours as the mode has them: the ladder under Auto values, and exactly what was given
  * under My values. Everything that changes the set of colours — or brings a whole case in
  * from the server or a reused game — goes through this, so the case can never sit in Auto
@@ -382,13 +422,23 @@ export function reducer(state: State, action: Action): State {
     // The same arithmetic the server does, run against the day the device is actually
     // in. A phone left open across local midnight must not go on showing yesterday's
     // run as safe, and the stored count is never touched — the lapse stays derived.
-    case 'recomputeStreak':
-      return {
-        ...state,
-        streak: liveStreak(state.storedStreak, state.streakDay, action.today),
-        streakAtRisk: streakAtRisk(state.streakDay, action.today),
-        streakExpiresAt: action.expiresAt,
-      };
+    case 'recomputeStreak': {
+      const streak = liveStreak(state.storedStreak, state.streakDay, action.today);
+      const atRisk = streakAtRisk(state.streakDay, action.today);
+
+      // A day that has not turned yet is no news. Answering with the state it was given
+      // is what keeps this cheap enough to run on every return, however often the
+      // platform decides that is.
+      if (
+        streak === state.streak &&
+        atRisk === state.streakAtRisk &&
+        action.expiresAt === state.streakExpiresAt
+      ) {
+        return state;
+      }
+
+      return { ...state, streak, streakAtRisk: atRisk, streakExpiresAt: action.expiresAt };
+    }
 
     case 'syncStart':
       return { ...state, syncing: true, syncError: null };
@@ -474,8 +524,12 @@ export function reducer(state: State, action: Action): State {
         syncError: null,
       };
 
-    case 'connection':
-      return { ...state, offline: !action.online };
+    // NetInfo reports on a timer, not only on a change, so most of these say what the
+    // last one did. A connection that has not moved leaves the state alone.
+    case 'connection': {
+      const offline = !action.online;
+      return offline === state.offline ? state : { ...state, offline };
+    }
 
     // Progress the server refused: it is not coming back, and the player is told rather
     // than shown a tick. Cleared when they start the next lesson — acknowledged by
@@ -760,14 +814,25 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [status]);
 
   // Coming back to the app is when a streak is most likely to have gone stale: the
-  // count on screen was worked out on a day that may since have ended. Recompute it
-  // from the device's own day first — instant, and right even with no signal — and ask
-  // the server after, which also brings back whatever hearts regenerated while away.
+  // count on screen was worked out on a day that may since have ended. What counts as
+  // coming back is [[onForeground]]'s call — the platform is free to say "active" more
+  // often than a player actually returns, and on web it does.
+  //
+  // Both refs and not state: neither belongs on screen, and changing them must not
+  // rebuild this listener.
+  const appState = useRef(AppState.currentState);
+  const syncedAt = useRef(Date.now());
+
   useEffect(() => {
     if (status !== 'signedIn') return;
 
     const subscription = AppState.addEventListener('change', (next) => {
-      if (next !== 'active') return;
+      const work = onForeground(appState.current, next, Date.now() - syncedAt.current);
+      appState.current = next;
+      if (work === 'none') return;
+
+      // The local day first: instant, right with no signal, and the thing that actually
+      // goes stale while the app is away.
       const now = new Date(Date.now() + clockOffset.current);
       const offset = tzOffsetMin(now);
       dispatch({
@@ -775,6 +840,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         today: localDay(now, offset),
         expiresAt: nextLocalMidnight(now, offset).toISOString(),
       });
+
+      if (work !== 'sync') return;
+      syncedAt.current = Date.now();
       void syncOutbox(dispatch, userId);
       refresh();
     });
