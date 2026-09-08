@@ -14,10 +14,21 @@ and must not be ported.
 Every value in `src/theme/tokens.ts` comes from that README. Add new design values there rather
 than inline, and keep the names the handoff uses (`reward`, `gold hairline`, `felt`, `surface`).
 
+`docs/design-handoff-02/` is the second bundle — the deltas for Home, Drill, Chips and You. Where
+the two disagree it wins, and **its** `design/Poker Coach v3 felt.dc.html` is the authoritative
+full-state prototype (package 01's copy of that filename is the older one). The prototype runs:
+start the `prototype` config in `.claude/launch.json` and open it over HTTP, not as a file — it
+needs the origin to load `support.js`.
+
 The design has since been taken further in a few places — always aces in the background, a
 carmesí "Deal the stacks", and a Path driven by real progress. Those are listed under
 "Deviations from the handoff" in the README; keep that list current when the design and the app
 part ways again.
+
+**Where the handoff and the server disagree, the server wins and the copy changes.** Update 02
+said five drills lock the streak and accuracy covers the last fifty drills; `complete_lesson`
+extends a run on the first lesson of the day and `get_state()` derives accuracy from every answer
+ever given. Check what the SQL actually does before writing a number into a screen.
 
 ## Content
 

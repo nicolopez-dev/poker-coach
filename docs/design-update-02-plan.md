@@ -208,17 +208,39 @@ npm run typecheck
 npm test
 ```
 
-| # | Phase | Depends on | Risk |
-| --- | --- | --- | --- |
-| 1 | Land the package, record the gap | — | none |
-| 2 | Spike: 3D rank chip on RN | 1 | **high** |
-| 3 | Tokens + shared primitives (`FlipCard`, `ranks.ts`, `RankChip`) | 2 | med |
-| 4 | Chips — setup (§3) | 1 | low |
-| 5 | Chips — Settle + Balance (§4) | 4, Decision 2 | med |
-| 6 | Drill — held cards (§2) | 3 | low |
-| 7 | You — stats, rank card, ladder (§5) | 3 | med |
-| 8 | Home — rewrite + §1 | 7 | **high** |
-| 9 | Docs reconciliation | 8 | low |
+| # | Phase | Depends on | Risk | Status |
+| --- | --- | --- | --- | --- |
+| 1 | Land the package, record the gap | — | none | **done** — `e6d9887`, `2ddedb9` |
+| 2 | Spike: 3D rank chip on RN | 1 | **high** | **done** — folded into 3 |
+| 3 | Tokens + shared primitives (`FlipCard`, `ranks.ts`, `RankChip`) | 2 | med | **done** — `86dde7a` |
+| 4 | Chips — setup (§3) | 1 | low | **done** — `afa12d7` |
+| 5 | Chips — Settle + Balance (§4) | 4, Decision 2 | med | **done** — `51bc4cf` |
+| 6 | Drill — held cards (§2) | 3 | low | **done** — `0f6a601` |
+| 7 | You — stats, rank card, ladder (§5) | 3 | med | **done** — `18884f1` |
+| 8 | Home — rewrite + §1 | 7 | **high** | **done** — `07a06c2`, less the side bet |
+| 8b | The side bet, for real | 8 | **high** | **open** — needs a rule (below) |
+| 9 | Docs reconciliation | 8 | low | **done** |
+
+Phases 7 and 8 were built before 4–6 in the end: the rank chip was the one piece that might not
+have been possible on React Native at all, and the You tab is where it lives, so proving it came
+first.
+
+### Phase 8b — the side bet
+
+The prototype's card reads *"Win 2 more drills without dropping a heart and today's XP doubles."*
+Nothing in the app doubles XP and no run of clean drills is tracked, so the card is not built. The
+decision was to build the mechanic for real, which means:
+
+- a **clean** drill is a completed lesson with no wrong answer — `lesson_completions` already
+  stores `correct_count` and `question_count`, so this needs no new column
+- the **run** is consecutive clean completions, newest backwards, broken by any drill that dropped
+  a heart
+- the **reward** doubles XP, and XP is derived on every read (`v_correct * 8` in `get_state`), so
+  the payout has to be derivable too rather than banked
+
+The open question is the exact rule — what "doubles" attaches to, and whether the run resets after
+paying out. Settle that before touching `get_state`: XP feeds the rank ladder and the You tab, and
+`supabase/tests/economy.test.sql` pins the current arithmetic.
 
 Why this order:
 

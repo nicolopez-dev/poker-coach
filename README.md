@@ -242,6 +242,33 @@ Sign In / Providers, on the hosted project before release. `supabase/config.toml
   colour, a fit that leaves one out is retried with one of every denomination reserved, and any
   colour that still can't be dealt is named on the result card.
 
+### From handoff 02
+
+- **The rank chip is not CSS 3D.** The handoff builds it from `transform-style: preserve-3d`,
+  faces pushed apart with `translateZ`, and a 24-segment rim standing in space. React Native has
+  none of those. The flip is real (two faces 180° apart, backface-culled); the milled edge is drawn
+  in SVG rather than composed from a conic gradient; and one slab scaled by |sin(ry)| stands in for
+  the rim, so the chip still has a thickness to show when it turns edge-on. See the note at the top
+  of [`RankChip.tsx`](src/components/RankChip.tsx).
+- **Five drills is the day's work, not the streak.** The handoff's streak card says "Five drills is
+  the streak" and "all five chips in, and today turns face-up". The server extends a run on the
+  **first** completed lesson of the day, so Home says one drill keeps it and five is the target.
+- **Accuracy is over every answer**, not the handoff's "Last 50 drills" — `get_state()` derives it
+  from the whole `answers` table, and no window over the last fifty is computed anywhere.
+- **Settling reports, it does not file.** Handoff 02 §4.3 has three button states, the third being
+  "Game saved ✓ · Filed under Your games". `games` is server-side and stays zero until P19, so the
+  button ships with two honest states and no save.
+- **The board caption is derived, not re-authored.** With the hand drawn separately, captions that
+  named the hold are trimmed to the board they now label — but only where the hand actually renders.
+  See [`src/content/cards.ts`](src/content/cards.ts).
+- **A day's card face is decoration.** The week row turns a day face up when it was played; which
+  card it turns up is a hash of the date, so it holds still. The answer count the old bar chart
+  carried lives on in the row's accessibility label.
+- **The hand of the day pays nothing.** It is drawn from the unit the player is on, costs no heart
+  and earns no XP — a taster rather than a lesson, and it says so by saying nothing.
+- **The side bet card is not built.** It advertises XP that doubles, and nothing in the app doubles
+  XP; it waits on the mechanic rather than shipping as a promise the app would break.
+
 ### React Native equivalents
 
 - **Colour picker** — the web prototype opens the OS `input[type=color]`. React Native has no
