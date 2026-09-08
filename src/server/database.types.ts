@@ -130,7 +130,10 @@ export type Database = {
       }
       games: {
         Row: {
+          auto_values: boolean | null
           buy_in: number
+          client_event_id: string
+          colors: Json | null
           deal: Json | null
           dealt_stack: number
           id: string
@@ -139,7 +142,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          auto_values?: boolean | null
           buy_in: number
+          client_event_id?: string
+          colors?: Json | null
           deal?: Json | null
           dealt_stack: number
           id?: string
@@ -148,7 +154,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          auto_values?: boolean | null
           buy_in?: number
+          client_event_id?: string
+          colors?: Json | null
           deal?: Json | null
           dealt_stack?: number
           id?: string
@@ -277,6 +286,7 @@ export type Database = {
           lesson_id: string
         }[]
       }
+      get_export: { Args: never; Returns: Json }
       get_state: { Args: never; Returns: Json }
       live_streak: {
         Args: {

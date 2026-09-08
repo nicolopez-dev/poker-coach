@@ -1,10 +1,14 @@
 import {
+  AUTO_VALUES,
+  VALUE_STEP,
+  autoValued,
   availablePoints,
   deal,
   dealtRows,
   exactFit,
   fit,
   smallestDenom,
+  snapValue,
   totalChips,
   undealtColors,
 } from './chips';
@@ -13,6 +17,57 @@ import { DEFAULT_COLORS } from '../data/chipCase';
 
 const caseOf = (...counts: number[]): ChipColor[] =>
   DEFAULT_COLORS.map((c, i) => ({ ...c, count: counts[i] ?? c.count }));
+
+describe('the values themselves', () => {
+  it('is one fixed ladder, in fives, smallest first', () => {
+    expect([...AUTO_VALUES]).toEqual([5, 10, 25, 50, 100, 500, 1000, 2000, 5000]);
+    expect(AUTO_VALUES.every((v) => v % VALUE_STEP === 0)).toBe(true);
+    expect([...AUTO_VALUES]).toEqual([...AUTO_VALUES].sort((a, b) => a - b));
+  });
+
+  it('rounds to the nearest five and never below one chip', () => {
+    expect([0, 1, 2, 3, 7, 12, 13, 4999].map(snapValue)).toEqual([5, 5, 5, 5, 5, 10, 15, 5000]);
+  });
+
+  it('lays the ladder over a case, cheapest colour first', () => {
+    const mine: ChipColor[] = [
+      { name: 'Blue', swatch: '#3a4f6b', count: 10, value: 200 },
+      { name: 'White', swatch: '#f4f1e6', count: 30, value: 15 },
+      { name: 'Red', swatch: '#ff7a63', count: 20, value: 60 },
+    ];
+    const laddered = autoValued(mine);
+
+    // the cheapest takes the first rung, and the order of the case is untouched
+    expect(laddered.map((c) => [c.name, c.value])).toEqual([
+      ['Blue', 25],
+      ['White', 5],
+      ['Red', 10],
+    ]);
+    expect(laddered.map((c) => c.count)).toEqual([10, 30, 20]);
+  });
+
+  it('leaves a colour it has no rung for as it was', () => {
+    const deep: ChipColor[] = AUTO_VALUES.concat([9999]).map((value, i) => ({
+      name: `C${i}`,
+      swatch: '#000000',
+      count: 10,
+      value,
+    }));
+
+    expect(autoValued(deep).map((c) => c.value)).toEqual([...AUTO_VALUES, 9999]);
+  });
+
+  it('deals the same denominations whatever the entry', () => {
+    const values = (buyIn: number) =>
+      deal({ players: 6, buyIn, colors: DEFAULT_COLORS, autoValues: true }).colors.map(
+        (c) => c.value,
+      );
+
+    // the prototype could hand the same case a different ladder for a different entry
+    expect(values(500)).toEqual(values(2000));
+    expect(values(500)).toEqual([5, 10, 25, 50, 100]);
+  });
+});
 
 describe('deal — auto values', () => {
   it('deals an exact stack for the default case', () => {
@@ -95,15 +150,38 @@ describe('adding a chip colour', () => {
 describe('deal — my values', () => {
   it('uses the values the user typed', () => {
     const colors: ChipColor[] = [
-      { name: 'White', swatch: '#f4f1e6', count: 120, value: 1 },
-      { name: 'Red', swatch: '#ff7a63', count: 120, value: 5 },
-      { name: 'Blue', swatch: '#3a4f6b', count: 120, value: 10 },
+      { name: 'White', swatch: '#f4f1e6', count: 120, value: 5 },
+      { name: 'Red', swatch: '#ff7a63', count: 120, value: 10 },
+      { name: 'Blue', swatch: '#3a4f6b', count: 120, value: 25 },
     ];
     const { result, colors: after } = deal({ players: 4, buyIn: 300, colors, autoValues: false });
-    expect(result.denoms).toEqual([1, 5, 10]);
+    expect(result.denoms).toEqual([5, 10, 25]);
     expect(result.ok).toBe(true);
     expect(result.val).toBe(300);
-    expect(after).toBe(colors); // manual mode never rewrites the case
+    // already in fives, so the case comes back as it went in
+    expect(after.map((c) => c.value)).toEqual([5, 10, 25]);
+  });
+
+  it('rounds a hand-typed value to the nearest five, in the case as well', () => {
+    const colors: ChipColor[] = [
+      { name: 'White', swatch: '#f4f1e6', count: 120, value: 3 },
+      { name: 'Red', swatch: '#ff7a63', count: 120, value: 12 },
+      { name: 'Blue', swatch: '#3a4f6b', count: 120, value: 24 },
+    ];
+    const { result, colors: after } = deal({ players: 4, buyIn: 300, colors, autoValues: false });
+
+    // a chip that cannot pay a blind is the one thing the tool must not deal
+    expect(after.map((c) => c.value)).toEqual([5, 10, 25]);
+    expect(result.denoms).toEqual([5, 10, 25]);
+  });
+
+  it('never lets a value fall to nothing', () => {
+    const colors: ChipColor[] = [
+      { name: 'White', swatch: '#f4f1e6', count: 120, value: 0 },
+      { name: 'Red', swatch: '#ff7a63', count: 120, value: 25 },
+    ];
+    const { colors: after } = deal({ players: 4, buyIn: 300, colors, autoValues: false });
+    expect(after[0].value).toBe(VALUE_STEP);
   });
 
   it('cannot make an entry the values do not divide into', () => {
@@ -154,8 +232,8 @@ describe('case helpers', () => {
   });
 
   it('reports the points each seat could be dealt', () => {
-    // 40 of each ÷ 6 players = 6 each: 6×(1+5+25+50+100)
-    expect(availablePoints(DEFAULT_COLORS, 6)).toBe(6 * (1 + 5 + 25 + 50 + 100));
+    // 40 of each ÷ 6 players = 6 each: 6×(5+10+25+50+100)
+    expect(availablePoints(DEFAULT_COLORS, 6)).toBe(6 * (5 + 10 + 25 + 50 + 100));
   });
 
   it('drops unused denominations from the result rows', () => {
