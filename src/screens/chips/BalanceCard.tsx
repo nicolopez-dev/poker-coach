@@ -10,8 +10,8 @@ import {
   POINTS_PER_UNIT,
   seatBalance,
   signedPoints,
-  signedUnits,
   tally,
+  unitFigure,
 } from '../../lib/balance';
 import type { DealResult, DealtRow } from '../../lib/chips';
 import { NAME_MAX_LENGTH, shortName } from '../../lib/names';
@@ -78,17 +78,31 @@ export function BalanceCard({
         <Text style={[styles.tableLabel, { width: 58 }]}>Seat</Text>
         <Text style={[styles.tableLabel, { width: 62, textAlign: 'center' }]}>End pts</Text>
         <Text style={[styles.tableLabel, { flex: 1, textAlign: 'right' }]}>Counts as</Text>
-        <Text style={[styles.tableLabel, { width: 70, textAlign: 'right' }]}>Balance</Text>
+        <Text style={[styles.tableLabel, { width: 70, textAlign: 'right' }]}>Units</Text>
       </View>
 
       <View style={{ gap: 7 }}>
         {ends.map((end, i) => {
           const seat = seatBalance(end, buyIn, dealtStack);
           const full = names[i] ?? '';
-          const bg =
-            seat.net > 0 ? colors.redTintDeep : seat.net < 0 ? colors.surfaceLocked : colors.surface;
+          // The winner takes the house's "good" dressing — near-black under a gold
+          // hairline — and red moves to the seats that lost units (handoff 02 §4.2).
+          const won = seat.net > 0;
+          const lost = seat.net < 0;
           return (
-            <View key={i} style={[styles.seatRow, { backgroundColor: bg }]}>
+            <View
+              key={i}
+              style={[
+                styles.seatRow,
+                {
+                  backgroundColor: won
+                    ? colors.rewardAlt
+                    : lost
+                      ? colors.redTintDeep
+                      : colors.surface,
+                },
+                won && styles.seatRowWon,
+              ]}>
               <TextInput
                 value={editingName === i ? full : shortName(full)}
                 onChangeText={(v) => setName(i, v)}
@@ -110,22 +124,19 @@ export function BalanceCard({
                 accessibilityLabel={`Seat ${i + 1} end points`}
               />
               <Text style={styles.countsAs}>{fmt(seat.countsAs)} pts</Text>
+              {/* Units lead, points follow: the table is settled in units, and the
+                  point count is the working that got there. */}
               <View style={styles.balanceCell}>
                 <Text
                   style={[
                     styles.balanceValue,
                     {
-                      color:
-                        seat.net > 0
-                          ? colors.redSoft
-                          : seat.net < 0
-                            ? colors.textSecondary
-                            : colors.textFaint,
+                      color: won ? colors.gold : lost ? colors.textSecondary : colors.textFaint,
                     },
                   ]}>
-                  {signedPoints(seat.net)}
+                  {unitFigure(seat.units)}
                 </Text>
-                <Text style={styles.balanceUnits}>{signedUnits(seat.units)}</Text>
+                <Text style={styles.balanceUnits}>{signedPoints(seat.net)} pts</Text>
               </View>
             </View>
           );
@@ -146,6 +157,25 @@ export function BalanceCard({
             { color: summary.balanced ? colors.textMuted : colors.redSoft },
           ]}>
           {summary.unitsInPlay.toFixed(2)} units in play
+        </Text>
+      </View>
+
+      {/* Handoff 02 §4.3, minus its third state. Settling is meant to file the game
+          under "Your games" and move the games counter, and neither exists yet —
+          `games` is server-side and stays zero until P19 (docs/accounts-plan.md). So
+          this reports whether the table balances and stops there; a "Game saved ✓" that
+          filed nothing would be the one thing this app does not do. The tally directly
+          above is the helper line the handoff draws under this button: same sentence,
+          with the numbers that led to it, so it is not said twice. */}
+      <View
+        accessibilityRole="summary"
+        style={[styles.settle, summary.balanced ? styles.settleReady : styles.settleBlocked]}>
+        <Text
+          style={[
+            styles.settleLabel,
+            { color: summary.balanced ? colors.rewardAlt : colors.textFaint },
+          ]}>
+          {summary.balanced ? 'Ready to settle' : 'Recount before settling'}
         </Text>
       </View>
     </Rise>
@@ -224,6 +254,26 @@ const styles = StyleSheet.create({
     letterSpacing: ls(9, 0.1),
     textTransform: 'uppercase',
     color: colors.textFaint,
+  },
+  /** the winning seat, dressed as every other "good" state in the app is */
+  seatRowWon: { borderWidth: 1, borderColor: colors.goldRule },
+  settle: {
+    marginTop: 16,
+    minHeight: 54,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  settleBlocked: { backgroundColor: colors.surfaceInput },
+  settleReady: { backgroundColor: colors.gold },
+  settleLabel: {
+    fontFamily: font.bold,
+    fontSize: 12,
+    lineHeight: 14,
+    letterSpacing: ls(12, 0.08),
+    textTransform: 'uppercase',
+    textAlign: 'center',
   },
   seatRow: {
     flexDirection: 'row',

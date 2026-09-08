@@ -1,4 +1,12 @@
-import { POINTS_PER_UNIT, pointScale, seatBalance, signedPoints, signedUnits, tally } from './balance';
+import {
+  POINTS_PER_UNIT,
+  pointScale,
+  seatBalance,
+  signedPoints,
+  signedUnits,
+  tally,
+  unitFigure,
+} from './balance';
 import { shortName } from './names';
 import { chipDash, chipInk, isLightChip, luminance } from './color';
 
@@ -29,6 +37,13 @@ describe('balance', () => {
     expect(b.net).toBe(-1000);
     expect(signedPoints(b.net)).toBe('−1,000');
     expect(signedUnits(b.units)).toBe('−10.00 units');
+  });
+
+  it('drops the word under a "Units" column header, and the sign with it', () => {
+    // the Balance table leads with this; the header already says what it is
+    expect(unitFigure(seatBalance(3800, 2000, 1900).units)).toBe('+20.00');
+    expect(unitFigure(seatBalance(1900, 2000, 1900).units)).toBe('0.00');
+    expect(unitFigure(seatBalance(950, 2000, 1900).units)).toBe('−10.00');
   });
 
   it('keeps 1 unit at 100 points', () => {

@@ -43,9 +43,10 @@ Anything switching on `lesson.kind` must stay total over both.
 
 ## Conventions
 
-- **Colour semantics matter.** Red is only for the chip action, hearts, the "Playing" badge and
-  chip-tool focus rings. "Good" states are near-black + white text + a 1px gold hairline
-  (`GoldFrame`), never green fills. Green is felt/surfaces and thin progress fills.
+- **Colour semantics matter.** Red is only for the chip action, hearts, the "Playing" badge,
+  chip-tool focus rings, and the Balance rows of seats that **lost** units (handoff 02 §4.2 — the
+  winning seat takes the gold hairline instead). "Good" states are near-black + white text + a 1px
+  gold hairline (`GoldFrame`), never green fills. Green is felt/surfaces and thin progress fills.
 - **Suit pips render in the platform font** via `<Suit>` — Archivo ships no card glyphs, and a
   missing glyph in a named family is tofu on Android.
 - **Letter spacing** is in em in CSS and points in RN: use `ls(fontSize, em)`.

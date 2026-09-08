@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ChipDrop } from '../components/anim';
 import { SwatchPicker } from '../components/SwatchPicker';
 import { TabScreen } from '../components/TabScreen';
-import { NumberField, RedButton } from '../components/ui';
+import { NumberField, RedButton, pressable } from '../components/ui';
 import {
   MAX_COLORS,
   MAX_NAME_LENGTH,
@@ -29,6 +29,13 @@ export function ChipsScreen() {
 
   const rows = dealtRows(result, chipCase);
   const inCase = totalChips(chipCase);
+
+  // Reset on every fresh solve, and on a loaded game — which clears `result` too. The
+  // panel is about one dealt table; it should not carry over to the next one.
+  const [settleOpen, setSettleOpen] = useState(false);
+  useEffect(() => {
+    setSettleOpen(false);
+  }, [result]);
 
   return (
     <TabScreen>
@@ -130,7 +137,19 @@ export function ChipsScreen() {
             chipsInCase={inCase}
             autoValues={autoValues}
           />
-          <BalanceCard result={result} rows={rows} />
+          {/* The Balance panel used to appear the moment stacks were solved, which put
+              end-of-night arithmetic in front of someone who had not dealt yet. It waits
+              behind this now, and folds itself away whenever a new deal is solved. */}
+          {settleOpen ? (
+            <BalanceCard result={result} rows={rows} />
+          ) : (
+            <Pressable
+              onPress={() => setSettleOpen(true)}
+              accessibilityRole="button"
+              style={pressable(styles.settleGate, 0.99)}>
+              <Text style={styles.settleGateLabel}>Settle the table →</Text>
+            </Pressable>
+          )}
         </>
       )}
 
@@ -327,6 +346,24 @@ const styles = StyleSheet.create({
     letterSpacing: ls(10, 0.06),
     textTransform: 'uppercase',
     color: colors.textMuted,
+  },
+  /** what stands where the Balance panel will open */
+  settleGate: {
+    marginTop: 20,
+    minHeight: 54,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.goldRule,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settleGateLabel: {
+    fontFamily: font.bold,
+    fontSize: 12,
+    lineHeight: 14,
+    letterSpacing: ls(12, 0.08),
+    textTransform: 'uppercase',
+    color: colors.gold,
   },
   /** the unit / stack / case line, sitting under both setting cards */
   facts: {
