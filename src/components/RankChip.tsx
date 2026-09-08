@@ -1,44 +1,36 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, PanResponder, Platform, StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import React, { useEffect, useRef, useState } from 'react';
+import { PanResponder, StyleSheet, Text, View } from 'react-native';
+import Svg, { Circle, Path, Polygon } from 'react-native-svg';
 
 import { RANKS, levelLabel } from '../data/ranks';
+import { shade } from '../lib/color';
 import { absoluteFill, colors, font } from '../theme/tokens';
 import { Suit } from './ui';
 
 /**
  * The rank chip — a casino chip you can spin, drag and flip.
  *
- * Entertainment only: nothing it does changes any data. It is mounted twice (Home's
- * rank card and the You tab's), and each instance is told which rank to wear — Home is
- * pinned to the live rank, You follows the ladder selection. See handoff 02 §5.1.
+ * Entertainment only: nothing it does changes any data. It is mounted twice (Home's rank
+ * card and the You tab's), and each instance is told which rank to wear — Home is pinned
+ * to the live rank, You follows the ladder selection. See handoff 02 §5.1.
  *
- * ## What React Native could not take from the CSS
+ * ## Why this draws its own geometry
  *
  * The handoff builds the chip out of `transform-style: preserve-3d`, faces pushed apart
- * with `translateZ(5px)`, a 24-segment milled rim standing in 3D space, and a
- * `repeating-conic-gradient` ground. React Native has **none** of those: no
- * `preserve-3d`, no `translateZ` in the transform list, no conic gradients, and no
- * z-sorting between sibling views. So:
+ * with `translateZ`, and a 24-segment rim standing in 3D space. React Native has none of
+ * those, and the obvious fallback — two flat faces that swap on `backfaceVisibility` —
+ * reads as a disc, not a chip: it has no edge, so it vanishes to nothing every half turn.
  *
- *   · **The flip is real.** Two sibling faces, each with its own `perspective` and a
- *     `rotateY` 180° apart, both `backfaceVisibility: 'hidden'`. This is the one piece
- *     of CSS 3D that RN reproduces exactly.
- *   · **The milled edge is drawn, not composed.** Twelve wedges in SVG reproduce what
- *     the conic gradient painted on the face. It is the same picture by another means.
- *   · **The standing rim is gone**, and something had to replace it: with the rim, a
- *     chip turned edge-on shows its cylinder side; without it the disc would simply
- *     vanish for a frame every half-turn. So a slab sits behind the faces and is scaled
- *     by |sin(ry)| — widest exactly when the faces are thinnest. It reads as the chip's
- *     thickness and costs one view instead of twenty-four.
+ * So the projection is done here instead. The chip is modelled as what it is, a short
+ * cylinder: a ring of quads for the milled edge and a polygon for each face, all rotated
+ * about Y then X, divided through by a camera distance and handed to SVG as flat paths.
+ * Every facet is then shaded by how squarely it faces the light, which is what makes a
+ * cylinder look round rather than like a stack of coloured strips.
  *
- * ## Why a timer and not `Animated.loop`
- *
- * The idle spin is specced as `ry += 1.1°` every 55ms — a slow, unbounded rotation that
- * a drag interrupts mid-flight and that has to hand its current angle to the ease-back.
- * A native-driven loop cannot be read or interrupted like that. The interval writes
- * straight to an `Animated.Value` instead, which updates the view without re-rendering
- * React, so the cost is one bridge write per tick and nothing above it.
+ * The cost is that the geometry is a function of the angle, so it cannot be handed to
+ * the native driver — the angles are ordinary React state and the shapes are recomputed
+ * per frame. At the handoff's own 55ms cadence and ~30 paths that is cheap, and it is
+ * what the prototype does too.
  */
 
 /** Rest angle — the chip sits slightly turned rather than face-on. */
@@ -56,94 +48,53 @@ const RETURN_MS = 600;
 /** Under this much travel a press is a tap — which flips the chip — not a drag. */
 const TAP_SLOP = 6;
 
-/** Wedges of the milled edge, and how wide each one is. 12 × 30° with an 8° dash. */
-const WEDGES = 12;
-const WEDGE_DEG = 8;
+/** The milling: a dash every 30°, as wide as the handoff's conic gradient cuts it. */
+const MILL_DASHES = 12;
+const MILL_DASH_ARC = 8;
 
-const NATIVE = Platform.OS !== 'web';
+/** Points around a face, enough that its outline reads as a curve. */
+const FACE_POINTS = 48;
 
-/** Keeps an angle in (−180, 180] so the edge slab can interpolate over a fixed range. */
-const wrap = (deg: number) => (((deg + 180) % 360) + 360) % 360 - 180;
+const TAU = Math.PI * 2;
+const DEG = Math.PI / 180;
 
-/** One dash of the milled edge, as a pie slice from the centre out to the rim. */
-function wedge(index: number, r: number): string {
-  const from = ((index * 360) / WEDGES - 90) * (Math.PI / 180);
-  const to = from + WEDGE_DEG * (Math.PI / 180);
-  const x0 = r + r * Math.cos(from);
-  const y0 = r + r * Math.sin(from);
-  const x1 = r + r * Math.cos(to);
-  const y1 = r + r * Math.sin(to);
-  return `M ${r} ${r} L ${x0} ${y0} A ${r} ${r} 0 0 1 ${x1} ${y1} Z`;
+/** Where the light sits, in view space. Up, to the left, and in front. */
+const LIGHT = { x: -0.35, y: -0.62, z: 0.7 };
+
+type Vec = { x: number; y: number; z: number };
+
+/** Rotate about Y, then X — the order the handoff's `rotateX(..) rotateY(..)` composes in. */
+function rotate({ x, y, z }: Vec, rx: number, ry: number): Vec {
+  const cy = Math.cos(ry * DEG);
+  const sy = Math.sin(ry * DEG);
+  const cx = Math.cos(rx * DEG);
+  const sx = Math.sin(rx * DEG);
+
+  const x1 = x * cy + z * sy;
+  const z1 = -x * sy + z * cy;
+
+  return { x: x1, y: y * cx - z1 * sx, z: y * sx + z1 * cx };
+}
+
+/** Keeps an angle in (−180, 180]. */
+const wrap = (deg: number) => ((((deg + 180) % 360) + 360) % 360) - 180;
+
+/** How squarely a surface meets the light, 0–1. */
+function lambert(n: Vec): number {
+  return Math.max(0, n.x * LIGHT.x + n.y * LIGHT.y + n.z * LIGHT.z);
 }
 
 /**
- * One side of the chip: milled ground, then the inner disc, then its mark.
- *
- * The inner disc is drawn over whole pie slices rather than clipping each one to an
- * annulus — same picture, twelve fewer arcs to get wrong.
+ * The milled edge takes the light hard — that swing from facet to facet is what reads as
+ * a curved surface rather than a row of stripes.
  */
-function ChipFace({
-  swatch,
-  dash,
-  ink,
-  size,
-  children,
-}: {
-  swatch: string;
-  dash: string;
-  ink: string;
-  size: number;
-  children: React.ReactNode;
-}) {
-  const r = size / 2;
-  // the handoff's `inset: 7px` on a 72px chip — kept proportional so any size reads right
-  const inner = r - (7 / 72) * size;
-
-  return (
-    <View style={{ width: size, height: size }}>
-      <Svg width={size} height={size} style={absoluteFill}>
-        <Circle cx={r} cy={r} r={r} fill={swatch} />
-        {Array.from({ length: WEDGES }, (_, i) => (
-          <Path key={i} d={wedge(i, r)} fill={dash} />
-        ))}
-        <Circle
-          cx={r}
-          cy={r}
-          r={inner}
-          fill={swatch}
-          stroke="rgba(255,255,255,.45)"
-          strokeWidth={1}
-        />
-      </Svg>
-      <View style={[absoluteFill, styles.mark]}>
-        <Text style={[styles.label, { color: ink, fontSize: size * (18 / 72) }]}>{children}</Text>
-      </View>
-    </View>
-  );
-}
+const rimLight = (n: Vec) => 0.5 + 0.72 * lambert(n);
 
 /**
- * A chip that does not turn — the ladder's swatches, and anywhere else a rank needs a
- * face rather than a toy. Same drawing as {@link RankChip}, without the machinery.
+ * The face takes it gently. It is the printed side of the chip and has to stay its own
+ * colour: a white chip that goes grey when it turns just looks like a different chip.
  */
-export function ChipDisc({
-  rankIndex,
-  size,
-  dimmed = false,
-}: {
-  rankIndex: number;
-  size: number;
-  dimmed?: boolean;
-}) {
-  const rank = RANKS[rankIndex] ?? RANKS[0];
-  return (
-    <View style={dimmed ? styles.dimmed : undefined}>
-      <ChipFace swatch={rank.swatch} dash={rank.dash} ink={rank.ink} size={size}>
-        {null}
-      </ChipFace>
-    </View>
-  );
-}
+const faceLight = (n: Vec) => 0.82 + 0.24 * lambert(n);
 
 export function RankChip({
   rankIndex,
@@ -156,25 +107,41 @@ export function RankChip({
 }) {
   const rank = RANKS[rankIndex] ?? RANKS[0];
 
-  // The angles live in refs as plain numbers as well as in Animated.Values: the timer
-  // and the pan responder both need to read the current angle synchronously, and an
-  // Animated.Value cannot be read without a listener.
-  const rx = useRef(REST_RX);
-  const ry = useRef(REST_RY);
-  const rxA = useRef(new Animated.Value(REST_RX)).current;
-  const ryA = useRef(new Animated.Value(REST_RY)).current;
+  // The angles drive the geometry, so they are plain state: there is nothing here a
+  // native-driven transform could carry.
+  const [angle, setAngle] = useState({ rx: REST_RX, ry: REST_RY });
+  const live = useRef(angle);
+  live.current = angle;
 
   /** null while the player has not touched it — the chip is free to spin. */
   const touchedAt = useRef<number | null>(null);
   const dragging = useRef(false);
   const returning = useRef(false);
   const start = useRef({ rx: REST_RX, ry: REST_RY, moved: 0 });
+  const raf = useRef<ReturnType<typeof requestAnimationFrame> | null>(null);
 
-  const set = (nextRx: number, nextRy: number) => {
-    rx.current = nextRx;
-    ry.current = wrap(nextRy);
-    rxA.setValue(rx.current);
-    ryA.setValue(ry.current);
+  const set = (rx: number, ry: number) => setAngle({ rx, ry: wrap(ry) });
+
+  /** Ease back to rest, then let the idle spin pick up again. */
+  const easeHome = () => {
+    returning.current = true;
+    const from = { ...live.current };
+    // the shortest way round, so a chip left face-down does not unwind the long way
+    const dry = wrap(REST_RY - from.ry);
+    const began = Date.now();
+
+    const step = () => {
+      const t = Math.min(1, (Date.now() - began) / RETURN_MS);
+      // the handoff's cubic-bezier(.2,.8,.2,1), near enough for a 600ms settle
+      const eased = 1 - Math.pow(1 - t, 3);
+      set(from.rx + (REST_RX - from.rx) * eased, from.ry + dry * eased);
+      if (t < 1) {
+        raf.current = requestAnimationFrame(step);
+        return;
+      }
+      returning.current = false;
+    };
+    step();
   };
 
   useEffect(() => {
@@ -183,36 +150,21 @@ export function RankChip({
 
       if (touchedAt.current !== null) {
         if (Date.now() - touchedAt.current <= SETTLE_MS) return;
-
-        // Left alone long enough: ease home, then let the idle spin pick up again.
         touchedAt.current = null;
-        returning.current = true;
-        rx.current = REST_RX;
-        ry.current = REST_RY;
-        Animated.parallel([
-          Animated.timing(rxA, {
-            toValue: REST_RX,
-            duration: RETURN_MS,
-            easing: Easing.bezier(0.2, 0.8, 0.2, 1),
-            useNativeDriver: NATIVE,
-          }),
-          Animated.timing(ryA, {
-            toValue: REST_RY,
-            duration: RETURN_MS,
-            easing: Easing.bezier(0.2, 0.8, 0.2, 1),
-            useNativeDriver: NATIVE,
-          }),
-        ]).start(() => {
-          returning.current = false;
-        });
+        easeHome();
         return;
       }
 
-      set(rx.current, ry.current + SPIN_STEP);
+      set(live.current.rx, live.current.ry + SPIN_STEP);
     }, SPIN_MS);
 
-    return () => clearInterval(timer);
-  }, [rxA, ryA]);
+    return () => {
+      clearInterval(timer);
+      if (raf.current !== null) cancelAnimationFrame(raf.current);
+    };
+    // easeHome closes over refs only, and the timer must not be rebuilt every frame
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const pan = useRef(
     PanResponder.create({
@@ -221,9 +173,8 @@ export function RankChip({
       onPanResponderGrant: () => {
         dragging.current = true;
         returning.current = false;
-        rxA.stopAnimation();
-        ryA.stopAnimation();
-        start.current = { rx: rx.current, ry: ry.current, moved: 0 };
+        if (raf.current !== null) cancelAnimationFrame(raf.current);
+        start.current = { ...live.current, moved: 0 };
       },
       onPanResponderMove: (_e, g) => {
         start.current.moved = Math.max(start.current.moved, Math.abs(g.dx) + Math.abs(g.dy));
@@ -231,8 +182,8 @@ export function RankChip({
       },
       onPanResponderRelease: () => {
         dragging.current = false;
-        // A press that went nowhere is a tap, and a tap turns the chip over.
-        if (start.current.moved < TAP_SLOP) set(rx.current, ry.current + 180);
+        // a press that went nowhere is a tap, and a tap turns the chip over
+        if (start.current.moved < TAP_SLOP) set(live.current.rx, live.current.ry + 180);
         touchedAt.current = Date.now();
       },
       onPanResponderTerminate: () => {
@@ -242,36 +193,7 @@ export function RankChip({
     }),
   ).current;
 
-  const spin = (offset: number) =>
-    ryA.interpolate({
-      inputRange: [-180, 180],
-      outputRange: [`${-180 + offset}deg`, `${180 + offset}deg`],
-    });
-
-  const tilt = rxA.interpolate({
-    inputRange: [-180, 180],
-    outputRange: ['-180deg', '180deg'],
-  });
-
-  // The chip's thickness, seen only when the faces are turned away: |sin(ry)|, sampled
-  // at the quarter-turns and interpolated between.
-  const edge = ryA.interpolate({
-    inputRange: [-180, -90, 0, 90, 180],
-    outputRange: [0, 1, 0, 1, 0],
-  });
-
-  const face = (offset: number, children: React.ReactNode) => (
-    <Animated.View
-      style={[
-        absoluteFill,
-        styles.face,
-        { transform: [{ perspective: size * 5.8 }, { rotateX: tilt }, { rotateY: spin(offset) }] },
-      ]}>
-      <ChipFace swatch={rank.swatch} dash={rank.dash} ink={rank.ink} size={size}>
-        {children}
-      </ChipFace>
-    </Animated.View>
-  );
+  const chip = geometry(angle.rx, angle.ry, size, rank);
 
   return (
     <View
@@ -279,33 +201,203 @@ export function RankChip({
       accessibilityRole="image"
       accessibilityLabel={accessibilityLabel ?? `${rank.name}, level ${rankIndex + 1}`}
       style={{ width: size, height: size }}>
-      <Animated.View
+      <Svg width={size} height={size}>
+        {chip.facets.map((f) => (
+          <Polygon key={f.key} points={f.points} fill={f.fill} />
+        ))}
+        <Polygon points={chip.face.points} fill={chip.face.fill} />
+        {chip.mill.map((m) => (
+          <Polygon key={m.key} points={m.points} fill={m.fill} />
+        ))}
+        <Path d={chip.disc.d} fill={chip.disc.fill} stroke={chip.disc.ring} strokeWidth={1} />
+      </Svg>
+
+      {/* The mark rides the face: shifted to where the face centre projects, and squashed
+          by however much the face is turned away. */}
+      <View
         style={[
-          absoluteFill,
-          styles.thickness,
+          styles.mark,
           {
-            backgroundColor: rank.dash,
-            width: size * (10 / 72),
-            left: size / 2 - size * (5 / 72),
-            transform: [{ scaleX: edge }],
+            transform: [
+              { translateX: chip.mark.x },
+              { translateY: chip.mark.y },
+              { scaleX: chip.mark.scaleX },
+              { scaleY: chip.mark.scaleY },
+            ],
           },
-        ]}
-      />
-      {face(0, levelLabel(rankIndex))}
-      {face(180, <Suit glyph="♠" size={size * (20 / 72)} color={rank.ink} />)}
+        ]}>
+        {chip.mark.front ? (
+          <Text style={[styles.label, { color: rank.ink, fontSize: size * (18 / 72) }]}>
+            {levelLabel(rankIndex)}
+          </Text>
+        ) : (
+          <Suit glyph="♠" size={size * (20 / 72)} color={rank.ink} />
+        )}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * The chip as flat shapes: the facets of its edge that face the camera, the face that
+ * does, and where its mark has to sit.
+ *
+ * Pure, so it can be read — and tested — without mounting anything.
+ */
+export function geometry(
+  rx: number,
+  ry: number,
+  size: number,
+  rank: { swatch: string; dash: string },
+) {
+  const c = size / 2;
+  // a little short of the box, so the edge has room when the chip turns broadside
+  const R = c * 0.92;
+  const T = size * (5 / 72);
+  const inner = R - (7 / 72) * size;
+  const camera = size * 5.8;
+
+  const to2d = (v: Vec) => {
+    const s = camera / (camera - v.z);
+    return { x: c + v.x * s, y: c + v.y * s };
+  };
+  const at = (x: number, y: number, z: number) => to2d(rotate({ x, y, z }, rx, ry));
+
+  // The face that is turned towards us — front at +T, back at −T.
+  const frontNormal = rotate({ x: 0, y: 0, z: 1 }, rx, ry);
+  const front = frontNormal.z > 0;
+  const faceZ = front ? T : -T;
+  const lit = faceLight(front ? frontNormal : { x: -frontNormal.x, y: -frontNormal.y, z: -frontNormal.z });
+
+  const ring = (radius: number, z: number) =>
+    Array.from({ length: FACE_POINTS }, (_, i) => {
+      const u = (i / FACE_POINTS) * TAU;
+      return at(radius * Math.cos(u), radius * Math.sin(u), z);
+    });
+
+  // The milling, as the handoff cuts it: a narrow dash every 30° around the chip. The
+  // same arcs drive both the edge and the ring on the face, so a dash carries over the
+  // corner instead of the two patterns sliding past each other.
+  const segments: { u0: number; u1: number; dash: boolean }[] = [];
+  for (let i = 0; i < MILL_DASHES; i++) {
+    const start = (i / MILL_DASHES) * TAU;
+    const cut = start + MILL_DASH_ARC * DEG;
+    segments.push({ u0: start, u1: cut, dash: true });
+    segments.push({ u0: cut, u1: start + TAU / MILL_DASHES, dash: false });
+  }
+
+  const facets: { key: string; points: string; fill: string }[] = [];
+  segments.forEach((seg, i) => {
+    const um = (seg.u0 + seg.u1) / 2;
+    const normal = rotate({ x: Math.cos(um), y: Math.sin(um), z: 0 }, rx, ry);
+    if (normal.z <= 0) return; // this facet is round the back
+
+    const corners = [
+      at(R * Math.cos(seg.u0), R * Math.sin(seg.u0), -T),
+      at(R * Math.cos(seg.u0), R * Math.sin(seg.u0), T),
+      at(R * Math.cos(seg.u1), R * Math.sin(seg.u1), T),
+      at(R * Math.cos(seg.u1), R * Math.sin(seg.u1), -T),
+    ];
+
+    facets.push({
+      key: `f${i}`,
+      points: corners.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' '),
+      fill: shade(seg.dash ? rank.dash : rank.swatch, rimLight(normal)),
+    });
+  });
+
+  // And the same dashes cut into the face's outer ring, which is what makes the chip
+  // still read as a chip when it is turned square on and has no edge to show.
+  const mill = segments
+    .filter((seg) => seg.dash)
+    .map((seg, i) => {
+      const arc = [0, 0.34, 0.67, 1].map((t) => seg.u0 + (seg.u1 - seg.u0) * t);
+      const outer = arc.map((u) => at(R * Math.cos(u), R * Math.sin(u), faceZ));
+      const back = [...arc].reverse().map((u) => at(inner * Math.cos(u), inner * Math.sin(u), faceZ));
+      return {
+        key: `m${i}`,
+        points: [...outer, ...back].map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' '),
+        fill: shade(rank.dash, lit),
+      };
+    });
+
+  const facePoints = ring(R, faceZ);
+  const discPoints = ring(inner, faceZ);
+
+  // The mark's box is the full chip; scaling it about its centre foreshortens the glyph
+  // exactly as the face it sits on is foreshortened.
+  const centre = at(0, 0, faceZ);
+  const edgeX = at(R, 0, faceZ);
+  const edgeY = at(0, -R, faceZ);
+
+  return {
+    facets,
+    mill,
+    face: {
+      points: facePoints.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' '),
+      fill: shade(rank.swatch, lit),
+    },
+    disc: {
+      d: `${discPoints.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(2)},${p.y.toFixed(2)}`).join('')}Z`,
+      fill: shade(rank.swatch, lit * 1.04),
+      ring: 'rgba(255,255,255,.45)',
+    },
+    mark: {
+      front,
+      x: centre.x - c,
+      y: centre.y - c,
+      scaleX: Math.abs(edgeX.x - centre.x) / R,
+      scaleY: Math.abs(edgeY.y - centre.y) / R,
+    },
+  };
+}
+
+/**
+ * A chip that does not turn — the ladder's swatches, and anywhere else a rank needs a
+ * face rather than a toy. Same drawing as {@link RankChip}, held at the rest angle.
+ */
+export function ChipDisc({
+  rankIndex,
+  size,
+  dimmed = false,
+}: {
+  rankIndex: number;
+  size: number;
+  dimmed?: boolean;
+}) {
+  const rank = RANKS[rankIndex] ?? RANKS[0];
+  const chip = geometry(REST_RX, REST_RY, size, rank);
+
+  return (
+    <View style={[{ width: size, height: size }, dimmed && styles.dimmed]}>
+      <Svg width={size} height={size}>
+        {chip.facets.map((f) => (
+          <Polygon key={f.key} points={f.points} fill={f.fill} />
+        ))}
+        <Polygon points={chip.face.points} fill={chip.face.fill} />
+        {chip.mill.map((m) => (
+          <Polygon key={m.key} points={m.points} fill={m.fill} />
+        ))}
+        <Circle
+          cx={chip.mark.x + size / 2}
+          cy={chip.mark.y + size / 2}
+          r={(size / 2) * 0.72 * chip.mark.scaleX}
+          fill={chip.disc.fill}
+          stroke={chip.disc.ring}
+          strokeWidth={1}
+        />
+      </Svg>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  face: { backfaceVisibility: 'hidden' },
-  /** stands in for the handoff's 24-segment rim — see the note at the top of the file */
-  thickness: {
-    right: undefined,
-    borderRadius: 999,
-    boxShadow: '0 3px 10px rgba(0,0,0,.5)',
+  mark: {
+    ...absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    pointerEvents: 'none',
   },
-  mark: { alignItems: 'center', justifyContent: 'center' },
   label: { fontFamily: font.bold, color: colors.text },
   /** a rank the player has not reached yet */
   dimmed: { opacity: 0.38 },

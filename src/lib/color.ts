@@ -21,6 +21,20 @@ export function isLightChip(swatch: string): boolean {
   return luminance(swatch) > LIGHT_CHIP;
 }
 
+/**
+ * The same colour under more or less light — `factor` 1 leaves it alone, below 1 darkens,
+ * above 1 lifts it towards white.
+ *
+ * The rank chip shades every facet of its milled edge this way, which is what stops a
+ * cylinder drawn face-on from reading as a flat disc.
+ */
+export function shade(hex: string, factor: number): string {
+  const { r, g, b } = rgb(hex);
+  const mix = (c: number) =>
+    Math.max(0, Math.min(255, Math.round(factor <= 1 ? c * factor : c + (255 - c) * (factor - 1))));
+  return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+}
+
 /** Colour of the edge dashes around a chip. */
 export function chipDash(swatch: string): string {
   return isLightChip(swatch) ? '#2b2b2b' : '#ffffff';

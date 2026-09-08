@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { PanResponder, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import { ChipDrop, Tilt } from '../../components/anim';
 import { FlipCard } from '../../components/FlipCard';
@@ -34,6 +34,27 @@ export function StreakCard({
   canPlay: boolean;
 }) {
   const [flipped, setFlipped] = useState(false);
+
+  /**
+   * Swipe left or right to turn the card over.
+   *
+   * `Capture` matters: the front face carries the "Keep dealing" button, and a Pressable
+   * claims the responder the moment a finger lands on it. Without capturing on *move*,
+   * every swipe that began on the button would be swallowed by it and the card would
+   * only ever flip from the dots below. Claiming on move rather than on start is what
+   * leaves an ordinary tap free to reach the button.
+   */
+  const swipe = useRef(
+    PanResponder.create({
+      // capture, so a swipe that began on the button is taken off it
+      onMoveShouldSetPanResponderCapture: (_e, g) => horizontal(g),
+      // and again on the way up, for a swipe that began on the card itself
+      onMoveShouldSetPanResponder: (_e, g) => horizontal(g),
+      onPanResponderRelease: (_e, g) => {
+        if (Math.abs(g.dx) > SWIPE) setFlipped((f) => !f);
+      },
+    }),
+  ).current;
 
   const front = (
     <GoldFrame radius={radius.hero} innerStyle={styles.face}>
@@ -104,9 +125,14 @@ export function StreakCard({
 
   return (
     <View>
-      <Tilt>
-        <FlipCard flipped={flipped} front={front} back={back} />
-      </Tilt>
+      {/* `touchAction: pan-y` is web-only and ignored on native: it tells the browser
+          the page scrolls vertically here and horizontal drags are ours, so it stops
+          swallowing the pointer stream mid-swipe. */}
+      <View {...swipe.panHandlers} style={SWIPE_AREA}>
+        <Tilt>
+          <FlipCard flipped={flipped} front={front} back={back} />
+        </Tilt>
+      </View>
       <Pressable
         onPress={() => setFlipped((f) => !f)}
         accessibilityRole="button"
@@ -114,7 +140,7 @@ export function StreakCard({
         style={styles.toggle}>
         <View style={[styles.dot, !flipped && styles.dotOn]} />
         <View style={[styles.dot, flipped && styles.dotOn]} />
-        <Text style={styles.toggleLabel}>{flipped ? 'Back to today' : 'How it works'}</Text>
+        <Text style={styles.toggleLabel}>Swipe or tap to flip</Text>
       </Pressable>
     </View>
   );
@@ -132,6 +158,20 @@ const STEPS = [
   { lead: 'Five is the day’s work.', rest: 'Each drill pays another chip into the row.' },
   { lead: 'Skip a day and the run resets.', rest: 'Your XP and rank stay where they are.' },
 ];
+
+/** A horizontal drag past this turns the card; anything less is a tap. */
+const SWIPE = 40;
+
+/**
+ * Web-only, and absent from React Native's style types because native has no notion of
+ * it: tells the browser this area scrolls vertically and that sideways drags belong to
+ * the card, so it stops swallowing the pointer stream halfway through a swipe.
+ */
+const SWIPE_AREA = { touchAction: 'pan-y' } as unknown as ViewStyle;
+
+/** A gesture is the card's once it is clearly sideways rather than a scroll. */
+const horizontal = (g: { dx: number; dy: number }) =>
+  Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5;
 
 const styles = StyleSheet.create({
   face: { padding: 20, ...shadows.big, overflow: 'hidden' },

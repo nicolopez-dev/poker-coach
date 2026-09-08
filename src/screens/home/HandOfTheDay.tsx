@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type ViewStyle,
 } from 'react-native';
 
 import { FlipCard } from '../../components/FlipCard';
@@ -34,6 +35,9 @@ const NATIVE = Platform.OS !== 'web';
 
 /** A horizontal drag past this is a flip; anything less is a tap. */
 const SWIPE = 40;
+
+/** Web-only, and not in React Native's style types — see StreakCard for why. */
+const SWIPE_AREA = { touchAction: 'pan-y' } as unknown as ViewStyle;
 
 /** Reveal once the card is this far into the pane. */
 const REVEAL_FRACTION = 0.3;
@@ -81,9 +85,16 @@ export function HandOfTheDay({ hand }: { hand: DailyHand }) {
   }, [seen, reveal]);
 
   // Horizontal drags flip; vertical ones are left to the pane so the page still scrolls.
+  // Captured on the way down as well as claimed on the way up — the question face is
+  // covered in answer buttons, and a Pressable owns the gesture from the moment it is
+  // touched, so a swipe that started on an option would never reach this otherwise.
+  const horizontal = (g: { dx: number; dy: number }) =>
+    Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5;
+
   const pan = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+      onMoveShouldSetPanResponderCapture: (_e, g) => horizontal(g),
+      onMoveShouldSetPanResponder: (_e, g) => horizontal(g),
       onPanResponderRelease: (_e, g) => {
         if (Math.abs(g.dx) > SWIPE) setFlipped((f) => !f);
       },
@@ -175,6 +186,7 @@ export function HandOfTheDay({ hand }: { hand: DailyHand }) {
         height.current = e.nativeEvent.layout.height;
       }}
       style={{
+        ...SWIPE_AREA,
         opacity: reveal,
         transform: [
           { translateY: reveal.interpolate({ inputRange: [0, 1], outputRange: [30, 0] }) },
