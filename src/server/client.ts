@@ -102,6 +102,10 @@ export type PlayerState = {
    * double — see `supabase/migrations/20260908120000_side_bet.sql`.
    */
   cleanRun: number;
+  /** the day's ante is running — every correct answer is worth double until one is missed */
+  doubleLive: boolean;
+  /** and it has been taken today already, so it cannot be taken again */
+  doubleToday: boolean;
   /** correct over total, 0–1 */
   accuracy: number;
   completedLessons: string[];
@@ -175,6 +179,19 @@ export async function submitAnswer(answer: {
     hearts: num(row, 'hearts'),
     nextHeartAt: nullableStr(row, 'next_heart_at'),
   };
+}
+
+/**
+ * Takes the day's ante — double XP until a wrong answer.
+ *
+ * The server refuses it unless the day's drills are all in, and refuses a second one the
+ * same day. Both come back as a `ServerError` rather than being second-guessed here: the
+ * client's idea of how much of the day is done is optimistic, and the table's is not.
+ */
+export async function takeDouble(): Promise<PlayerState> {
+  const { data, error } = await supabase.rpc('take_double');
+  if (error) throw failure(error);
+  return toPlayerState(data);
 }
 
 /** Finishes a lesson and applies the streak rule, returning the state that results. */
@@ -345,6 +362,8 @@ export function toPlayerState(data: Json): PlayerState {
     streakDay: nullableStr(row, 'streak_day'),
     xp: num(row, 'xp'),
     cleanRun: num(row, 'clean_run'),
+    doubleLive: bool(row, 'double_live'),
+    doubleToday: bool(row, 'double_today'),
     accuracy: num(row, 'accuracy'),
     completedLessons: strings(row, 'completed_lesson_ids'),
     week: week(row, 'week'),

@@ -202,6 +202,7 @@ export type Database = {
       }
       player_state: {
         Row: {
+          double_from: string | null
           hearts: number
           hearts_settled_at: string
           longest_streak: number
@@ -211,6 +212,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          double_from?: string | null
           hearts?: number
           hearts_settled_at?: string
           longest_streak?: number
@@ -220,6 +222,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          double_from?: string | null
           hearts?: number
           hearts_settled_at?: string
           longest_streak?: number
@@ -279,7 +282,15 @@ export type Database = {
         }
         Returns: Json
       }
+      daily_goal: { Args: never; Returns: number }
       delete_account: { Args: never; Returns: undefined }
+      double_window: {
+        Args: { p_user: string }
+        Returns: {
+          ends: string
+          starts: string
+        }[]
+      }
       doubled_lessons: {
         Args: { p_user: string }
         Returns: {
@@ -319,6 +330,7 @@ export type Database = {
         }
         Returns: Json
       }
+      take_double: { Args: never; Returns: Json }
     }
     Enums: {
       [_ in never]: never

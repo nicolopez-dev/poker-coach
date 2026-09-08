@@ -3,6 +3,7 @@ import { PanResponder, Pressable, StyleSheet, Text, View, type ViewStyle } from 
 
 import { ChipDrop, Tilt } from '../../components/anim';
 import { FlipCard } from '../../components/FlipCard';
+import { ChipDisc } from '../../components/RankChip';
 import { GoldFrame, Sheen } from '../../components/Gold';
 import { Suit, pressable } from '../../components/ui';
 import { colors, font, ls, radius, shadows } from '../../theme/tokens';
@@ -20,6 +21,9 @@ export function StreakCard({
   headline,
   cta,
   onDeal,
+  onDouble,
+  offerDouble,
+  doubleLive,
   streak,
   dailyLabel,
   canPlay,
@@ -29,6 +33,12 @@ export function StreakCard({
   headline: string;
   cta: string;
   onDeal: () => void;
+  /** take the day's ante */
+  onDouble: () => void;
+  /** the row is full and the ante has not been taken today */
+  offerDouble: boolean;
+  /** it has been taken and is still running */
+  doubleLive: boolean;
   streak: number;
   dailyLabel: string;
   canPlay: boolean;
@@ -67,37 +77,64 @@ export function StreakCard({
         <Text style={styles.dailyLabel}>{dailyLabel}</Text>
       </View>
 
+      {/* A paid chip is a chip: milled edge, gold face, spade on it — the handoff paints
+          that ring with a conic gradient, which is the same drawing the rank chip does. */}
       <View style={styles.chips}>
         {Array.from({ length: goal }, (_, i) => {
           const paid = i < done;
           const next = i === done;
           return (
             <ChipDrop key={i} duration={350} replayKey={done}>
-              <View
-                style={[
-                  styles.chip,
-                  paid
-                    ? styles.chipPaid
-                    : { borderColor: next ? colors.gold : 'rgba(255,255,255,.22)' },
-                ]}>
-                {paid && <Suit glyph="♠" size={11} color={colors.cardInk} />}
-              </View>
+              {paid ? (
+                <View style={styles.chipPaid}>
+                  <ChipDisc
+                    size={CHIP}
+                    colours={{ swatch: colors.goldRule, dash: '#ffffff' }}
+                    face={colors.gold}
+                    mark="♠"
+                    markInk={colors.cardInk}
+                  />
+                </View>
+              ) : (
+                <View
+                  style={[
+                    styles.chip,
+                    { borderColor: next ? colors.gold : 'rgba(255,255,255,.22)' },
+                  ]}
+                />
+              )}
             </ChipDrop>
           );
         })}
       </View>
 
-      <Text style={styles.headline}>{headline}</Text>
+      <Text style={styles.headline}>{doubleLive ? 'You’re on a roll — every hand pays twice.' : headline}</Text>
 
-      <Pressable
-        onPress={onDeal}
-        accessibilityRole="button"
-        style={pressable(styles.cta, 0.98)}>
-        <Text style={styles.ctaLabel}>{cta}</Text>
-        <View style={styles.ctaGlyph}>
-          <Suit glyph={canPlay ? '♠' : '♥'} size={15} color={canPlay ? colors.gold : colors.red} />
+      {/* Three things the button can be. Once the row is full the deal is done, so it
+          offers the ante instead; once that is taken the card has nothing left to ask
+          for and says what is running. */}
+      {doubleLive ? (
+        <View style={[styles.cta, styles.ctaLocked]}>
+          <Text style={styles.ctaLockedLabel}>Double XP running</Text>
+          <View style={styles.ctaGlyph}>
+            <Suit glyph="♠" size={15} color={colors.gold} />
+          </View>
         </View>
-      </Pressable>
+      ) : (
+        <Pressable
+          onPress={offerDouble ? onDouble : onDeal}
+          accessibilityRole="button"
+          style={pressable(styles.cta, 0.98)}>
+          <Text style={styles.ctaLabel}>{offerDouble ? 'Ante up — double XP' : cta}</Text>
+          <View style={styles.ctaGlyph}>
+            <Suit
+              glyph={offerDouble || canPlay ? '♠' : '♥'}
+              size={15}
+              color={offerDouble || canPlay ? colors.gold : colors.red}
+            />
+          </View>
+        </Pressable>
+      )}
     </GoldFrame>
   );
 
@@ -155,9 +192,15 @@ export function StreakCard({
  */
 const STEPS = [
   { lead: 'One drill keeps the run.', rest: 'Finish a single lesson and today counts.' },
-  { lead: 'Five is the day’s work.', rest: 'Each drill pays another chip into the row.' },
+  {
+    lead: 'A chip a drill, five to fill the row.',
+    rest: 'Fill it and you can ante up: every answer worth double until you miss one.',
+  },
   { lead: 'Skip a day and the run resets.', rest: 'Your XP and rank stay where they are.' },
 ];
+
+/** The streak row's chips, as the handoff sizes them. */
+const CHIP = 34;
 
 /** A horizontal drag past this turns the card; anything less is a tap. */
 const SWIPE = 40;
@@ -195,20 +238,15 @@ const styles = StyleSheet.create({
   dailyLabel: { fontFamily: font.bold, fontSize: 11, lineHeight: 13, color: colors.gold },
   chips: { flexDirection: 'row', gap: 7, marginBottom: 16 },
   chip: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: CHIP,
+    height: CHIP,
+    borderRadius: CHIP / 2,
     borderWidth: 1,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  chipPaid: {
-    backgroundColor: colors.gold,
-    borderColor: colors.goldRule,
-    borderStyle: 'solid',
-    ...shadows.chipLarge,
-  },
+  chipPaid: { borderRadius: CHIP / 2, ...shadows.chipLarge },
   headline: {
     fontFamily: font.bold,
     fontSize: 19,
@@ -229,6 +267,16 @@ const styles = StyleSheet.create({
     paddingRight: 12,
   },
   ctaLabel: { fontFamily: font.bold, fontSize: 15, lineHeight: 17, color: colors.cardInk },
+  /** the ante is running: the card has nothing left to ask for, so it stops asking */
+  ctaLocked: { backgroundColor: colors.greenDeep },
+  ctaLockedLabel: {
+    fontFamily: font.bold,
+    fontSize: 13,
+    lineHeight: 15,
+    letterSpacing: ls(13, 0.06),
+    textTransform: 'uppercase',
+    color: colors.gold,
+  },
   ctaGlyph: {
     width: 36,
     height: 36,

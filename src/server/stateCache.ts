@@ -86,7 +86,8 @@ function parse(raw: string): PlayerState | null {
     'games',
   ] as const;
   if (numbers.some((field) => typeof state[field] !== 'number')) return null;
-  if (typeof state.streakAtRisk !== 'boolean') return null;
+  const flags = ['streakAtRisk', 'doubleLive', 'doubleToday'] as const;
+  if (flags.some((field) => typeof state[field] !== 'boolean')) return null;
   if (typeof state.serverNow !== 'string') return null;
 
   const dates = ['nextHeartAt', 'streakExpiresAt', 'streakDay'] as const;

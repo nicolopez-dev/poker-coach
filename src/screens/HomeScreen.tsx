@@ -62,6 +62,9 @@ export function HomeScreen() {
     week,
     lessonsToday,
     cleanRun,
+    doubleLive,
+    doubleToday,
+    takeDouble,
     startNextLesson,
     go,
   } = useStore();
@@ -162,6 +165,10 @@ export function HomeScreen() {
                 : 'Deal me in'
           }
           onDeal={startNextLesson}
+          onDouble={takeDouble}
+          // the row is full, and the day's one bet is still there to take
+          offerDouble={hydrated && done >= DAILY_GOAL && !doubleToday}
+          doubleLive={doubleLive}
           streak={streak}
           dailyLabel={hydrated ? `${done} of ${DAILY_GOAL} drills` : PENDING}
           canPlay={canPlay}

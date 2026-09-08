@@ -438,15 +438,32 @@ export function geometry(
  */
 export function ChipDisc({
   rankIndex,
+  colours,
   size,
   dimmed = false,
+  face,
+  mark,
+  markInk,
 }: {
-  rankIndex: number;
+  /** which rank to wear; ignored when `colours` is given */
+  rankIndex?: number;
+  /** an explicit chip, for the ones that are not ranks — the streak row's, say */
+  colours?: { swatch: string; dash: string };
   size: number;
   dimmed?: boolean;
+  /** the inner disc, when it is not the swatch itself */
+  face?: string;
+  /** a glyph on that disc */
+  mark?: string;
+  markInk?: string;
 }) {
-  const rank = RANKS[rankIndex] ?? RANKS[0];
-  const chip = geometry(REST_RX, REST_RY, size, rank);
+  const chip = geometry(
+    REST_RX,
+    REST_RY,
+    size,
+    colours ?? RANKS[rankIndex ?? 0] ?? RANKS[0],
+  );
+  const discR = (size / 2) * 0.72 * chip.mark.scaleX;
 
   return (
     <View style={[{ width: size, height: size }, dimmed && styles.dimmed]}>
@@ -461,11 +478,21 @@ export function ChipDisc({
         <Circle
           cx={chip.mark.x + size / 2}
           cy={chip.mark.y + size / 2}
-          r={(size / 2) * 0.72 * chip.mark.scaleX}
-          fill={chip.disc.fill}
+          r={discR}
+          fill={face ?? chip.disc.fill}
           stroke={chip.disc.ring}
           strokeWidth={1}
         />
+        {mark ? (
+          <SvgText
+            x={chip.mark.x + size / 2}
+            y={chip.mark.y + size / 2 + discR * 0.36}
+            textAnchor="middle"
+            fill={markInk ?? colors.cardInk}
+            fontSize={discR * 0.95}>
+            {mark}
+          </SvgText>
+        ) : null}
       </Svg>
     </View>
   );

@@ -53,6 +53,8 @@ const playerState = (): PlayerState => ({
   streakDay: '2026-09-06',
   xp: 16,
   cleanRun: 0,
+  doubleLive: false,
+  doubleToday: false,
   accuracy: 1,
   completedLessons: ['l1'],
   week: [],

@@ -39,7 +39,7 @@ import {
   saveChipCase,
   type ChipCase,
 } from '../server/chipCase';
-import { tzOffsetMin, type PlayerState, type WeekDay } from '../server/client';
+import { takeDouble, tzOffsetMin, type PlayerState, type WeekDay } from '../server/client';
 import {
   fetchGames,
   forgetGames,
@@ -133,6 +133,10 @@ export type State = {
   gained: number;
   /** drills finished clean back to back, from the server — the side bet's run */
   cleanRun: number;
+  /** the day's ante is running: correct answers pay double until one is missed */
+  doubleLive: boolean;
+  /** it has been taken today, so the offer is spent whether or not it is still live */
+  doubleToday: boolean;
   /** no wrong answer in the drill open right now, so it is still in the running */
   drillClean: boolean;
 
@@ -174,13 +178,22 @@ export const SIDE_BET_RUN = 3;
 /**
  * Is the drill in progress going to pay double?
  *
- * It is the `SIDE_BET_RUN`th clean drill or later: the run the player was already on,
- * plus this one, and only while this one is still unblemished. The server works the same
- * thing out from the completions it holds; this is the client's copy of the rule, and it
- * exists only so the drill's own tally is right while it is being played.
+ * Two ways it can, and they do not stack — sixteen either way, never thirty-two:
+ *
+ *   · the **side bet**, on the `SIDE_BET_RUN`th clean drill or later — the run already
+ *     behind the player, plus this one;
+ *   · the **ante**, taken once the day's chips were all in, which runs until a wrong
+ *     answer anywhere.
+ *
+ * Both end the moment this drill is blemished, which is what `drillClean` carries. The
+ * server works all of it out from the answers it holds; this is only the client's copy,
+ * and it exists so the drill's own "+N XP" is right while it is being played.
  */
-export function sideBetPaying(state: Pick<State, 'cleanRun' | 'drillClean'>): boolean {
-  return state.drillClean && state.cleanRun + 1 >= SIDE_BET_RUN;
+export function payingDouble(
+  state: Pick<State, 'cleanRun' | 'drillClean' | 'doubleLive'>,
+): boolean {
+  if (!state.drillClean) return false;
+  return state.doubleLive || state.cleanRun + 1 >= SIDE_BET_RUN;
 }
 
 /** Exported for `store.test.ts`, which drives the reducer without mounting React. */
@@ -225,6 +238,8 @@ export const initialState: State = {
   chosen: null,
   gained: 0,
   cleanRun: 0,
+  doubleLive: false,
+  doubleToday: false,
   drillClean: true,
 
   // the case an account starts with, until the server sends one of its own
@@ -403,6 +418,8 @@ function fromServer(state: State, player: PlayerState, clockOffset: number): Sta
     streakDay: player.streakDay,
     xp: player.xp,
     cleanRun: player.cleanRun,
+    doubleLive: player.doubleLive,
+    doubleToday: player.doubleToday,
     accuracy: player.accuracy,
     week: player.week,
     lessonsToday: player.lessonsToday,
@@ -533,7 +550,7 @@ export function reducer(state: State, action: Action): State {
         return {
           ...state,
           chosen: action.id,
-          gained: state.gained + XP_PER_ANSWER * (sideBetPaying(state) ? 2 : 1),
+          gained: state.gained + XP_PER_ANSWER * (payingDouble(state) ? 2 : 1),
         };
       }
 
@@ -812,6 +829,8 @@ export type Store = State & {
   setEnd: (index: number, value: string) => void;
   setName: (index: number, value: string) => void;
   setEditingName: (index: number | null) => void;
+  /** take the day's ante — double XP until a wrong answer */
+  takeDouble: () => void;
   toggleGames: () => void;
   /** leaves the out-of-hearts screen for Home */
   dismissHearts: () => void;
@@ -1069,6 +1088,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setEnd: (index, value) => dispatch({ type: 'setEnd', index, value }),
       setName: (index, value) => dispatch({ type: 'setName', index, value }),
       setEditingName: (index) => dispatch({ type: 'setEditingName', index }),
+      // The server decides whether the bet may be taken at all — the client's idea of
+      // how much of the day is done is optimistic, and the table's is not. A refusal is
+      // not worth announcing: re-reading the state is what corrects the offer.
+      takeDouble: () => {
+        void takeDouble()
+          .then((next) =>
+            dispatch({
+              type: 'hydrate',
+              state: next,
+              clockOffset: Date.parse(next.serverNow) - Date.now(),
+              source: 'server',
+            }),
+          )
+          .catch(() => refresh());
+      },
       toggleGames: () => dispatch({ type: 'toggleGames' }),
       dismissHearts: () => dispatch({ type: 'dismissHearts' }),
       refresh,
