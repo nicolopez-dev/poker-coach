@@ -22,6 +22,8 @@ export const colors = {
   hairline: 'rgba(240,239,233,.10)',
   hairlineStrong: 'rgba(240,239,233,.22)',
   hairlineFaint: 'rgba(240,239,233,.07)',
+  /** the rules dividing the You tab's stat grid into cells (handoff 02 §5.4) */
+  hairlineCell: 'rgba(240,239,233,.08)',
 
   text: '#f0efe9',
   textOnReward: '#ffffff',
@@ -69,6 +71,13 @@ type Locations = readonly [number, number, ...number[]];
 /** the 1px gradient border texture, 115deg */
 export const goldGradient: Stops = ['#8a6a2f', '#f0dca0', '#c8a558', '#7d5f2a'];
 export const goldGradientLocations: Locations = [0, 0.36, 0.62, 1];
+
+/**
+ * The same trick in silver, 115deg — the Hand of the day's hairline (handoff 02 §1.5).
+ * Gold is the reward frame; silver belongs to that one card and nothing else.
+ */
+export const silverGradient: Stops = ['#5d6470', '#e6ebf0', '#aab3bd', '#5a6270'];
+export const silverGradientLocations: Locations = [0, 0.36, 0.62, 1];
 
 /** near-black gradient fill used by the hero and result cards (155deg) */
 export const rewardCardFill: Stops = ['#151a18', '#0d1211', '#080c0a'];
