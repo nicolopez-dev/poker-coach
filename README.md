@@ -266,8 +266,12 @@ Sign In / Providers, on the hosted project before release. `supabase/config.toml
   carried lives on in the row's accessibility label.
 - **The hand of the day pays nothing.** It is drawn from the unit the player is on, costs no heart
   and earns no XP — a taster rather than a lesson, and it says so by saying nothing.
-- **The side bet card is not built.** It advertises XP that doubles, and nothing in the app doubles
-  XP; it waits on the mechanic rather than shipping as a promise the app would break.
+- **The side bet is a real mechanic, not a card.** The handoff advertises XP that doubles; nothing
+  doubled XP, so the rule was built rather than the promise printed. Three drills in a row with no
+  wrong answer and the third pays double, as does every clean one after it. Derived on read from
+  `lesson_completions`, never banked —
+  [`20260908120000_side_bet.sql`](supabase/migrations/20260908120000_side_bet.sql), pinned by
+  [`side_bet.test.sql`](supabase/tests/side_bet.test.sql).
 
 ### React Native equivalents
 

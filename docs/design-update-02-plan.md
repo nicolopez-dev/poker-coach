@@ -218,7 +218,7 @@ npm test
 | 6 | Drill — held cards (§2) | 3 | low | **done** — `0f6a601` |
 | 7 | You — stats, rank card, ladder (§5) | 3 | med | **done** — `18884f1` |
 | 8 | Home — rewrite + §1 | 7 | **high** | **done** — `07a06c2`, less the side bet |
-| 8b | The side bet, for real | 8 | **high** | **open** — needs a rule (below) |
+| 8b | The side bet, for real | 8 | **high** | **done** — `9b2378a` |
 | 9 | Docs reconciliation | 8 | low | **done** |
 
 Phases 7 and 8 were built before 4–6 in the end: the rank chip was the one piece that might not
@@ -238,9 +238,16 @@ decision was to build the mechanic for real, which means:
 - the **reward** doubles XP, and XP is derived on every read (`v_correct * 8` in `get_state`), so
   the payout has to be derivable too rather than banked
 
-The open question is the exact rule — what "doubles" attaches to, and whether the run resets after
-paying out. Settle that before touching `get_state`: XP feeds the rank ladder and the You tab, and
-`supabase/tests/economy.test.sql` pins the current arithmetic.
+**The rule, decided 2026-09-08:** the third clean drill pays double — 16 XP an answer instead of 8
+— and so does every clean drill after it, until one is slipped. Doubling attaches to the **lesson**,
+not the day, so a drill is worth what it was worth when it was played and no total ever rewrites
+itself retroactively. Rejected: doubling the whole day (needs a stored payout marker, and the
+player's total jumps) and a flat bonus (XP that came from no answer, so it would have to be banked).
+
+One consequence is deliberate and pinned as case B8: a completion that syncs late lands in the run
+where it was *played*, so it can lengthen a run it turns out to have been part of and pay out an
+earlier drill. That follows from deriving rather than banking, and it can only ever be as true as
+the history is.
 
 Why this order:
 
