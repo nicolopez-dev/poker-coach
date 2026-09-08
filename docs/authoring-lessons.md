@@ -121,8 +121,13 @@ wrong answer.
 
 ### Showing cards
 
-Add a fan above the context line. Hole cards sit level; give board cards `offset: 10` so they
-drop away from the hand.
+Write the fan as one array. Hole cards sit level; give board cards `offset: 10` so they drop away
+from the hand.
+
+**They are drawn in two places.** Since handoff 02 §2 the drill splits the array back apart: the
+board stays in the row under the prompt, and a hand of exactly two hole cards is dealt in above the
+answer options, where it can be tapped open. `src/content/cards.ts` does the splitting — you
+author one fan, as below, and never a separate `hole` field.
 
 ```ts
 cards: [
@@ -146,6 +151,12 @@ Rules the test enforces:
   other two in prose is how a reader ends up misreading the hand. `the-game-full-hand` walks a
   hand from preflop to river this way: hole cards alone, then hand + flop, then board only.
 - **Every fan is captioned** with `cardsLabel`, and the caption says what the reader is looking at.
+- **Don't name the hold in the caption when the hand is drawn.** With two hole cards on screen,
+  `'The board — you hold A♠ 5♠'` is saying what the picture already says, so the app trims it back
+  to `'The board'` (and `'Your two cards, then the flop'` to `'The flop'`). Write the short form
+  for new questions; the trim is there for the ones written before the hand existed. A caption
+  carrying something the cards *cannot* show — `'The flop — you defended the big blind'` — is kept
+  as written, and so is any caption on a question with fewer than two hole cards.
 
 Seven-card fans — your hand *and* a full board — need the fan to shrink to fit first, in
 [`DrillOverlay.tsx`](../src/screens/DrillOverlay.tsx). Until then the two-fan rule above covers
