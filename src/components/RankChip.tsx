@@ -1,11 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { PanResponder, StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Path, Polygon } from 'react-native-svg';
+import { PanResponder, StyleSheet, View } from 'react-native';
+import Svg, { Circle, G, Path, Polygon, Text as SvgText } from 'react-native-svg';
 
 import { RANKS, levelLabel } from '../data/ranks';
 import { shade } from '../lib/color';
 import { absoluteFill, colors, font } from '../theme/tokens';
-import { Suit } from './ui';
 
 /**
  * The rank chip — a casino chip you can spin, drag and flip.
@@ -45,6 +44,9 @@ const SPIN_MS = 55;
 const SETTLE_MS = 1600;
 const RETURN_MS = 600;
 
+/** How long a tap takes to carry the chip through its half turn. */
+const FLIP_MS = 520;
+
 /** Under this much travel a press is a tap — which flips the chip — not a drag. */
 const TAP_SLOP = 6;
 
@@ -78,6 +80,28 @@ function rotate({ x, y, z }: Vec, rx: number, ry: number): Vec {
 
 /** Keeps an angle in (−180, 180]. */
 const wrap = (deg: number) => ((((deg + 180) % 360) + 360) % 360) - 180;
+
+/** The handoff's `cubic-bezier(.2,.8,.2,1)`, near enough over half a second. */
+export const ease = (t: number) => 1 - Math.pow(1 - Math.max(0, Math.min(1, t)), 3);
+
+/**
+ * How far a turn has got, `t` from 0 to 1.
+ *
+ * Both angles are carried **unwrapped**, so a half turn really travels a half turn.
+ * Wrapping mid-flight is what turns an animation into a jump: the shortest equivalent
+ * angle to "180° from here" is "here".
+ */
+export function turnAt(
+  from: { rx: number; ry: number },
+  to: { rx: number; ry: number },
+  t: number,
+): { rx: number; ry: number } {
+  const e = ease(t);
+  return { rx: from.rx + (to.rx - from.rx) * e, ry: from.ry + (to.ry - from.ry) * e };
+}
+
+/** The rest angle expressed as a target reachable the short way round from `ry`. */
+export const restFrom = (ry: number) => ({ rx: REST_RX, ry: ry + wrap(REST_RY - ry) });
 
 /** How squarely a surface meets the light, 0–1. */
 function lambert(n: Vec): number {
@@ -122,26 +146,45 @@ export function RankChip({
 
   const set = (rx: number, ry: number) => setAngle({ rx, ry: wrap(ry) });
 
-  /** Ease back to rest, then let the idle spin pick up again. */
-  const easeHome = () => {
-    returning.current = true;
+  const stopTween = () => {
+    if (raf.current !== null) cancelAnimationFrame(raf.current);
+    raf.current = null;
+    returning.current = false;
+  };
+
+  /**
+   * Turn the chip to an angle over time.
+   *
+   * `toRy` is **unwrapped** on purpose: the caller says how far to go, not merely where
+   * to end up, so a flip can travel a deliberate half turn and a settle can take the
+   * short way home. Wrapping it here would collapse both into "the nearest equivalent
+   * angle" and the chip would arrive without having gone anywhere.
+   */
+  const tween = (toRx: number, toRy: number, ms: number) => {
+    stopTween();
     const from = { ...live.current };
-    // the shortest way round, so a chip left face-down does not unwind the long way
-    const dry = wrap(REST_RY - from.ry);
     const began = Date.now();
+    returning.current = true;
 
     const step = () => {
-      const t = Math.min(1, (Date.now() - began) / RETURN_MS);
-      // the handoff's cubic-bezier(.2,.8,.2,1), near enough for a 600ms settle
-      const eased = 1 - Math.pow(1 - t, 3);
-      set(from.rx + (REST_RX - from.rx) * eased, from.ry + dry * eased);
+      const t = Math.min(1, (Date.now() - began) / ms);
+      const now = turnAt(from, { rx: toRx, ry: toRy }, t);
+      set(now.rx, now.ry);
       if (t < 1) {
         raf.current = requestAnimationFrame(step);
         return;
       }
+      raf.current = null;
       returning.current = false;
     };
-    step();
+
+    raf.current = requestAnimationFrame(step);
+  };
+
+  /** Ease back to rest the short way round, then let the idle spin pick up again. */
+  const easeHome = () => {
+    const home = restFrom(live.current.ry);
+    tween(home.rx, home.ry, RETURN_MS);
   };
 
   useEffect(() => {
@@ -172,8 +215,7 @@ export function RankChip({
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
         dragging.current = true;
-        returning.current = false;
-        if (raf.current !== null) cancelAnimationFrame(raf.current);
+        stopTween();
         start.current = { ...live.current, moved: 0 };
       },
       onPanResponderMove: (_e, g) => {
@@ -182,9 +224,13 @@ export function RankChip({
       },
       onPanResponderRelease: () => {
         dragging.current = false;
-        // a press that went nowhere is a tap, and a tap turns the chip over
-        if (start.current.moved < TAP_SLOP) set(live.current.rx, live.current.ry + 180);
         touchedAt.current = Date.now();
+        // A press that went nowhere is a tap, and a tap turns the chip over — through
+        // the half turn, not straight to the other side of it.
+        if (start.current.moved < TAP_SLOP) {
+          const { rx, ry } = live.current;
+          tween(rx, ry + 180, FLIP_MS);
+        }
       },
       onPanResponderTerminate: () => {
         dragging.current = false;
@@ -210,31 +256,49 @@ export function RankChip({
           <Polygon key={m.key} points={m.points} fill={m.fill} />
         ))}
         <Path d={chip.disc.d} fill={chip.disc.fill} stroke={chip.disc.ring} strokeWidth={1} />
+        <Mark chip={chip} rank={rank} rankIndex={rankIndex} size={size} />
       </Svg>
-
-      {/* The mark rides the face: shifted to where the face centre projects, and squashed
-          by however much the face is turned away. */}
-      <View
-        style={[
-          styles.mark,
-          {
-            transform: [
-              { translateX: chip.mark.x },
-              { translateY: chip.mark.y },
-              { scaleX: chip.mark.scaleX },
-              { scaleY: chip.mark.scaleY },
-            ],
-          },
-        ]}>
-        {chip.mark.front ? (
-          <Text style={[styles.label, { color: rank.ink, fontSize: size * (18 / 72) }]}>
-            {levelLabel(rankIndex)}
-          </Text>
-        ) : (
-          <Suit glyph="♠" size={size * (20 / 72)} color={rank.ink} />
-        )}
-      </View>
     </View>
+  );
+}
+
+/**
+ * The level or the spade, printed on whichever face is showing.
+ *
+ * It lives inside the SVG rather than as a `<Text>` over it because only SVG will take
+ * an arbitrary affine matrix. A React Native transform list could scale the glyph but
+ * not shear it, so a chip tilted on both axes made the mark shrink instead of lean with
+ * the face it is painted on.
+ */
+function Mark({
+  chip,
+  rank,
+  rankIndex,
+  size,
+}: {
+  chip: ReturnType<typeof geometry>;
+  rank: { ink: string };
+  rankIndex: number;
+  size: number;
+}) {
+  const fontSize = size * (chip.mark.front ? 18 : 20) / 72;
+
+  return (
+    <G transform={`matrix(${chip.mark.matrix.map((n) => n.toFixed(4)).join(' ')})`}>
+      <SvgText
+        x={0}
+        // SVG hangs text off its baseline; a third of the size down centres a cap-height glyph
+        y={fontSize * 0.35}
+        textAnchor="middle"
+        fill={rank.ink}
+        fontSize={fontSize}
+        // The spade is deliberately given no family: Archivo ships no card glyphs, so it
+        // falls to the platform font exactly as `<Suit>` does elsewhere.
+        fontFamily={chip.mark.front ? font.bold : undefined}
+        fontWeight={chip.mark.front ? undefined : '700'}>
+        {chip.mark.front ? levelLabel(rankIndex) : '♠'}
+      </SvgText>
+    </G>
   );
 }
 
@@ -324,11 +388,24 @@ export function geometry(
   const facePoints = ring(R, faceZ);
   const discPoints = ring(inner, faceZ);
 
-  // The mark's box is the full chip; scaling it about its centre foreshortens the glyph
-  // exactly as the face it sits on is foreshortened.
+  // Where the face's own two axes land on screen. Taken together as an affine matrix
+  // they carry the turn and the lean, not just the squash — which is what makes the mark
+  // ride the face instead of merely shrinking on the spot when the chip is tilted.
   const centre = at(0, 0, faceZ);
-  const edgeX = at(R, 0, faceZ);
-  const edgeY = at(0, -R, faceZ);
+  const alongX = at(R, 0, faceZ);
+  const alongY = at(0, R, faceZ);
+
+  // The back is seen from behind, so its x axis runs the other way; negating it keeps
+  // the glyph the right way round rather than mirrored.
+  const handed = front ? 1 : -1;
+  const matrix = [
+    (handed * (alongX.x - centre.x)) / R,
+    (handed * (alongX.y - centre.y)) / R,
+    (alongY.x - centre.x) / R,
+    (alongY.y - centre.y) / R,
+    centre.x,
+    centre.y,
+  ];
 
   return {
     facets,
@@ -344,10 +421,13 @@ export function geometry(
     },
     mark: {
       front,
+      /** `matrix(a b c d e f)` straight onto an SVG group */
+      matrix,
       x: centre.x - c,
       y: centre.y - c,
-      scaleX: Math.abs(edgeX.x - centre.x) / R,
-      scaleY: Math.abs(edgeY.y - centre.y) / R,
+      // how far each axis is foreshortened, for anything that only needs the magnitude
+      scaleX: Math.hypot(alongX.x - centre.x, alongX.y - centre.y) / R,
+      scaleY: Math.hypot(alongY.x - centre.x, alongY.y - centre.y) / R,
     },
   };
 }
