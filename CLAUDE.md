@@ -132,6 +132,21 @@ npx supabase test db
 `db reset` is what proves a migration applies; run `npm run gen:types` after it, since
 `src/server/database.types.ts` is generated and types every wrapper in `src/server/`.
 
+**And re-seed the answer key, or you break the app in three places that never mention content.**
+`db reset` empties `content_questions` and there is no `seed.sql` to refill it. With that table
+at zero rows `submit_answer` has nothing to mark against, so: answers are refused and drills
+report "not saved"; hearts are never spent server-side, so the optimistic count on screen falls
+to zero and locks the player out; and the next `get_state()` — the one dealing stacks triggers —
+replaces that zero with the untouched five, so hearts look like they restore themselves.
+
+`npm run sync:content` **does not** fix a local reset: its credentials come from `.env.admin`,
+which points at the hosted project, so it reseeds production instead. Override the target —
+`process.env` wins over the file — and take the service-role key from `npx supabase status`:
+
+```bash
+SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_ROLE_KEY=<local key> npx tsx scripts/sync-content.ts
+```
+
 ## Editing files on Windows
 
 Do not pipe source files through PowerShell `Get-Content` / `Set-Content` to do bulk edits: the

@@ -64,6 +64,23 @@ The two Supabase commands need Docker running and `npx supabase start` done once
 drops and replays every migration, so it is the way to check a migration actually applies;
 `test db` runs `supabase/tests/*.sql` against the result.
 
+> **`db reset` empties `content_questions`, and you have to put it back.** There is no
+> `seed.sql`: the answer key is generated, so a reset leaves the table at zero rows and
+> `submit_answer` has nothing to mark against. The app then fails in three places at once and
+> none of them mentions content — answers are refused, so nothing saves; hearts are never
+> actually spent server-side, so the optimistic count on screen drifts down to zero and the
+> player is locked out; and the next `get_state()` — the one a deal triggers — replaces that
+> zero with the untouched five, so hearts appear to restore themselves.
+>
+> **`npm run sync:content` alone will not fix it**, and this is the sharp edge: credentials come
+> from `.env.admin`, which points at the **hosted** project, so the obvious recovery command
+> reseeds production and leaves your local stack exactly as broken. Point it at local explicitly
+> — `process.env` wins over the file:
+>
+> ```bash
+> SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_ROLE_KEY="$(npx supabase status -o json | npx --yes json SERVICE_ROLE_KEY)" npx tsx scripts/sync-content.ts
+> ```
+
 `gen:types` needs the same local stack — run it after every migration, since the generated file
 is what types `supabase` and every wrapper in `src/server/`. Swap `--local` for `--linked` to
 generate against the hosted project instead, but only once its migrations are pushed: an
