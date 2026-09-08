@@ -67,14 +67,22 @@ export function ChipsScreen() {
             <EntryBetField />
             <Text style={styles.unitsLabel}>units</Text>
           </View>
-          <Text style={styles.betHint}>
-            1 unit = {POINTS_PER_UNIT} points
-            {'\n'}
-            <Text style={styles.betHintStrong}>
-              Stack: {fmt(buyIn)} pts · case holds {fmt(availablePoints(chipCase, players))} pts each
-            </Text>
-          </Text>
         </View>
+      </View>
+
+      {/* The three facts used to live inside the Entry bet card, which stretched the
+          Players card to match it. Out here they are one quiet line and the two cards
+          come out the same height. */}
+      <View style={styles.facts}>
+        <Text style={styles.fact}>
+          1 unit = <Text style={styles.factValue}>{POINTS_PER_UNIT} pts</Text>
+        </Text>
+        <Text style={styles.fact}>
+          Stack <Text style={styles.factValue}>{fmt(buyIn)} pts</Text>
+        </Text>
+        <Text style={styles.fact}>
+          Case <Text style={styles.factValue}>{fmt(availablePoints(chipCase, players))} pts each</Text>
+        </Text>
       </View>
 
       <View style={styles.caseHeader}>
@@ -149,14 +157,24 @@ function EntryBetField() {
       onChangeText={(v) => {
         const digitsOnly = v.replace(/[^0-9]/g, '');
         setText(digitsOnly);
-        setBet(digitsOnly);
+        // An empty field is a moment mid-edit, not an entry of nothing. Clearing it to
+        // type a new number used to snap the stack to one unit under the cursor and
+        // rewrite the line below; the stack now stays where it was until there is a
+        // number to read, or until the field is left empty on blur.
+        if (digitsOnly !== '') setBet(digitsOnly);
       }}
       onFocus={() => {
         focused.current = true;
       }}
       onBlur={() => {
         focused.current = false;
-        setText(String(units));
+        if (text === '') {
+          setBet('1');
+          setText('1');
+        } else {
+          // whatever was typed, shown back as the store clamped it
+          setText(String(units));
+        }
       }}
       width={78}
       accessibilityLabel="Entry bet in units"
@@ -310,14 +328,23 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors.textMuted,
   },
-  betHint: {
+  /** the unit / stack / case line, sitting under both setting cards */
+  facts: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: 4,
+    columnGap: 16,
+    marginTop: -4,
+    marginHorizontal: 2,
+    marginBottom: 16,
+  },
+  fact: {
     fontFamily: font.regular,
     fontSize: 10,
-    lineHeight: 10 * 1.35,
+    lineHeight: 10 * 1.5,
     color: colors.textFaint,
-    marginTop: 8,
   },
-  betHintStrong: { color: colors.textMuted },
+  factValue: { fontFamily: font.bold, color: colors.textSecondary },
   caseHeader: {
     flexDirection: 'row',
     alignItems: 'center',
