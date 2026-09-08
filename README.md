@@ -343,9 +343,11 @@ Supabase's side of the account rather than the app's.
   **first** completed lesson of the day, so Home says one drill keeps it and five is the target.
 - **Accuracy is over every answer**, not the handoff's "Last 50 drills" — `get_state()` derives it
   from the whole `answers` table, and no window over the last fifty is computed anywhere.
-- **Settling reports, it does not file.** Handoff 02 §4.3 has three button states, the third being
-  "Game saved ✓ · Filed under Your games". `games` is server-side and stays zero until P19, so the
-  button ships with two honest states and no save.
+- **Settling ends a debounce; it is not what saves the game.** The evening is written as it is
+  played — the row when the stacks are dealt, the seats 800ms after the last count typed. §4.3's
+  button sends the pending counts immediately (`flushSeats`) and confirms the night is filed, so
+  all three of its states are real. A failed write stays silent, as everything in
+  [`games.ts`](src/server/games.ts) does by design.
 - **The board caption is derived, not re-authored.** With the hand drawn separately, captions that
   named the hold are trimmed to the board they now label — but only where the hand actually renders.
   See [`src/content/cards.ts`](src/content/cards.ts).

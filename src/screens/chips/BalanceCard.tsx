@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Rise } from '../../components/anim';
 import { Chip, ChipEdge } from '../../components/Chip';
@@ -15,6 +15,7 @@ import {
 } from '../../lib/balance';
 import type { DealResult, DealtRow } from '../../lib/chips';
 import { NAME_MAX_LENGTH, shortName } from '../../lib/names';
+import { flushSeats } from '../../server/games';
 import { useStore } from '../../state/store';
 import { colors, font, ls, radius, shadows, type } from '../../theme/tokens';
 
@@ -30,6 +31,19 @@ export function BalanceCard({
   rows: DealtRow[];
 }) {
   const { players, buyIn, ends, names, editingName, setEnd, setName, setEditingName } = useStore();
+
+  // Settling is a moment, not a state worth keeping: it belongs to this panel, and the
+  // panel closes with the deal. Editing any seat total after saving takes it back —
+  // what was filed is no longer what is on screen.
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    setSaved(false);
+  }, [ends, names]);
+
+  const settle = async () => {
+    await flushSeats();
+    setSaved(true);
+  };
 
   const dealtStack = result.val;
   const scale = pointScale(buyIn, dealtStack);
@@ -163,24 +177,42 @@ export function BalanceCard({
         </Text>
       </View>
 
-      {/* Handoff 02 §4.3, minus its third state. Settling is meant to file the game
-          under "Your games" and move the games counter, and neither exists yet —
-          `games` is server-side and stays zero until P19 (docs/accounts-plan.md). So
-          this reports whether the table balances and stops there; a "Game saved ✓" that
-          filed nothing would be the one thing this app does not do. The tally directly
-          above is the helper line the handoff draws under this button: same sentence,
-          with the numbers that led to it, so it is not said twice. */}
-      <View
-        accessibilityRole="summary"
-        style={[styles.settle, summary.balanced ? styles.settleReady : styles.settleBlocked]}>
+      {/* Handoff 02 §4.3. The evening is already being written as it is played — the row
+          when the stacks are dealt, the seats 800ms after the last count typed — so this
+          is not what *causes* the game to be saved. What it does is end the debounce: the
+          counts go now rather than presently, and the player gets told the night is
+          filed instead of having to trust that it was. `games.ts` swallows a failed
+          write by design, so this reports what the app did, not what the server holds. */}
+      <Pressable
+        onPress={settle}
+        disabled={!summary.balanced || saved}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !summary.balanced, checked: saved }}
+        style={[
+          styles.settle,
+          saved ? styles.settleSaved : summary.balanced ? styles.settleReady : styles.settleBlocked,
+        ]}>
         <Text
           style={[
             styles.settleLabel,
-            { color: summary.balanced ? colors.rewardAlt : colors.textFaint },
+            {
+              color: saved
+                ? colors.greenLight
+                : summary.balanced
+                  ? colors.rewardAlt
+                  : colors.textFaint,
+            },
           ]}>
-          {summary.balanced ? 'Ready to settle' : 'Recount before settling'}
+          {saved ? 'Game saved ✓' : 'Settle game'}
         </Text>
-      </View>
+      </Pressable>
+      <Text style={styles.settleHelp}>
+        {saved
+          ? 'Filed under Your games on the You tab.'
+          : summary.balanced
+            ? 'Every point accounted for. Settling saves this game.'
+            : 'Recount — the chips on the table do not match the points dealt.'}
+      </Text>
     </Rise>
   );
 }
@@ -270,6 +302,15 @@ const styles = StyleSheet.create({
   },
   settleBlocked: { backgroundColor: colors.surfaceInput },
   settleReady: { backgroundColor: colors.gold },
+  settleSaved: { backgroundColor: colors.greenDeep },
+  settleHelp: {
+    fontFamily: font.regular,
+    fontSize: 10,
+    lineHeight: 10 * 1.4,
+    color: colors.textFaint,
+    textAlign: 'center',
+    marginTop: 8,
+  },
   settleLabel: {
     fontFamily: font.bold,
     fontSize: 12,

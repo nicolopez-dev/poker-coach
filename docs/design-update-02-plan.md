@@ -142,7 +142,7 @@ one `Animated.loop` per instance, native-driven, per the house rule in CLAUDE.md
 Drag is `PanResponder` — the project has neither `react-native-gesture-handler` nor `reanimated`,
 by design.
 
-### 3b · Settling a game (§4.3) collides with the roadmap
+### 3b · Settling a game (§4.3) collides with the roadmap — ~~open~~ **resolved, premise stale**
 
 §4.3: *"Settling saves the game to Your games and increments the games counter."*
 
@@ -155,7 +155,15 @@ This repo's standing rule is that it does not fake data — `PENDING` dashes, `C
 "authored copy, not a finding". A `Game saved ✓` state with `Filed under Your games on the You tab`
 that files nothing would break that rule.
 
-#### Decision 2 — how far does "Settle" go? · **RESOLVED 2026-09-08: gate only, no save**
+> **Superseded 2026-09-08.** The premise below is wrong: P19 shipped in
+> [#6](https://github.com/nicolopez-dev/poker-coach/pull/6) while this branch was out, so `games`
+> and `game_seats` exist and "Your games" is real. §4.3 is implemented **whole**, with all three
+> button states. The evening is already written as it is played — the row on the deal, the seats
+> 800ms after the last count — so the button calls `flushSeats()` to send the pending counts at
+> once and confirm the night is filed, rather than being what causes the save. Kept below because
+> the reasoning is still the right reasoning; only the fact it rested on was out of date.
+
+#### Decision 2 — how far does "Settle" go? · ~~RESOLVED 2026-09-08: gate only, no save~~
 
 Ship §4 minus the save. `Settle the table →` reveals the panel; the units-led column, the row
 grounds and the balanced test (`sum(endPoints) === pointsPerStack * players`) are all real; the
@@ -406,7 +414,10 @@ must pass.
 ```
 Read docs/design-handoff-02/README.md §4, and docs/design-update-02-plan.md §3b and §3c.
 
-DECISION NEEDED BEFORE YOU START: §4.3 says settling "saves the game to Your games and
+RESOLVED — no decision needed: P19 shipped in #6, games are recorded, and §4.3 is implemented
+whole. The paragraph below is kept only as the record of what was believed at the time.
+
+WAS: §4.3 says settling "saves the game to Your games and
 increments the games counter", but GAMES in src/data/profile.ts is sample data and the
 games counter is server-side and stays 0 until P19 in docs/accounts-plan.md. Read §3b of
 the plan, tell me which of the three options you recommend, and wait for my answer.
