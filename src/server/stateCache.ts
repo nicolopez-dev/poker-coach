@@ -42,10 +42,18 @@ export async function writeCachedState(userId: string, state: PlayerState): Prom
   }
 }
 
-/** Forgets one player's cache — signing out of a shared device, or deleting an account. */
+/**
+ * Forgets one player's cache — signing out of a shared device, or deleting an account.
+ *
+ * Every version of it, not only the one this build writes: an older blob is orphaned
+ * rather than migrated, and it is still that player's numbers sitting on the disk.
+ */
 export async function clearCachedState(userId: string): Promise<void> {
   try {
-    await AsyncStorage.removeItem(key(userId));
+    const keys = (await AsyncStorage.getAllKeys()).filter(
+      (stored) => stored.startsWith('pokerCoach.state.v') && stored.endsWith(`.${userId}`),
+    );
+    if (keys.length) await AsyncStorage.multiRemove(keys);
   } catch {
     // same again: a cache that will not clear is overwritten on the next hydrate
   }

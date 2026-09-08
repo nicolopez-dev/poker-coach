@@ -140,6 +140,9 @@ Carried over from the handoff's own open items:
   with no games says so.
 - Seat names are stored with the seats they were typed into, and nothing reads them back yet.
 - Apple sign-in is not wired yet, and profile setup is a placeholder.
+- The privacy policy and terms the app links to are pages on the marketing site, not in this
+  repo — `pokercoach.app/privacy` and `pokercoach.app/terms` have to be live before either
+  store will take a build (see [docs/environments.md](docs/environments.md)).
 
 ## Running against the local stack
 
@@ -234,6 +237,30 @@ Sign In / Providers, on the hosted project before release. `supabase/config.toml
 `enable_manual_linking = false` for the local stack, which is a different setting — it governs
 `linkIdentity()` calls, not automatic linking by email.
 
+### Deleting and exporting
+
+Both live at the bottom of the You screen and both go through
+[`src/server/account.ts`](src/server/account.ts).
+
+**Delete account** opens a sheet that asks for the word `DELETE` to be typed, says what goes,
+and then calls `delete_account()`. Apple 5.1.1(v) requires it to be reachable in the app rather
+than through a support address. One `delete from auth.users` takes the lot: every user-owned
+table hangs off it by `on delete cascade`, and
+[`supabase/tests/account.test.sql`](supabase/tests/account.test.sql) fires those cascades for
+real and asserts that all seven tables come back empty. The three copies this phone keeps — the
+cached state, the outbox and the acknowledged lapses — are cleared alongside, and then the app
+signs out.
+
+**Export my data** calls `get_export()`, writes the reply to the cache directory as
+`poker-coach-data-<date>.json` and hands it to the share sheet. It carries all seven tables,
+every column of each except `user_id`, which the document states once at the top. The same
+pgTAP file has a case that fails the build when a column is added to one of those tables and
+not to the export — an incomplete copy is the failure GDPR Article 15 is about, and it would
+otherwise be invisible.
+
+`auth.users` is deliberately not read by either function: the address and the provider are
+Supabase's side of the account rather than the app's.
+
 ## Deviations from the handoff
 
 - **Background cards are always aces**, on every tab and on login, rather than the handoff's
@@ -256,6 +283,11 @@ Sign In / Providers, on the hosted project before release. `supabase/config.toml
 - **The solver retries for full spread.** Where the prototype could silently deal zero of a
   colour, a fit that leaves one out is retried with one of every denomination reserved, and any
   colour that still can't be dealt is named on the result card.
+- **You and Login carry account and legal rows the handoff has no design for.** "Export my data"
+  and "Delete account" sit under "Log out" in the same restrained treatment — 11px uppercase and
+  no red button — and a "Privacy policy · Terms" line closes both screens. None of it is
+  decoration: Apple 5.1.1(v) wants deletion in the app, GDPR wants both, and neither store takes
+  a build whose privacy policy cannot be reached.
 
 ### React Native equivalents
 

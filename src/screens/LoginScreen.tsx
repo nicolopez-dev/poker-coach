@@ -15,6 +15,7 @@ import { AceCard } from '../components/AceCard';
 import { Rise } from '../components/anim';
 import { Felt } from '../components/Felt';
 import { GoogleIcon } from '../components/icons';
+import { LegalLinks } from '../components/LegalLinks';
 import { AuthField, Brand, RewardButton } from '../components/ui';
 import { useAuth } from '../auth/AuthProvider';
 import { colors, font, ls, radius, spacing } from '../theme/tokens';
@@ -176,6 +177,13 @@ export function LoginScreen() {
               <Text style={styles.forgot}>Forgot password?</Text>
             </Pressable>
           </View>
+
+          {/*
+            Both stores reject a build whose privacy policy cannot be reached, and this
+            is the screen where an account is created — the one moment consent is
+            actually being given.
+          */}
+          <LegalLinks style={styles.legal} />
         </Rise>
       </KeyboardAvoidingView>
     </View>
@@ -259,4 +267,5 @@ const styles = StyleSheet.create({
     color: colors.textFaint,
     paddingVertical: 8,
   },
+  legal: { marginTop: 2 },
 });
