@@ -119,6 +119,33 @@ wrong answer.
   just restate the answer.
 - The kicker ("Unit 2 · Position · 1 of 3") is generated — don't write it.
 
+### `correct` lives on the server too
+
+The client never gets to say whether an answer was right. `public.content_questions` holds the
+correct option id of every question, and `submit_answer` grades against *that* — otherwise XP and
+accuracy would be whatever a patched build claimed (`docs/accounts-plan.md` §5).
+
+So the answer key is a copy, and a copy goes stale. **Adding a question, deleting one, reordering
+them, or changing a `correct` or an option `id` means re-running the sync**:
+
+```bash
+npm run sync:content
+```
+
+It reads `COURSE`, replaces the table, and rewrites
+[`src/content/content-hash.json`](../src/content/content-hash.json) with the hash of what it
+pushed. `course.test.ts` compares that hash against the course on every run, so **forgetting the
+sync fails `npm test`** with *"the answer key has changed — run `npm run sync:content`"*. That
+failure is the whole point: without it the server would go on marking answers against the old key,
+silently, and only for real players.
+
+Two things follow from it. `content_questions` is **generated, never hand-edited** — the next sync
+undoes you. And the sync needs the service-role key, from `.env.admin` or from `SUPABASE_URL` and
+`SUPABASE_SERVICE_ROLE_KEY` in the environment, which is how you point it at the local stack.
+
+Editing only prose — a `prompt`, a `context`, a `why`, an option `label` — changes nothing the
+server holds, so no sync is needed. The hash covers the key, not the copy.
+
 ### Showing cards
 
 Add a fan above the context line. Hole cards sit level; give board cards `offset: 10` so they
@@ -187,10 +214,17 @@ with the table screen.
 - Every card fan is one legal deal, complete, captioned, and five cards or fewer.
 - Every figure quoted is asserted in [`holdem.test.ts`](../src/lib/holdem.test.ts).
 - Wrong answers are mistakes a player would actually make — never a hand the board cannot make.
+- The answer key has been re-synced if any `correct`, option `id`, or question order changed.
+
+```bash
+npm run sync:content
+```
 
 ```bash
 npm test
 ```
 
 [`course.test.ts`](../src/content/course.test.ts) enforces everything on that list a machine can
-check, and names the offending lesson and question number when it fails.
+check, and names the offending lesson and question number when it fails — including the last
+line, which fails as *"the answer key has changed — run `npm run sync:content`"* until the
+mirror matches.

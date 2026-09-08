@@ -19,6 +19,11 @@ for the one chip action and for hearts.
 
 - **Expo SDK 57** / React Native 0.86 / React 19 — iOS, Android and web from one codebase
 - TypeScript, strict
+- **Supabase** — Postgres with row level security, and Auth for email/password and Google.
+  Everything the player earns is server-derived: hearts, the streak, XP and finished lessons
+  come out of `SECURITY DEFINER` functions and are never written by the client. The schema, the
+  functions and the pgTAP tests that hold them to it live in
+  [`supabase/`](supabase); [`docs/accounts-plan.md`](docs/accounts-plan.md) is the design
 - `react-native-svg` for the felt, court cards, chips and icons; `expo-linear-gradient` for the
   gold hairline; `expo-blur` for the header
 - Animation on React Native's built-in `Animated` — no Reanimated, so no extra native config
@@ -46,14 +51,14 @@ tablets and desktop.
 | --- | --- |
 | `npm run web` | Expo dev server, opened in a browser |
 | `npm start` | Expo dev server (pick a target) |
-| `npm test` | Jest — the chip solver and Balance maths |
+| `npm test` | Jest — the chip solver, the Balance maths, the course, the outbox and the store |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run sync:content` | Regenerates the server's answer key from `src/content/course.ts` |
 | `npm run gen:types` | Regenerates `src/server/database.types.ts` from the local database |
 | `npm run env:local` | Points the app at the local Supabase stack (writes `.env.local`) |
 | `npm run env:hosted` | Removes `.env.local`, back to the project in `.env` |
 | `npx supabase db reset` | Rebuilds the local database from `supabase/migrations/` |
-| `npx supabase test db` | pgTAP — the row level security rules |
+| `npx supabase test db` | pgTAP — row level security, the economy, and the deletion cascades |
 
 The two Supabase commands need Docker running and `npx supabase start` done once. `db reset`
 drops and replays every migration, so it is the way to check a migration actually applies;
@@ -117,32 +122,71 @@ Both are ported closely from the prototype and covered by tests:
 
 ## What isn't built yet
 
-Carried over from the handoff's own open items:
+The accounts work is done: sign-up, password reset, Google, the profile step, and progress that
+persists — hearts, the streak, XP, finished lessons, the chip case and the games are all real
+and all server-derived. What is left:
 
-- Content is one lesson of three questions, in Position. The other four chapters are sketched
-  and read as locked until lessons are written for them.
-- Table lessons against AI players are modelled but not built.
-- Hearts, streak, XP and finished lessons are real, in both directions: the state comes from
-  the server and is cached per user for the next cold start, every answer and completion goes
-  through the outbox to the P3 functions — queued on this phone when there is no connection
-  and flushed on reconnect, on foreground and after a hydrate — and running out of hearts
-  stops play until one returns.
-- The coach's note on Home is authored copy with nothing computing it, and is marked as such
+- **Table lessons** against AI players are modelled but not built. `Lesson` is a union and the
+  course, the Path and the launcher all handle `table`; anything that isn't a drill opens a
+  placeholder until that screen exists.
+- **The coach's note on Home is authored copy** with nothing computing it, and is marked as such
   in `src/data/profile.ts` — the last of the sample data. Everything else on Home and You is
-  real: accuracy, the week chart, the daily goal, XP, the streak and the games count, all
   derived server-side from the answers themselves.
-- The chip case follows the account — read on sign-in and written back debounced as it is
-  edited, last write wins. A case nobody has touched has no row at all.
-- "Your games" is the real record. Dealing the stacks writes a game — with the case it was
-  played with, values and all — and editing the case and dealing again updates that same row, so
-  one evening is one row; entering the end-of-game counts records a seat each with its balance.
-  **Reuse** puts that whole setup back, overwriting the case currently in the tool. An account
-  with no games says so.
-- Seat names are stored with the seats they were typed into, and nothing reads them back yet.
-- Apple sign-in is not wired yet, and profile setup is a placeholder.
-- The privacy policy and terms the app links to are pages on the marketing site, not in this
-  repo — `pokercoach.app/privacy` and `pokercoach.app/terms` have to be live before either
-  store will take a build (see [docs/environments.md](docs/environments.md)).
+- **Seat names** are stored with the seats they were typed into, and nothing reads them back yet.
+- **Apple sign-in is not wired.** Google is. Apple's is required before an iOS build that offers
+  a third-party sign-in will pass review.
+- **The privacy policy and terms are not in this repo.** The app links to
+  `pokercoach.app/privacy` and `pokercoach.app/terms`, which are pages on the marketing site;
+  both have to be live before either store will take a build.
+
+## Running the backend
+
+The app talks to a real Postgres. `.env` holds the two values that point it at one — copy
+[`.env.example`](.env.example) and fill them in from the Supabase dashboard, Project Settings →
+API:
+
+| Variable | What it is |
+| --- | --- |
+| `EXPO_PUBLIC_SUPABASE_URL` | the project URL |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | the anon / publishable key — **public by design**, it ships in the bundle, and RLS is what protects the data |
+
+The **service-role key never goes in `.env`** and never reaches the app (§3 rule 2). It belongs
+in `.env.admin`, which is gitignored and read by one thing only: `npm run sync:content`.
+
+Two commands keep a database in step with this repo, and both need Docker running and
+`npx supabase start` done once:
+
+```bash
+npx supabase db reset
+```
+
+Drops the local database and replays every migration in `supabase/migrations/`, so it is how you
+find out whether a migration actually applies. Run `npm run gen:types` after it —
+`src/server/database.types.ts` is generated, and it is what types every wrapper in `src/server/`.
+
+```bash
+npm run sync:content
+```
+
+Pushes the answer key from `src/content/course.ts` into `public.content_questions`, the mirror
+`submit_answer` grades against. **Editing a question and not running this is a silent bug** — the
+server would go on marking answers against the old key — so `npm test` fails against
+`src/content/content-hash.json` until you do. It needs the service-role key, from `.env.admin` or
+from `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in the environment (which is how you point it
+at the local stack).
+
+```bash
+npx supabase test db
+```
+
+Runs the pgTAP files in `supabase/tests/` — row level security, the economy, and the cascades
+behind account deletion.
+
+**Google and Apple sign-in need a dev build.** Both use the native ID-token flow rather than a
+browser redirect, so they are native modules and cannot run in Expo Go or on web: `npx expo
+prebuild`, then `npm run android` / `npm run ios`. The Google button is present on web and says
+it is unavailable rather than crashing. `@react-native-community/netinfo` and `expo-sharing` are
+native modules too, so **an existing dev build has to be rebuilt once** after pulling them in.
 
 ## Running against the local stack
 
@@ -168,13 +212,10 @@ Three things differ from the hosted project, on purpose:
   the reset link is during local testing.
 - **No leaked-password check locally** — see [Passwords](#passwords).
 
-Google sign-in works in neither: it is a native module, so it needs a dev build
-(`npx expo prebuild` and `npm run android` / `npm run ios`).
-
-`@react-native-community/netinfo`, which tells the outbox when a connection comes back, is a
-native module too — **an existing dev build has to be rebuilt once** for it to link. Without
-that the app still works, and still queues; it just waits for a foreground or the next write to
-flush instead of noticing the moment signal returns.
+Google sign-in works against neither stack without a dev build, as above. Nor does
+`@react-native-community/netinfo`, which is what tells the outbox a connection has come back:
+without it the app still works and still queues, it just waits for a foreground or the next
+write to flush instead of noticing the moment signal returns.
 
 ## Accounts
 
