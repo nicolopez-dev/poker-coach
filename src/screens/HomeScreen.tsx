@@ -178,7 +178,7 @@ export function HomeScreen() {
 
         {hand && (
           <View style={styles.hotd}>
-            <HandOfTheDay hand={hand} />
+            <HandOfTheDay hand={hand} day={today} />
           </View>
         )}
 

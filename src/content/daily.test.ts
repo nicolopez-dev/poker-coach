@@ -29,6 +29,18 @@ describe('the hand of the day', () => {
     }
   });
 
+  it('carries the address the server marks against', () => {
+    // without these the day's hand could not be answered for real — `submit_answer`
+    // finds the key by lesson and index, and the completion needs the chapter
+    for (let d = 1; d <= 14; d++) {
+      const hand = handOfTheDay(written, `2026-04-${String(d).padStart(2, '0')}`)!;
+      const lesson = written.lessons.filter(isDrill).find((l) => l.id === hand.lessonId)!;
+      expect(lesson).toBeDefined();
+      expect(hand.chapterId).toBe(written.id);
+      expect(lesson.questions[hand.questionIndex]).toBe(hand.question);
+    }
+  });
+
   it('has no hand when there is no chapter, or nothing written in it', () => {
     expect(handOfTheDay(undefined, '2026-09-08')).toBeNull();
     const empty = COURSE.find((c) => c.lessons.length === 0);

@@ -12,10 +12,18 @@
 import { isDrill } from './progress';
 import type { Chapter, Question } from './types';
 
-/** A question, and enough to say where it came from. */
+/**
+ * A question, and enough to say where it came from — and to mark it.
+ *
+ * `lessonId` and `questionIndex` are its address in `content_questions`, which is what
+ * lets the day's hand be answered for real rather than played at: the server marks it
+ * against the same key it marks the lesson's own copy against.
+ */
 export type DailyHand = {
   question: Question;
   lessonId: string;
+  chapterId: string;
+  questionIndex: number;
   chapterTitle: string;
 };
 
@@ -37,10 +45,16 @@ export function handOfTheDay(chapter: Chapter | undefined, day: string): DailyHa
 
   const pool = chapter.lessons
     .filter(isDrill)
-    .flatMap((lesson) => lesson.questions.map((question) => ({ question, lessonId: lesson.id })));
+    .flatMap((lesson) =>
+      lesson.questions.map((question, questionIndex) => ({
+        question,
+        lessonId: lesson.id,
+        questionIndex,
+      })),
+    );
 
   if (pool.length === 0) return null;
 
   const pick = pool[hashDay(day) % pool.length];
-  return { ...pick, chapterTitle: chapter.title };
+  return { ...pick, chapterId: chapter.id, chapterTitle: chapter.title };
 }

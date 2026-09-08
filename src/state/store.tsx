@@ -13,6 +13,7 @@ import {
   type ChapterProgress,
   type LessonRef,
 } from '../content/progress';
+import type { DailyHand } from '../content/daily';
 import { XP_PER_ANSWER, type Question } from '../content/types';
 import {
   DEFAULT_CASE,
@@ -48,6 +49,12 @@ import {
   type GameDeal,
   type RecordedGame,
 } from '../server/games';
+import {
+  forgetPlayedHand,
+  readPlayedHand,
+  writePlayedHand,
+  type PlayedHand,
+} from '../server/dailyHand';
 import { fetchProfile, type Profile } from '../server/profile';
 import { useHydrate, type HydrateAction } from '../server/useHydrate';
 import { beginRun, finishLesson, recordAnswer, syncOutbox, type DrillAction } from './drill';
@@ -168,6 +175,9 @@ export type State = {
 
   gamesOpen: boolean;
 
+  /** today's hand of the day, once it has been played on this device */
+  playedHand: PlayedHand | null;
+
   /** the verify-email strip is dismissible for the session; `reset` brings it back */
   verifyDismissed: boolean;
 };
@@ -256,6 +266,7 @@ export const initialState: State = {
   editingName: null,
 
   gamesOpen: false,
+  playedHand: null,
 
   verifyDismissed: false,
 };
@@ -266,6 +277,7 @@ type Action =
   | { type: 'reset' }
   | { type: 'setProfile'; profile: Profile }
   | { type: 'chipCaseLoaded'; chipCase: ChipCase }
+  | { type: 'handPlayed'; played: PlayedHand }
   | { type: 'go'; tab: Tab }
   | { type: 'startLesson'; ref: LessonRef | undefined }
   | { type: 'closeDrill' }
@@ -448,6 +460,9 @@ export function reducer(state: State, action: Action): State {
     // lose by it. An edit made while the read was in flight keeps the tool — that edit
     // is on its way to the server already, and last write wins — and a case that has
     // been dealt from is left alone, because replacing it would void the deal on screen.
+    case 'handPlayed':
+      return { ...state, playedHand: action.played };
+
     case 'chipCaseLoaded':
       if (state.result || !sameCase(caseOf(state), DEFAULT_CASE)) return state;
       return {
@@ -831,6 +846,8 @@ export type Store = State & {
   setEditingName: (index: number | null) => void;
   /** take the day's ante — double XP until a wrong answer */
   takeDouble: () => void;
+  /** answer the hand of the day for real: marked, paid and spent like any other */
+  answerDailyHand: (hand: DailyHand, day: string, optionId: string) => void;
   toggleGames: () => void;
   /** leaves the out-of-hearts screen for Home */
   dismissHearts: () => void;
@@ -871,6 +888,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     // and the row they were being written to; all of it goes with them
     forgetChipCase();
     forgetGames();
+    if (userId) void forgetPlayedHand(userId);
     dispatch({ type: 'reset' });
   }, [status]);
 
@@ -941,6 +959,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       live = false;
     };
   }, [status]);
+
+  // What the player already did with today's hand, so the card comes back locked
+  // rather than offering a second go at it.
+  useEffect(() => {
+    if (!userId) return;
+    let live = true;
+
+    readPlayedHand(userId).then((played) => {
+      if (live && played) dispatch({ type: 'handPlayed', played });
+    });
+
+    return () => {
+      live = false;
+    };
+  }, [userId]);
 
   // The chip case, read once per sign-in. Whether it is adopted is the reducer's call:
   // an edit made while this was in flight keeps the tool it is holding.
@@ -1102,6 +1135,28 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             }),
           )
           .catch(() => refresh());
+      },
+      /**
+       * The day's hand goes through `submit_answer` like every other question: the
+       * server marks it against `content_questions`, spends a heart if it was wrong, and
+       * the XP follows from the answer row rather than from anything counted here.
+       *
+       * The card is locked locally the moment it is answered — before the round trip,
+       * and whether or not the round trip lands. A player who is offline has still
+       * played today's hand, and the outbox will carry it when there is a network.
+       */
+      answerDailyHand: (hand, day, optionId) => {
+        if (!userId) return;
+        dispatch({ type: 'handPlayed', played: { day, optionId } });
+        void writePlayedHand(userId, { day, optionId });
+        void recordAnswer(dispatch, {
+          userId,
+          ref: { chapterId: hand.chapterId, lessonId: hand.lessonId },
+          questionIndex: hand.questionIndex,
+          optionId,
+          clockOffset: state.clockOffset,
+          clientEventId: Crypto.randomUUID(),
+        }).then(() => refresh());
       },
       toggleGames: () => dispatch({ type: 'toggleGames' }),
       dismissHearts: () => dispatch({ type: 'dismissHearts' }),

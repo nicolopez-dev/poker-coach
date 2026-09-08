@@ -16,7 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { PlayerState } from './client';
 
 /** Bumped whenever `PlayerState` changes shape; an older blob is dropped, not migrated. */
-const VERSION = 3;
+const VERSION = 4;
 
 const key = (userId: string) => `pokerCoach.state.v${VERSION}.${userId}`;
 

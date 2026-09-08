@@ -18,13 +18,20 @@ import { useScrollOffset } from '../../components/TabScreen';
 import { Suit } from '../../components/ui';
 import { splitCards } from '../../content/cards';
 import type { DailyHand } from '../../content/daily';
+import { useStore } from '../../state/store';
 import { colors, font, ls, radius } from '../../theme/tokens';
 
 /**
- * One question a day, face down until you turn it over.
+ * One question a day, face down until you turn it over — and it counts.
  *
- * It is deliberately outside the economy: no XP, no heart, nothing recorded. A taster
- * on the way past, which is why nothing here talks about rewards.
+ * The hand is a real question out of the unit the player is on, so it has an address in
+ * `content_questions` and goes through `submit_answer` like any other: the server marks
+ * it, pays the XP if it was right, and takes the heart if it was not. Nothing about it
+ * is play money, which is why the card locks once it is answered rather than letting
+ * anyone shop for the right option.
+ *
+ * That lock is local (see [[dailyHand]]) — it gates a card rather than deciding
+ * anything, and a second device honestly gets one more crack at it.
  *
  * Two things the handoff is firm about, both because getting them wrong makes the card
  * unusable: the flip is a **swipe**, never a tap — a tap has to reach the answer
@@ -42,10 +49,14 @@ const SWIPE_AREA = { touchAction: 'pan-y' } as unknown as ViewStyle;
 /** Reveal once the card is this far into the pane. */
 const REVEAL_FRACTION = 0.3;
 
-export function HandOfTheDay({ hand }: { hand: DailyHand }) {
+export function HandOfTheDay({ hand, day }: { hand: DailyHand; day: string }) {
+  const { playedHand, answerDailyHand } = useStore();
   const [flipped, setFlipped] = useState(false);
-  const [chosen, setChosen] = useState<string | null>(null);
   const [seen, setSeen] = useState(false);
+
+  // Yesterday's record is not today's hand, so the card opens again on its own.
+  const played = playedHand?.day === day ? playedHand : null;
+  const chosen = played?.optionId ?? null;
 
   const reveal = useRef(new Animated.Value(0)).current;
   const scrollY = useScrollOffset();
@@ -115,7 +126,7 @@ export function HandOfTheDay({ hand }: { hand: DailyHand }) {
       />
       <View style={styles.coverBody}>
         <Text style={styles.coverTitle}>Hand of the day</Text>
-        <Text style={styles.coverHint}>Flip to play →</Text>
+        <Text style={styles.coverHint}>{answered ? 'Played today ✓' : 'Flip to play →'}</Text>
       </View>
     </SilverFrame>
   );
@@ -152,7 +163,7 @@ export function HandOfTheDay({ hand }: { hand: DailyHand }) {
           return (
             <Pressable
               key={o.id}
-              onPress={() => !answered && setChosen(o.id)}
+              onPress={() => !answered && answerDailyHand(hand, day, o.id)}
               disabled={answered}
               accessibilityRole="button"
               accessibilityState={{ selected: picked, disabled: answered }}
@@ -173,6 +184,10 @@ export function HandOfTheDay({ hand }: { hand: DailyHand }) {
             {right ? '♠  Nicely played' : '♥  Not this time'}
           </Text>
           <Text style={styles.feedbackBody}>{hand.question.why}</Text>
+          {/* One hand a day. It counted like any other — marked by the server, paid in
+              XP if it was right, a heart short if it was not — so there is nothing left
+              to offer until tomorrow deals a new one. */}
+          <Text style={styles.feedbackAgain}>That’s today’s hand — back tomorrow with a new one.</Text>
         </View>
       )}
     </SilverFrame>
@@ -302,6 +317,16 @@ const styles = StyleSheet.create({
   feedbackRight: { backgroundColor: colors.rewardAlt, borderColor: colors.goldRule },
   feedbackWrong: { backgroundColor: colors.redTintDeep, borderColor: colors.redBorder },
   feedbackTitle: { fontFamily: font.bold, fontSize: 12, lineHeight: 14, marginBottom: 5 },
+  /** the card is spent for the day, and says so under the explanation */
+  feedbackAgain: {
+    fontFamily: font.bold,
+    fontSize: 10,
+    lineHeight: 12,
+    letterSpacing: ls(10, 0.08),
+    textTransform: 'uppercase',
+    color: colors.textFaint,
+    marginTop: 10,
+  },
   feedbackBody: {
     fontFamily: font.regular,
     fontSize: 12,

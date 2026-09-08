@@ -375,8 +375,14 @@ Supabase's side of the account rather than the app's.
 - **A day's card face is decoration.** The week row turns a day face up when it was played; which
   card it turns up is a hash of the date, so it holds still. The answer count the old bar chart
   carried lives on in the row's accessibility label.
-- **The hand of the day pays nothing.** It is drawn from the unit the player is on, costs no heart
-  and earns no XP — a taster rather than a lesson, and it says so by saying nothing.
+- **The hand of the day counts.** It is drawn from the unit the player is on, so it has an address
+  in `content_questions` and goes through `submit_answer` like any other question — marked by the
+  server, paid in XP if right, a heart short if wrong. The card then locks until tomorrow; that
+  lock is local ([`dailyHand.ts`](src/server/dailyHand.ts)), since it gates a card rather than
+  deciding anything.
+- **Two ways to double XP, and they never stack.** Three drills in a row without a wrong answer
+  (the side bet), or filling the day's row of chips and taking the ante — either makes an answer
+  worth 16, both together still 16. `player_xp` is a `when/when/else` for exactly that reason.
 - **The side bet is a real mechanic, not a card.** The handoff advertises XP that doubles; nothing
   doubled XP, so the rule was built rather than the promise printed. Three drills in a row with no
   wrong answer and the third pays double, as does every clean one after it. Derived on read from
