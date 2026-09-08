@@ -57,16 +57,19 @@ export function FlipCard({
 
   return (
     <View style={style}>
+      {/* `pointerEvents` goes in style, not as a prop; gating it on the flip state is
+          what keeps the face underneath reachable */}
       <Animated.View
-        style={[styles.face, face('0deg', '180deg')]}
-        // pointerEvents belongs in style on RN, and gating it on flip state is what
-        // keeps the face underneath reachable
-        pointerEvents={flipped ? 'none' : 'auto'}>
+        style={[styles.face, face('0deg', '180deg'), { pointerEvents: flipped ? 'none' : 'auto' }]}>
         {front}
       </Animated.View>
       <Animated.View
-        style={[absoluteFill, styles.face, face('180deg', '360deg')]}
-        pointerEvents={flipped ? 'auto' : 'none'}>
+        style={[
+          absoluteFill,
+          styles.face,
+          face('180deg', '360deg'),
+          { pointerEvents: flipped ? 'auto' : 'none' },
+        ]}>
         {back}
       </Animated.View>
     </View>
