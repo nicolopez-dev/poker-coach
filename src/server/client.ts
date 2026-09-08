@@ -223,6 +223,26 @@ export async function deleteAccount(): Promise<void> {
   if (error) throw failure(error);
 }
 
+/**
+ * Everything the account holds: profile, hearts and streak, every answer and completion,
+ * the chip case and the games. The shape is `get_export()`'s, and it is deliberately left
+ * as it came.
+ *
+ * The readers below exist because a screen cannot render a `Json`; this is not for a
+ * screen. It is written to a file and handed to the player, so turning it into camelCase
+ * on the way would only mean handing them a document that no longer matches the one the
+ * server can be asked for again. `record` is the whole check — an answer that is not an
+ * object is not a document, and must not reach a file as the word `null`.
+ */
+export async function getExport(): Promise<AccountExport> {
+  const { data, error } = await supabase.rpc('get_export');
+  if (error) throw failure(error);
+  return record(data);
+}
+
+/** The export document, read as a whole rather than field by field. */
+export type AccountExport = Row;
+
 // ──────────────────────────────────────────────────────────────────── the wire
 
 /** A PostgREST error, turned into one of ours. Only the mapping produces a message. */

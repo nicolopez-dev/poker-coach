@@ -32,3 +32,18 @@ export async function markLapseSeen(userId: string, streakDay: string): Promise<
     // the card comes back next launch, which is a small cost for a full disk
   }
 }
+
+/**
+ * Forgets every lapse this player was told about — one of the three local copies
+ * [[account]] clears when an account ends. Enumerated rather than removed by key: the
+ * day the run ended is part of the key, so there is no single one to reach for.
+ */
+export async function clearLapses(userId: string): Promise<void> {
+  try {
+    const prefix = `pokerCoach.lapse.v1.${userId}.`;
+    const keys = (await AsyncStorage.getAllKeys()).filter((stored) => stored.startsWith(prefix));
+    if (keys.length) await AsyncStorage.multiRemove(keys);
+  } catch {
+    // nothing here is load-bearing; the worst a leftover costs is a card not shown
+  }
+}

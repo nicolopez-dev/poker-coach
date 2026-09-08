@@ -41,6 +41,36 @@ fan, or a lesson with the wrong number of questions for its tier.
 `Lesson` is a union: `drill` today, `table` (beating a table of AI players) reserved for later.
 Anything switching on `lesson.kind` must stay total over both.
 
+## The server
+
+Three layers, and the boundaries between them are the whole design (`docs/accounts-plan.md` §2).
+
+```
+screens / components  →  src/state/store.tsx  →  src/server/  →  src/auth/supabase.ts
+```
+
+- **Screens never import `supabase`.** They read the store and call `src/server/`. Only
+  `src/auth/` and `src/server/` may touch the client, and `src/server/client.ts` is the only
+  module that calls an RPC. A screen reaching past the store is how this turns into a rewrite.
+- **Hearts, streak, XP and completions are server-derived, and must never be written
+  client-side.** `player_state`, `answers` and `lesson_completions` carry a `select` policy and
+  nothing else — there is no insert, update or delete policy and no grant, so `update
+  player_state set hearts = 5` has nothing to match. Every mutation goes through a
+  `SECURITY DEFINER` function that recomputes from `now()`. The client may move *optimistically*
+  — `src/lib/hearts.ts` and `src/lib/streak.ts` mirror the SQL so the UI does not wait on a round
+  trip, and offline play has something to reason with — but the server's answer replaces whatever
+  was on screen, always. XP is never counted locally at all: it is derived from `answers` on
+  every read.
+- **Never add a table without RLS, and never write a `SECURITY DEFINER` function without
+  `set search_path = ''`** and a schema qualifier on every reference. §3 rules 1 and 4;
+  `supabase/tests/rls.test.sql` fails the build on the first, and an unqualified definer function
+  is a privilege-escalation hole.
+- **The service-role key never enters the app.** It lives in `.env.admin` for
+  `scripts/sync-content.ts` and nowhere else. The anon key is public by design.
+- **`get_export()` must name every column of the seven user-owned tables.** Add a column to one
+  of them and `supabase/tests/account.test.sql` fails until the export names it too — an
+  incomplete copy is the failure GDPR Article 15 is about.
+
 ## Conventions
 
 - **Colour semantics matter.** Red is only for the chip action, hearts, the "Playing" badge and
@@ -74,7 +104,21 @@ npm test
 ```
 
 The tests cover the chip solver and the Balance maths — the two things that must not drift from
-the handoff. Keep them passing when touching `src/lib/`.
+the handoff — plus the course, the outbox, the store and the answer-key hash. Keep them passing
+when touching `src/lib/`.
+
+Touching anything in `supabase/` means the database tests too, which need Docker up:
+
+```bash
+npx supabase db reset
+```
+
+```bash
+npx supabase test db
+```
+
+`db reset` is what proves a migration applies; run `npm run gen:types` after it, since
+`src/server/database.types.ts` is generated and types every wrapper in `src/server/`.
 
 ## Editing files on Windows
 

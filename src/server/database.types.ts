@@ -270,6 +270,7 @@ export type Database = {
         Returns: Json
       }
       delete_account: { Args: never; Returns: undefined }
+      get_export: { Args: never; Returns: Json }
       get_state: { Args: never; Returns: Json }
       live_streak: {
         Args: {

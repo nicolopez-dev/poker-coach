@@ -1,16 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '../auth/AuthProvider';
 import { Rise } from '../components/anim';
 import { Avatar } from '../components/Avatar';
+import { LegalLinks } from '../components/LegalLinks';
 import { TabScreen } from '../components/TabScreen';
 import { OutlineButton, PENDING, ProgressBar } from '../components/ui';
 import { currentChapter } from '../content/progress';
 import { fmt, POINTS_PER_UNIT } from '../lib/balance';
 import { gameDate, gameDetail } from '../lib/games';
+import { exportData } from '../server/account';
 import { useProgress, useStore } from '../state/store';
-import { colors, font, ls, radius, shadows } from '../theme/tokens';
+import { colors, font, ls, radius, shadows, TOUCH } from '../theme/tokens';
+import { DeleteAccountSheet } from './DeleteAccountSheet';
 
 export function YouScreen() {
   const {
@@ -30,6 +33,27 @@ export function YouScreen() {
   } = useStore();
   const { signOut, goTo } = useAuth();
   const progress = useProgress();
+
+  // The account controls own their own state: none of this outlives the screen, and
+  // none of it is anybody else's business — the store holds what the player *is*, not
+  // what a sheet is doing.
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  /**
+   * The share sheet is the confirmation, so a success says nothing: the file is already
+   * on its way, or they closed the sheet, which is an answer too. Only a failure needs
+   * words.
+   */
+  async function exportNow() {
+    if (exporting) return;
+    setExportError(null);
+    setExporting(true);
+    const outcome = await exportData();
+    if (!outcome.ok) setExportError(outcome.message);
+    setExporting(false);
+  }
 
   // "Unit 3 · 7-day streak" — the same unit the Path and Home headers name, and the
   // streak the header pill shows, rather than the handoff's invented "Friday-night
@@ -79,117 +103,160 @@ export function YouScreen() {
   ];
 
   return (
-    <TabScreen>
-      <View style={styles.profile}>
-        <Avatar avatarId={avatarId} name={displayName} size={60} />
-        <View style={styles.identity}>
-          <Text style={styles.name} numberOfLines={1}>
-            {displayName ?? 'Your seat'}
-          </Text>
-          <Text style={styles.subtitle}>{subtitle}</Text>
-          <Pressable
-            onPress={() => goTo('profileSetup')}
-            accessibilityRole="button"
-            style={styles.edit}>
-            <Text style={styles.editLabel}>Edit profile</Text>
-          </Pressable>
+    <>
+      <TabScreen>
+        <View style={styles.profile}>
+          <Avatar avatarId={avatarId} name={displayName} size={60} />
+          <View style={styles.identity}>
+            <Text style={styles.name} numberOfLines={1}>
+              {displayName ?? 'Your seat'}
+            </Text>
+            <Text style={styles.subtitle}>{subtitle}</Text>
+            <Pressable
+              onPress={() => goTo('profileSetup')}
+              accessibilityRole="button"
+              style={styles.edit}>
+              <Text style={styles.editLabel}>Edit profile</Text>
+            </Pressable>
+          </View>
         </View>
-      </View>
 
-      <View style={styles.statGrid}>
-        {stats.map((s) => (
-          <View key={s.label} style={[styles.statCard, { backgroundColor: s.bg }]}>
-            <Text style={[styles.statValue, { color: s.ink }]}>{s.value}</Text>
-            <Text style={styles.statLabel}>{s.label}</Text>
-            {s.note ? <Text style={styles.statNote}>{s.note}</Text> : null}
+        <View style={styles.statGrid}>
+          {stats.map((s) => (
+            <View key={s.label} style={[styles.statCard, { backgroundColor: s.bg }]}>
+              <Text style={[styles.statValue, { color: s.ink }]}>{s.value}</Text>
+              <Text style={styles.statLabel}>{s.label}</Text>
+              {s.note ? <Text style={styles.statNote}>{s.note}</Text> : null}
+            </View>
+          ))}
+        </View>
+
+        <Text style={styles.sectionLabel}>Mastery</Text>
+        {progress.map(({ chapter, pct }) => (
+          <View key={chapter.id} style={styles.masteryRow}>
+            <View style={styles.masteryHead}>
+              <Text style={styles.masteryName}>{chapter.title}</Text>
+              <Text style={styles.masteryPct}>{hydrated ? `${pct}%` : PENDING}</Text>
+            </View>
+            <ProgressBar pct={pct} height={9} />
           </View>
         ))}
-      </View>
 
-      <Text style={styles.sectionLabel}>Mastery</Text>
-      {progress.map(({ chapter, pct }) => (
-        <View key={chapter.id} style={styles.masteryRow}>
-          <View style={styles.masteryHead}>
-            <Text style={styles.masteryName}>{chapter.title}</Text>
-            <Text style={styles.masteryPct}>{hydrated ? `${pct}%` : PENDING}</Text>
-          </View>
-          <ProgressBar pct={pct} height={9} />
-        </View>
-      ))}
+        <OutlineButton
+          label="Your games"
+          glyph={gamesOpen ? '×' : '♠'}
+          active={gamesOpen}
+          onPress={toggleGames}
+          style={styles.gamesToggle}
+        />
 
-      <OutlineButton
-        label="Your games"
-        glyph={gamesOpen ? '×' : '♠'}
-        active={gamesOpen}
-        onPress={toggleGames}
-        style={styles.gamesToggle}
-      />
-
-      {gamesOpen && (
-        <Rise duration={300} style={styles.gamesPanel}>
-          <View style={styles.gamesHead}>
-            <Text style={styles.gamesCount}>
-              {gamesLoaded ? `Last ${recentGames.length} of ${games}` : PENDING}
-            </Text>
-            <Text style={styles.gamesUnits}>Balance in units</Text>
-          </View>
-          {noGames ? (
-            <Text style={styles.gamesEmpty}>
-              No games yet. Set a table up under Chips and the evening lands here.
-            </Text>
-          ) : !gamesLoaded ? (
-            <Text style={styles.gamesEmpty}>Looking them up…</Text>
-          ) : (
-            <View style={{ gap: 8 }}>
-              {recentGames.map((g) => {
-                // null until somebody counts the chips; an uncounted evening says so
-                // rather than showing a nought it has not earned
-                const net = g.netPoints === null ? null : g.netPoints / POINTS_PER_UNIT;
-                return (
-                  <View key={g.id} style={styles.gameRow}>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={styles.gameDate}>{gameDate(g.playedAt)}</Text>
-                      <Text style={styles.gameDetail}>{gameDetail(g)}</Text>
-                    </View>
-                    <View>
-                      <Text
-                        style={[
-                          styles.gameNet,
-                          {
-                            color:
-                              net === null
-                                ? colors.textFaint
-                                : net > 0
-                                  ? colors.greenLight
-                                  : colors.textSecondary,
-                          },
-                        ]}>
-                        {net === null
-                          ? '—'
-                          : `${net > 0 ? '+' : net < 0 ? '−' : ''}${Math.abs(net).toFixed(2)}`}
-                      </Text>
-                      <Text style={styles.gameNetLabel}>{net === null ? 'not counted' : 'units'}</Text>
-                    </View>
-                    <OutlineButton
-                      label="Reuse"
-                      height={44}
-                      onPress={() => loadGame(g)}
-                      style={styles.reuse}
-                    />
-                  </View>
-                );
-              })}
+        {gamesOpen && (
+          <Rise duration={300} style={styles.gamesPanel}>
+            <View style={styles.gamesHead}>
+              <Text style={styles.gamesCount}>
+                {gamesLoaded ? `Last ${recentGames.length} of ${games}` : PENDING}
+              </Text>
+              <Text style={styles.gamesUnits}>Balance in units</Text>
             </View>
-          )}
-        </Rise>
-      )}
+            {noGames ? (
+              <Text style={styles.gamesEmpty}>
+                No games yet. Set a table up under Chips and the evening lands here.
+              </Text>
+            ) : !gamesLoaded ? (
+              <Text style={styles.gamesEmpty}>Looking them up…</Text>
+            ) : (
+              <View style={{ gap: 8 }}>
+                {recentGames.map((g) => {
+                  // null until somebody counts the chips; an uncounted evening says so
+                  // rather than showing a nought it has not earned
+                  const net = g.netPoints === null ? null : g.netPoints / POINTS_PER_UNIT;
+                  return (
+                    <View key={g.id} style={styles.gameRow}>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.gameDate}>{gameDate(g.playedAt)}</Text>
+                        <Text style={styles.gameDetail}>{gameDetail(g)}</Text>
+                      </View>
+                      <View>
+                        <Text
+                          style={[
+                            styles.gameNet,
+                            {
+                              color:
+                                net === null
+                                  ? colors.textFaint
+                                  : net > 0
+                                    ? colors.greenLight
+                                    : colors.textSecondary,
+                            },
+                          ]}>
+                          {net === null
+                            ? '—'
+                            : `${net > 0 ? '+' : net < 0 ? '−' : ''}${Math.abs(net).toFixed(2)}`}
+                        </Text>
+                        <Text style={styles.gameNetLabel}>
+                          {net === null ? 'not counted' : 'units'}
+                        </Text>
+                      </View>
+                      <OutlineButton
+                        label="Reuse"
+                        height={44}
+                        onPress={() => loadGame(g)}
+                        style={styles.reuse}
+                      />
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </Rise>
+        )}
 
-      {/* wrapped, not passed by reference: the press event is not a sign-out scope */}
-      <Pressable onPress={() => signOut()} accessibilityRole="button" style={styles.logout}>
-        <Text style={styles.logoutLabel}>Log out</Text>
-      </Pressable>
-      <View style={{ height: 20 }} />
-    </TabScreen>
+        {/*
+          The account itself, in one quiet block. Deletion sits here in the same
+          treatment as logging out rather than under a red button — Apple 5.1.1(v) asks
+          for it to be reachable, not for it to be shouted, and red is spoken for by the
+          chip action, hearts and the "Playing" badge. What makes it deliberate is the
+          word the sheet asks to be typed.
+        */}
+        <View style={styles.account}>
+          {/* wrapped, not passed by reference: the press event is not a sign-out scope */}
+          <Pressable
+            onPress={() => signOut()}
+            accessibilityRole="button"
+            style={styles.accountAction}>
+            <Text style={styles.accountLabel}>Log out</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={exportNow}
+            disabled={exporting}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: exporting, busy: exporting }}
+            style={styles.accountAction}>
+            <Text style={[styles.accountLabel, exporting && styles.accountLabelBusy]}>
+              {exporting ? 'Gathering your data…' : 'Export my data'}
+            </Text>
+          </Pressable>
+          {exportError && (
+            <Text style={styles.accountError} accessibilityRole="alert">
+              {exportError}
+            </Text>
+          )}
+
+          <Pressable
+            onPress={() => setConfirmingDelete(true)}
+            accessibilityRole="button"
+            style={styles.accountAction}>
+            <Text style={styles.accountLabel}>Delete account</Text>
+          </Pressable>
+        </View>
+
+        <LegalLinks style={styles.legal} />
+        <View style={{ height: 20 }} />
+      </TabScreen>
+
+      {confirmingDelete && <DeleteAccountSheet onClose={() => setConfirmingDelete(false)} />}
+    </>
   );
 }
 
@@ -339,8 +406,9 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   reuse: { paddingHorizontal: 14 },
-  logout: { minHeight: 44, marginTop: 14, justifyContent: 'center' },
-  logoutLabel: {
+  account: { marginTop: 14 },
+  accountAction: { minHeight: TOUCH, justifyContent: 'center' },
+  accountLabel: {
     fontFamily: font.regular,
     fontSize: 11,
     lineHeight: 13,
@@ -348,4 +416,18 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors.textFaint,
   },
+  /**
+   * In flight. These rows already sit at the quietest ink the app has, so working is
+   * shown by lifting one step rather than dimming into nothing.
+   */
+  accountLabelBusy: { color: colors.textMuted },
+  /** red for a failed action, as on the auth screens */
+  accountError: {
+    fontFamily: font.regular,
+    fontSize: 11,
+    lineHeight: 13 * 1.25,
+    color: colors.red,
+    paddingBottom: 6,
+  },
+  legal: { marginTop: 10, justifyContent: 'flex-start' },
 });

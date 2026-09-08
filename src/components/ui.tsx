@@ -324,12 +324,13 @@ export function RedButton({
   );
 }
 
-/** Outline pill — "Your games", "Reuse". */
+/** Outline pill — "Your games", "Reuse", "Delete account". */
 export function OutlineButton({
   label,
   glyph,
   onPress,
   active = false,
+  disabled = false,
   height = 52,
   style,
 }: {
@@ -337,13 +338,17 @@ export function OutlineButton({
   glyph?: string;
   onPress: () => void;
   active?: boolean;
+  /** dims the pill and stops the press — the same treatment `RewardButton` uses */
+  disabled?: boolean;
   height?: number;
   style?: StyleProp<ViewStyle>;
 }) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
       style={[
         styles.outlineButton,
         {
@@ -351,6 +356,7 @@ export function OutlineButton({
           borderColor: active ? colors.goldRule : colors.hairlineStrong,
           justifyContent: glyph ? 'space-between' : 'center',
         },
+        disabled && styles.ctaDisabled,
         style,
       ]}>
       <Text style={[styles.outlineLabel, active && { color: colors.gold }]}>{label}</Text>
@@ -565,7 +571,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  /** In flight: dim the whole pill, gold hairline included, and keep it in place. */
+  /**
+   * Unavailable: dim the whole pill, hairline included, and keep it in place. A form in
+   * flight, or a confirmation that has not been typed out yet.
+   */
   ctaDisabled: { opacity: 0.55 },
   /** Lifted from the login screen so sign-up cannot drift away from it. */
   authField: {
