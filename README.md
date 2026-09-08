@@ -332,12 +332,16 @@ Supabase's side of the account rather than the app's.
 
 ### From handoff 02
 
-- **The rank chip is not CSS 3D.** The handoff builds it from `transform-style: preserve-3d`,
-  faces pushed apart with `translateZ`, and a 24-segment rim standing in space. React Native has
-  none of those. The flip is real (two faces 180° apart, backface-culled); the milled edge is drawn
-  in SVG rather than composed from a conic gradient; and one slab scaled by |sin(ry)| stands in for
-  the rim, so the chip still has a thickness to show when it turns edge-on. See the note at the top
-  of [`RankChip.tsx`](src/components/RankChip.tsx).
+- **The rank chip projects itself.** The handoff builds it from `transform-style: preserve-3d`,
+  faces pushed apart with `translateZ`, and a rim standing in space; React Native has none of those,
+  and stacking two flat faces gives a disc with no edge. So the chip is modelled as the short
+  cylinder it is and projected in JS — rotated about Y then X, divided through by a camera distance,
+  drawn as SVG paths, each facet of the milled edge shaded by how it meets the light. The milling is
+  cut into the face as well as the edge, which is what the conic gradient was doing and what carries
+  the chip square on, where a real chip shows no rim. The geometry depends on the angle, so it is
+  recomputed per frame rather than handed to the native driver. See the note at the top of
+  [`RankChip.tsx`](src/components/RankChip.tsx); the shape is pinned by
+  [`RankChip.test.ts`](src/components/RankChip.test.ts).
 - **Five drills is the day's work, not the streak.** The handoff's streak card says "Five drills is
   the streak" and "all five chips in, and today turns face-up". The server extends a run on the
   **first** completed lesson of the day, so Home says one drill keeps it and five is the target.
