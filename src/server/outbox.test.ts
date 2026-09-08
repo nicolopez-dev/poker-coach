@@ -52,6 +52,7 @@ const playerState = (): PlayerState => ({
   storedStreak: 2,
   streakDay: '2026-09-06',
   xp: 16,
+  cleanRun: 0,
   accuracy: 1,
   completedLessons: ['l1'],
   week: [],

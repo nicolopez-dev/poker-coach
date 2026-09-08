@@ -250,6 +250,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      clean_run: { Args: { p_user: string }; Returns: number }
+      clean_run_positions: {
+        Args: { p_user: string }
+        Returns: {
+          clean: boolean
+          lesson_id: string
+          n: number
+          pos: number
+        }[]
+      }
       complete_lesson: {
         Args: {
           p_chapter_id: string
@@ -261,6 +271,12 @@ export type Database = {
         Returns: Json
       }
       delete_account: { Args: never; Returns: undefined }
+      doubled_lessons: {
+        Args: { p_user: string }
+        Returns: {
+          lesson_id: string
+        }[]
+      }
       get_state: { Args: never; Returns: Json }
       live_streak: {
         Args: {
@@ -270,6 +286,7 @@ export type Database = {
         }
         Returns: number
       }
+      player_xp: { Args: { p_user: string }; Returns: number }
       set_profile: {
         Args: { p_avatar_id: string; p_display_name: string }
         Returns: Json

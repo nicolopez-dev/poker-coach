@@ -28,7 +28,7 @@ import { liveStreak, streakAtRisk } from '../lib/streak';
 import { ServerError, type AnswerOutcome, type PlayerState } from '../server/client';
 import { clearOutbox, pending } from '../server/outbox';
 import { beginRun, finishLesson, recordAnswer, syncOutbox } from './drill';
-import { initialState, reducer } from './store';
+import { initialState, reducer, sideBetPaying } from './store';
 
 const CHAPTER = COURSE[0];
 const LESSON = CHAPTER.lessons[0];
@@ -93,6 +93,7 @@ function fakeServer({ hearts = 5, key = RIGHT }: { hearts?: number; key?: string
         storedStreak: 12,
         streakDay: '2026-09-05',
         xp: answered.filter((a) => a.correct).length * XP_PER_ANSWER,
+        cleanRun: 0,
         accuracy: 1,
         completedLessons: [input.lessonId],
         week: [],
@@ -366,6 +367,7 @@ describe('the streak', () => {
     storedStreak: stored,
     streakDay,
     xp: 0,
+    cleanRun: 0,
     accuracy: 1,
     completedLessons: [],
     week: [],
@@ -492,5 +494,45 @@ describe('opening a lesson', () => {
 
     expect(s.state.outOfHearts).toBe(false);
     expect(s.state.tab).toBe('home');
+  });
+});
+
+/**
+ * The client's copy of the side-bet rule. The server is the authority — it holds the
+ * completions — but the drill's own tally has to be right while it is being played, so
+ * the two have to agree on when a drill is paying double.
+ *
+ * Mirrors B2–B5 in supabase/tests/side_bet.test.sql.
+ */
+describe('the side bet, from the drill in progress', () => {
+  const at = (cleanRun: number, drillClean = true) => ({ cleanRun, drillClean });
+
+  it('pays the ordinary rate on the first two of a run', () => {
+    expect(sideBetPaying(at(0))).toBe(false);
+    expect(sideBetPaying(at(1))).toBe(false);
+  });
+
+  it('pays double once this drill would be the third', () => {
+    expect(sideBetPaying(at(2))).toBe(true);
+  });
+
+  it('keeps paying deeper into the run', () => {
+    expect(sideBetPaying(at(7))).toBe(true);
+  });
+
+  it('stops the moment the drill is blemished, however long the run was', () => {
+    expect(sideBetPaying(at(9, false))).toBe(false);
+  });
+
+  it('takes a wrong answer out of the running, and stops doubling from there', () => {
+    let state = reducer(
+      { ...initialState, hydrated: true, cleanRun: 5, drillClean: true },
+      { type: 'startLesson', ref: REF },
+    );
+    expect(state.drillClean).toBe(true);
+
+    state = reducer(state, { type: 'pick', id: WRONG, at: NOW });
+    expect(state.drillClean).toBe(false);
+    expect(sideBetPaying(state)).toBe(false);
   });
 });

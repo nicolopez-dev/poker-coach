@@ -12,7 +12,7 @@ import { RANKS, nextRankFrom, rankIndexFor, rankPct } from '../data/ranks';
 import { fmt } from '../lib/balance';
 import { formatCountdown } from '../lib/hearts';
 import { dayFace, dayLetter } from '../lib/week';
-import { useProgress, useStore } from '../state/store';
+import { SIDE_BET_RUN, useProgress, useStore } from '../state/store';
 import { colors, font, ls, radius, shadows, spacing, TOUCH } from '../theme/tokens';
 import { HandOfTheDay } from './home/HandOfTheDay';
 import { StreakLapseCard } from './home/StreakLapseCard';
@@ -31,6 +31,15 @@ function headlineFor(done: number): string {
   const left = DAILY_GOAL - done;
   if (left <= 0) return 'Streak locked. Anything else today is profit.';
   return `${left} ${left === 1 ? 'drill' : 'drills'} left to finish today`;
+}
+
+/** What the side bet is worth saying, from the run the player is on. */
+function sideBetNote(cleanRun: number): string {
+  if (cleanRun >= SIDE_BET_RUN) {
+    return 'Every drill you finish clean is worth double. Slip one and the run ends.';
+  }
+  const left = SIDE_BET_RUN - cleanRun;
+  return `Win ${left} more drill${left === 1 ? '' : 's'} without a wrong answer and they start paying double.`;
 }
 
 function runLine(done: number, streak: number): string {
@@ -52,6 +61,7 @@ export function HomeScreen() {
     clockOffset,
     week,
     lessonsToday,
+    cleanRun,
     startNextLesson,
     go,
   } = useStore();
@@ -66,6 +76,7 @@ export function HomeScreen() {
   const next = nextRankFrom(rankIndex);
   const today = week[week.length - 1]?.day ?? '';
   const hand = handOfTheDay(chapter?.chapter, today);
+  const paying = cleanRun >= SIDE_BET_RUN;
 
   return (
     <TabScreen contentStyle={styles.pane}>
@@ -181,6 +192,28 @@ export function HomeScreen() {
             </Text>
           </View>
         </View>
+
+        {/* Three drills clean in a row and the third pays double, as does every clean
+            one after it. The run is the server's — it holds the completions — and the
+            dots count it out. */}
+        {hydrated && (
+          <View style={styles.sideBet}>
+            <View style={styles.sideBetHead}>
+              <Text style={styles.sideBetTitle}>
+                {paying ? 'Side bet: paying double' : 'Side bet: three in a row'}
+              </Text>
+              <View style={styles.sideBetDots}>
+                {Array.from({ length: SIDE_BET_RUN }, (_, i) => (
+                  <View
+                    key={i}
+                    style={[styles.sideBetDot, i < Math.min(cleanRun, SIDE_BET_RUN) && styles.sideBetDotOn]}
+                  />
+                ))}
+              </View>
+            </View>
+            <Text style={styles.sideBetNote}>{sideBetNote(cleanRun)}</Text>
+          </View>
+        )}
 
         <View style={styles.tablesHead}>
           <Text style={styles.kicker}>Pick a table</Text>
@@ -352,6 +385,39 @@ const styles = StyleSheet.create({
   },
   rankBar: { marginBottom: 7 },
   rankNote: { fontFamily: font.regular, fontSize: 11, lineHeight: 14, color: colors.textFaint },
+
+  sideBet: {
+    marginTop: 14,
+    borderRadius: 24,
+    backgroundColor: colors.redTintDeep,
+    borderWidth: 1,
+    borderColor: colors.redBorder,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+  },
+  sideBetHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 9,
+  },
+  sideBetTitle: {
+    flex: 1,
+    fontFamily: font.bold,
+    fontSize: 14,
+    lineHeight: 14 * 1.2,
+    color: colors.text,
+  },
+  sideBetDots: { flexDirection: 'row', gap: 4 },
+  sideBetDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.greenSpent },
+  sideBetDotOn: { backgroundColor: colors.red },
+  sideBetNote: {
+    fontFamily: font.regular,
+    fontSize: 12,
+    lineHeight: 12 * 1.45,
+    color: colors.redBody,
+  },
 
   tablesHead: {
     marginTop: 14,

@@ -114,6 +114,10 @@ export type State = {
    * total is not: it is derived from `answers` server-side and arrives with the state.
    */
   gained: number;
+  /** drills finished clean back to back, from the server — the side bet's run */
+  cleanRun: number;
+  /** no wrong answer in the drill open right now, so it is still in the running */
+  drillClean: boolean;
 
   players: number;
   /** entry in points (units × 100) */
@@ -136,6 +140,21 @@ export type State = {
 };
 
 /** Exported for `store.test.ts`, which drives the reducer without mounting React. */
+/** Where a clean drill has to land in the run before the side bet pays. */
+export const SIDE_BET_RUN = 3;
+
+/**
+ * Is the drill in progress going to pay double?
+ *
+ * It is the `SIDE_BET_RUN`th clean drill or later: the run the player was already on,
+ * plus this one, and only while this one is still unblemished. The server works the same
+ * thing out from the completions it holds; this is the client's copy of the rule, and it
+ * exists only so the drill's own tally is right while it is being played.
+ */
+export function sideBetPaying(state: Pick<State, 'cleanRun' | 'drillClean'>): boolean {
+  return state.drillClean && state.cleanRun + 1 >= SIDE_BET_RUN;
+}
+
 export const initialState: State = {
   displayName: null,
   avatarId: null,
@@ -176,6 +195,8 @@ export const initialState: State = {
   qi: 0,
   chosen: null,
   gained: 0,
+  cleanRun: 0,
+  drillClean: true,
 
   players: 6,
   buyIn: 500,
@@ -275,6 +296,7 @@ function fromServer(state: State, player: PlayerState, clockOffset: number): Sta
     storedStreak: player.storedStreak,
     streakDay: player.streakDay,
     xp: player.xp,
+    cleanRun: player.cleanRun,
     accuracy: player.accuracy,
     week: player.week,
     lessonsToday: player.lessonsToday,
@@ -351,6 +373,8 @@ export function reducer(state: State, action: Action): State {
         completionError: null,
         outOfHearts: false,
         gained: 0,
+        // every drill starts in the running for the side bet
+        drillClean: true,
       };
 
     case 'closeDrill':
@@ -371,15 +395,33 @@ export function reducer(state: State, action: Action): State {
       const question = activeQuestions(state)[state.qi];
       const right = !!question && action.id === question.correct;
       if (right) {
-        return { ...state, chosen: action.id, gained: state.gained + XP_PER_ANSWER };
+        // The side bet doubles a drill that lands third or later in a clean run. The
+        // server decides it, from completions the client cannot see — but the client can
+        // work out whether *this* drill qualifies: the run it started on, plus this
+        // drill, provided nothing has been missed yet. Only `gained` moves; `xp` still
+        // comes back derived, so a disagreement corrects itself on the next read.
+        return {
+          ...state,
+          chosen: action.id,
+          gained: state.gained + XP_PER_ANSWER * (sideBetPaying(state) ? 2 : 1),
+        };
       }
 
+      // A missed answer takes the drill out of the running for the side bet, whatever
+      // then happens to the heart.
       const at = new Date(action.at);
       try {
-        return { ...state, chosen: action.id, ...spent(state, at) };
+        return { ...state, chosen: action.id, drillClean: false, ...spent(state, at) };
       } catch {
         // nothing left to spend, and no server needed to know it
-        return { ...state, chosen: action.id, hearts: 0, outOfHearts: true, drillOpen: false };
+        return {
+          ...state,
+          chosen: action.id,
+          drillClean: false,
+          hearts: 0,
+          outOfHearts: true,
+          drillOpen: false,
+        };
       }
     }
 

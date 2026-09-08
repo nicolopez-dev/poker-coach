@@ -72,6 +72,7 @@ function parse(raw: string): PlayerState | null {
     'storedStreak',
     'longestStreak',
     'xp',
+    'cleanRun',
     'accuracy',
     'lessonsToday',
     'games',

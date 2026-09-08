@@ -20,6 +20,7 @@ const STATE: PlayerState = {
   storedStreak: 40,
   streakDay: '2026-09-04',
   xp: 1240,
+  cleanRun: 0,
   accuracy: 0.78,
   completedLessons: ['felt-1', 'felt-2'],
   week: [],

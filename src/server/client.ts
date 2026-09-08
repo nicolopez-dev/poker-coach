@@ -97,6 +97,11 @@ export type PlayerState = {
   /** the local day the run was last extended, or null for a player who never had one */
   streakDay: string | null;
   xp: number;
+  /**
+   * Drills finished clean, back to back. Three is where the side bet starts paying
+   * double — see `supabase/migrations/20260908120000_side_bet.sql`.
+   */
+  cleanRun: number;
   /** correct over total, 0–1 */
   accuracy: number;
   completedLessons: string[];
@@ -319,6 +324,7 @@ export function toPlayerState(data: Json): PlayerState {
     storedStreak: num(row, 'stored_streak_count'),
     streakDay: nullableStr(row, 'streak_day'),
     xp: num(row, 'xp'),
+    cleanRun: num(row, 'clean_run'),
     accuracy: num(row, 'accuracy'),
     completedLessons: strings(row, 'completed_lesson_ids'),
     week: week(row, 'week'),
