@@ -247,6 +247,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'You both check the river. What happens now?',
             cards: [
+              { rank: 'A', suit: '♠' },
+              { rank: '9', suit: '♦' },
               { rank: 'K', suit: '♥', offset: 10 },
               { rank: 'Q', suit: '♣', offset: 10 },
               { rank: '7', suit: '♠', offset: 10 },
@@ -335,6 +337,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Which five are you actually playing?',
             cards: [
+              { rank: 'A', suit: '♠' },
+              { rank: 'K', suit: '♥' },
               { rank: 'A', suit: '♦', offset: 10 },
               { rank: 'K', suit: '♠', offset: 10 },
               { rank: '9', suit: '♣', offset: 10 },
@@ -354,6 +358,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Do both of your cards have to play?',
             cards: [
+              { rank: '3', suit: '♦' },
+              { rank: '2', suit: '♣' },
               { rank: 'A', suit: '♠', offset: 10 },
               { rank: 'K', suit: '♠', offset: 10 },
               { rank: 'Q', suit: '♠', offset: 10 },
@@ -472,6 +478,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'You have a pair of sevens, they have ace-high. Nobody bet the river.',
             cards: [
+              { rank: '7', suit: '♦' },
+              { rank: '7', suit: '♣' },
               { rank: 'K', suit: '♠', offset: 10 },
               { rank: '9', suit: '♥', offset: 10 },
               { rank: '4', suit: '♦', offset: 10 },
@@ -491,6 +499,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'You missed everything and they check the river to you. Any way to win?',
             cards: [
+              { rank: 'A', suit: '♠' },
+              { rank: '5', suit: '♠' },
               { rank: 'K', suit: '♦', offset: 10 },
               { rank: '9', suit: '♥', offset: 10 },
               { rank: '7', suit: '♣', offset: 10 },
@@ -603,6 +613,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'You bet €7 and they call. The turn is the 8♦, pairing the board. What do you have now?',
             cards: [
+              { rank: 'A', suit: '♥' },
+              { rank: 'Q', suit: '♠' },
               { rank: 'A', suit: '♦', offset: 10 },
               { rank: '8', suit: '♣', offset: 10 },
               { rank: '3', suit: '♥', offset: 10 },
@@ -621,6 +633,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'River is the 2♣, they check, you bet €20 and they fold. What do you show?',
             cards: [
+              { rank: 'A', suit: '♥' },
+              { rank: 'Q', suit: '♠' },
               { rank: 'A', suit: '♦', offset: 10 },
               { rank: '8', suit: '♣', offset: 10 },
               { rank: '3', suit: '♥', offset: 10 },
@@ -655,6 +669,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Neither of you paired anything. How does it get settled?',
             cards: [
+              { rank: 'A', suit: '♠' },
+              { rank: 'Q', suit: '♦' },
               { rank: '9', suit: '♠', offset: 10 },
               { rank: '7', suit: '♥', offset: 10 },
               { rank: '4', suit: '♦', offset: 10 },
@@ -674,6 +690,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Your deuces against their ace-king. Who takes it?',
             cards: [
+              { rank: '2', suit: '♥' },
+              { rank: '2', suit: '♣' },
               { rank: 'Q', suit: '♣', offset: 10 },
               { rank: '9', suit: '♦', offset: 10 },
               { rank: '7', suit: '♠', offset: 10 },
@@ -693,6 +711,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Both of you hold a pocket pair and the board missed you both.',
             cards: [
+              { rank: 'J', suit: '♥' },
+              { rank: 'J', suit: '♦' },
               { rank: 'A', suit: '♠', offset: 10 },
               { rank: 'K', suit: '♦', offset: 10 },
               { rank: '7', suit: '♥', offset: 10 },
@@ -712,6 +732,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'The pair is on the board. What separates you?',
             cards: [
+              { rank: 'K', suit: '♥' },
+              { rank: 'Q', suit: '♦' },
               { rank: '7', suit: '♥', offset: 10 },
               { rank: '7', suit: '♦', offset: 10 },
               { rank: '5', suit: '♣', offset: 10 },
@@ -738,6 +760,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Both your cards paired. What do you call this?',
             cards: [
+              { rank: 'A', suit: '♠' },
+              { rank: '9', suit: '♦' },
               { rank: 'A', suit: '♥', offset: 10 },
               { rank: '9', suit: '♣', offset: 10 },
               { rank: '6', suit: '♠', offset: 10 },
@@ -757,6 +781,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Kings and fives, or queens and jacks?',
             cards: [
+              { rank: 'K', suit: '♥' },
+              { rank: '5', suit: '♦' },
               { rank: 'K', suit: '♦', offset: 10 },
               { rank: 'Q', suit: '♥', offset: 10 },
               { rank: '5', suit: '♠', offset: 10 },
@@ -776,6 +802,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'The two pair is sitting on the board. Now what?',
             cards: [
+              { rank: 'A', suit: '♣' },
+              { rank: '3', suit: '♦' },
               { rank: '9', suit: '♠', offset: 10 },
               { rank: '9', suit: '♦', offset: 10 },
               { rank: '4', suit: '♣', offset: 10 },
@@ -795,6 +823,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Your three eights against their aces and kings.',
             cards: [
+              { rank: '8', suit: '♥' },
+              { rank: '8', suit: '♦' },
               { rank: 'A', suit: '♥', offset: 10 },
               { rank: '8', suit: '♣', offset: 10 },
               { rank: 'K', suit: '♠', offset: 10 },
@@ -821,6 +851,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Your pocket pair caught a third one. What is that worth?',
             cards: [
+              { rank: '6', suit: '♥' },
+              { rank: '6', suit: '♦' },
               { rank: 'K', suit: '♠', offset: 10 },
               { rank: '6', suit: '♣', offset: 10 },
               { rank: '4', suit: '♦', offset: 10 },
@@ -840,6 +872,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'The board is paired and you hold the fourth one.',
             cards: [
+              { rank: '8', suit: '♥' },
+              { rank: 'A', suit: '♦' },
               { rank: '8', suit: '♦', offset: 10 },
               { rank: '8', suit: '♣', offset: 10 },
               { rank: 'K', suit: '♠', offset: 10 },
@@ -859,6 +893,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'You both hold an eight. Who wins?',
             cards: [
+              { rank: '8', suit: '♥' },
+              { rank: 'A', suit: '♦' },
               { rank: '8', suit: '♦', offset: 10 },
               { rank: '8', suit: '♣', offset: 10 },
               { rank: 'K', suit: '♠', offset: 10 },
@@ -878,6 +914,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Three tens on a connected board. Are you safe?',
             cards: [
+              { rank: '10', suit: '♥' },
+              { rank: '10', suit: '♠' },
               { rank: '10', suit: '♦', offset: 10 },
               { rank: '9', suit: '♣', offset: 10 },
               { rank: '8', suit: '♠', offset: 10 },
@@ -904,6 +942,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Five in a row — but do they count from two different places?',
             cards: [
+              { rank: '7', suit: '♦' },
+              { rank: '6', suit: '♠' },
               { rank: '9', suit: '♣', offset: 10 },
               { rank: '8', suit: '♥', offset: 10 },
               { rank: '5', suit: '♦', offset: 10 },
@@ -923,6 +963,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Ace, two, three, four, five. Is that anything?',
             cards: [
+              { rank: 'A', suit: '♠' },
+              { rank: '2', suit: '♦' },
               { rank: '5', suit: '♣', offset: 10 },
               { rank: '4', suit: '♥', offset: 10 },
               { rank: '3', suit: '♠', offset: 10 },
@@ -942,6 +984,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Queen, king, ace, two, three. Does the ace bridge them?',
             cards: [
+              { rank: 'A', suit: '♦' },
+              { rank: '2', suit: '♣' },
               { rank: 'K', suit: '♠', offset: 10 },
               { rank: 'Q', suit: '♥', offset: 10 },
               { rank: '3', suit: '♦', offset: 10 },
@@ -961,6 +1005,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'You both made a straight. Whose is bigger?',
             cards: [
+              { rank: 'J', suit: '♠' },
+              { rank: '4', suit: '♦' },
               { rank: '10', suit: '♦', offset: 10 },
               { rank: '9', suit: '♣', offset: 10 },
               { rank: '8', suit: '♠', offset: 10 },
@@ -987,6 +1033,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Three hearts out there, two in your hand.',
             cards: [
+              { rank: 'K', suit: '♥' },
+              { rank: '4', suit: '♥' },
               { rank: 'A', suit: '♥', offset: 10 },
               { rank: '9', suit: '♥', offset: 10 },
               { rank: '2', suit: '♥', offset: 10 },
@@ -1006,6 +1054,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Two flushes. Who wins?',
             cards: [
+              { rank: 'K', suit: '♥' },
+              { rank: '4', suit: '♥' },
               { rank: 'A', suit: '♥', offset: 10 },
               { rank: '9', suit: '♥', offset: 10 },
               { rank: '2', suit: '♥', offset: 10 },
@@ -1025,6 +1075,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'You hold the ace of spades and there are three more out there.',
             cards: [
+              { rank: 'A', suit: '♠' },
+              { rank: '7', suit: '♦' },
               { rank: 'K', suit: '♠', offset: 10 },
               { rank: '9', suit: '♠', offset: 10 },
               { rank: '4', suit: '♠', offset: 10 },
@@ -1044,6 +1096,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Your five diamonds against their five in a row.',
             cards: [
+              { rank: 'A', suit: '♦' },
+              { rank: '5', suit: '♦' },
               { rank: '9', suit: '♦', offset: 10 },
               { rank: '8', suit: '♦', offset: 10 },
               { rank: '7', suit: '♣', offset: 10 },
@@ -1070,6 +1124,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Three queens and a pair on the board.',
             cards: [
+              { rank: 'Q', suit: '♥' },
+              { rank: 'Q', suit: '♦' },
               { rank: 'Q', suit: '♠', offset: 10 },
               { rank: '8', suit: '♣', offset: 10 },
               { rank: '8', suit: '♥', offset: 10 },
@@ -1089,6 +1145,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Two full houses. Which one takes it?',
             cards: [
+              { rank: 'Q', suit: '♥' },
+              { rank: 'Q', suit: '♦' },
               { rank: 'Q', suit: '♠', offset: 10 },
               { rank: '8', suit: '♣', offset: 10 },
               { rank: '8', suit: '♥', offset: 10 },
@@ -1108,6 +1166,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Their flush against your full house.',
             cards: [
+              { rank: 'K', suit: '♥' },
+              { rank: '9', suit: '♦' },
               { rank: 'K', suit: '♠', offset: 10 },
               { rank: 'K', suit: '♦', offset: 10 },
               { rank: '7', suit: '♠', offset: 10 },
@@ -1127,6 +1187,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'The board is a full house all by itself.',
             cards: [
+              { rank: 'A', suit: '♠' },
+              { rank: 'K', suit: '♦' },
               { rank: '6', suit: '♣', offset: 10 },
               { rank: '6', suit: '♦', offset: 10 },
               { rank: '6', suit: '♥', offset: 10 },
@@ -1153,6 +1215,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'All four of them.',
             cards: [
+              { rank: '5', suit: '♥' },
+              { rank: '5', suit: '♦' },
               { rank: '5', suit: '♠', offset: 10 },
               { rank: '5', suit: '♣', offset: 10 },
               { rank: 'K', suit: '♦', offset: 10 },
@@ -1172,6 +1236,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Quads against kings full.',
             cards: [
+              { rank: '5', suit: '♥' },
+              { rank: '5', suit: '♦' },
               { rank: '5', suit: '♠', offset: 10 },
               { rank: '5', suit: '♣', offset: 10 },
               { rank: 'K', suit: '♦', offset: 10 },
@@ -1191,6 +1257,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Five hearts, and five in a row. What is that?',
             cards: [
+              { rank: '7', suit: '♥' },
+              { rank: '6', suit: '♥' },
               { rank: '9', suit: '♥', offset: 10 },
               { rank: '8', suit: '♥', offset: 10 },
               { rank: '5', suit: '♥', offset: 10 },
@@ -1210,6 +1278,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Ten through ace, all in spades.',
             cards: [
+              { rank: 'A', suit: '♠' },
+              { rank: 'K', suit: '♠' },
               { rank: 'Q', suit: '♠', offset: 10 },
               { rank: 'J', suit: '♠', offset: 10 },
               { rank: '10', suit: '♠', offset: 10 },
@@ -1236,6 +1306,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'You both paired the ace. What decides it?',
             cards: [
+              { rank: 'A', suit: '♠' },
+              { rank: 'K', suit: '♥' },
               { rank: 'A', suit: '♦', offset: 10 },
               { rank: '9', suit: '♣', offset: 10 },
               { rank: '6', suit: '♠', offset: 10 },
@@ -1255,6 +1327,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'A big board. Does your kicker still play?',
             cards: [
+              { rank: 'A', suit: '♠' },
+              { rank: '3', suit: '♥' },
               { rank: 'A', suit: '♦', offset: 10 },
               { rank: 'K', suit: '♣', offset: 10 },
               { rank: 'Q', suit: '♠', offset: 10 },
@@ -1274,6 +1348,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Three tens each, and a board full of big cards.',
             cards: [
+              { rank: '10', suit: '♥' },
+              { rank: '5', suit: '♣' },
               { rank: '10', suit: '♦', offset: 10 },
               { rank: '10', suit: '♣', offset: 10 },
               { rank: 'A', suit: '♠', offset: 10 },
@@ -1293,6 +1369,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'You both hit your ace. Are you happy about it?',
             cards: [
+              { rank: 'A', suit: '♣' },
+              { rank: '4', suit: '♦' },
               { rank: 'A', suit: '♥', offset: 10 },
               { rank: '8', suit: '♦', offset: 10 },
               { rank: '6', suit: '♣', offset: 10 },
@@ -1319,6 +1397,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'The board made a straight and neither of you helped.',
             cards: [
+              { rank: '6', suit: '♦' },
+              { rank: '3', suit: '♣' },
               { rank: 'A', suit: '♥', offset: 10 },
               { rank: 'K', suit: '♦', offset: 10 },
               { rank: 'Q', suit: '♠', offset: 10 },
@@ -1338,6 +1418,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Same straight on the board — but you have two hearts.',
             cards: [
+              { rank: '9', suit: '♥' },
+              { rank: '2', suit: '♥' },
               { rank: 'A', suit: '♥', offset: 10 },
               { rank: 'K', suit: '♥', offset: 10 },
               { rank: 'Q', suit: '♠', offset: 10 },
@@ -1357,6 +1439,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Two pair on the board, and you both hold a queen.',
             cards: [
+              { rank: 'Q', suit: '♥' },
+              { rank: '9', suit: '♦' },
               { rank: 'J', suit: '♦', offset: 10 },
               { rank: 'J', suit: '♣', offset: 10 },
               { rank: '4', suit: '♠', offset: 10 },
@@ -1376,6 +1460,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'You both make the same straight. Do suits break the tie?',
             cards: [
+              { rank: '10', suit: '♦' },
+              { rank: '3', suit: '♣' },
               { rank: '9', suit: '♠', offset: 10 },
               { rank: '8', suit: '♦', offset: 10 },
               { rank: '7', suit: '♣', offset: 10 },
@@ -3317,6 +3403,14 @@ export const COURSE: Chapter[] = [
           },
           {
             prompt: 'So why bother tracking something worth one out?',
+            cards: [
+              { rank: 'A', suit: '♦' },
+              { rank: 'J', suit: '♦' },
+              { rank: 'K', suit: '♦', offset: 10 },
+              { rank: '8', suit: '♠', offset: 10 },
+              { rank: '3', suit: '♣', offset: 10 },
+            ],
+            cardsLabel: 'The flop',
             context: 'You hold A♦ J♦ on K♦ 8♠ 3♣.',
             options: [
               { id: 'a', label: 'You should not — round it away' },
@@ -3896,6 +3990,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'The turn gives you the straight. Anything to worry about?',
             cards: [
+              { rank: 'J', suit: '♥' },
+              { rank: '10', suit: '♣' },
               { rank: '9', suit: '♠', offset: 10 },
               { rank: '8', suit: '♠', offset: 10 },
               { rank: '2', suit: '♣', offset: 10 },
@@ -4190,6 +4286,11 @@ export const COURSE: Chapter[] = [
           },
           {
             prompt: 'And reverse implied odds?',
+            cards: [
+              { rank: 'K', suit: '♦' },
+              { rank: '9', suit: '♦' },
+            ],
+            cardsLabel: 'Your two cards',
             context: 'You hold K♦ 9♦ and call a raise from a player who only raises good hands.',
             options: [
               { id: 'a', label: 'The extra you win when your draw comes in' },
@@ -4631,6 +4732,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Turn brings the jack of hearts and they check again.',
             cards: [
+              { rank: 'A', suit: '♠' },
+              { rank: 'Q', suit: '♥' },
               { rank: 'Q', suit: '♦', offset: 10 },
               { rank: '8', suit: '♣', offset: 10 },
               { rank: '3', suit: '♥', offset: 10 },
@@ -4649,6 +4752,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'The river pairs the board. They check a third time.',
             cards: [
+              { rank: 'A', suit: '♠' },
+              { rank: 'Q', suit: '♥' },
               { rank: 'Q', suit: '♦', offset: 10 },
               { rank: '8', suit: '♣', offset: 10 },
               { rank: '3', suit: '♥', offset: 10 },
@@ -4770,6 +4875,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'River, and they have checked three times.',
             cards: [
+              { rank: '9', suit: '♥' },
+              { rank: '9', suit: '♦' },
               { rank: 'K', suit: '♠', offset: 10 },
               { rank: '7', suit: '♦', offset: 10 },
               { rank: '2', suit: '♣', offset: 10 },
@@ -5110,6 +5217,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'They bet the river. What kind of hand is this?',
             cards: [
+              { rank: '8', suit: '♥' },
+              { rank: '8', suit: '♦' },
               { rank: 'A', suit: '♠', offset: 10 },
               { rank: 'K', suit: '♦', offset: 10 },
               { rank: '7', suit: '♣', offset: 10 },
@@ -5529,6 +5638,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'They bet every street and the board finished like this.',
             cards: [
+              { rank: 'A', suit: '♠' },
+              { rank: 'Q', suit: '♥' },
               { rank: 'Q', suit: '♦', offset: 10 },
               { rank: '8', suit: '♣', offset: 10 },
               { rank: '3', suit: '♥', offset: 10 },
@@ -5548,6 +5659,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'Same hand, same three bets, but the board ran out differently.',
             cards: [
+              { rank: 'A', suit: '♠' },
+              { rank: 'Q', suit: '♥' },
               { rank: 'Q', suit: '♦', offset: 10 },
               { rank: '8', suit: '♣', offset: 10 },
               { rank: '3', suit: '♥', offset: 10 },
@@ -7206,6 +7319,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'River is the 7♠. They check a second time. What is the play?',
             cards: [
+              { rank: '9', suit: '♥' },
+              { rank: '9', suit: '♦' },
               { rank: 'K', suit: '♠', offset: 10 },
               { rank: '8', suit: '♦', offset: 10 },
               { rank: '3', suit: '♥', offset: 10 },
@@ -7713,6 +7828,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'You hold K♠ Q♠ on a board of A♠ J♠ 4♠ 7♦ 2♣ and they bet big.',
             cards: [
+              { rank: 'K', suit: '♠' },
+              { rank: 'Q', suit: '♠' },
               { rank: 'A', suit: '♠', offset: 10 },
               { rank: 'J', suit: '♠', offset: 10 },
               { rank: '4', suit: '♠', offset: 10 },
@@ -8072,6 +8189,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'So you bet for value. They check-raise all-in. Now what?',
             cards: [
+              { rank: 'K', suit: '♥' },
+              { rank: 'Q', suit: '♦' },
               { rank: 'K', suit: '♠', offset: 10 },
               { rank: '9', suit: '♦', offset: 10 },
               { rank: '4', suit: '♣', offset: 10 },
@@ -8705,6 +8824,8 @@ export const COURSE: Chapter[] = [
           {
             prompt: 'You hold K♥ Q♦ on K♠ 9♦ 4♣ against one random hand. How many combinations beat you?',
             cards: [
+              { rank: 'K', suit: '♥' },
+              { rank: 'Q', suit: '♦' },
               { rank: 'K', suit: '♠', offset: 10 },
               { rank: '9', suit: '♦', offset: 10 },
               { rank: '4', suit: '♣', offset: 10 },
