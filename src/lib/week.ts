@@ -44,3 +44,30 @@ const LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 export function dayLetter(day: string): string {
   return LETTERS[new Date(`${day}T12:00:00.000Z`).getUTCDay()] ?? '';
 }
+
+/** The thirteen ranks and four suits a day's card can wear. */
+const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'] as const;
+const SUITS = ['♠', '♥', '♦', '♣'] as const;
+
+export type DayFace = { rank: string; suit: (typeof SUITS)[number] };
+
+/**
+ * The card face a day wears in the week row (handoff 02 draws the week as a hand).
+ *
+ * **Decoration, not data.** Nothing is encoded in the rank or the suit — what the row
+ * actually says is which days were played, which is carried by whether the card is face
+ * up. The face is derived from the date only so that it is stable: the same day keeps
+ * the same card across re-renders, app restarts and tab changes, instead of reshuffling
+ * itself every time the screen mounts.
+ */
+export function dayFace(day: string): DayFace {
+  // a cheap string hash — this needs to be stable and spread out, not unguessable
+  let hash = 0;
+  for (let i = 0; i < day.length; i++) hash = (hash * 31 + day.charCodeAt(i)) | 0;
+  hash = Math.abs(hash);
+
+  return {
+    rank: RANKS[hash % RANKS.length],
+    suit: SUITS[Math.floor(hash / RANKS.length) % SUITS.length],
+  };
+}

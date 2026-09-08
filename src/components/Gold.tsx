@@ -4,10 +4,13 @@ import { Animated, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import {
+  colors,
   goldGradient,
   goldGradientLocations,
   rewardCardFill,
   rewardCardFillLocations,
+  silverGradient,
+  silverGradientLocations,
 } from '../theme/tokens';
 import { Tilt, useSheen } from './anim';
 
@@ -27,6 +30,39 @@ const FILL_ANGLE = angle(155);
  * The web original does it with a double background and `background-clip`;
  * here the gradient is a 1px frame around the surface.
  */
+/**
+ * The same 1px frame in silver, for the Hand of the day (handoff 02 §1.5).
+ *
+ * Gold marks a reward. This card is not one — it is a question sitting on the way past —
+ * so the handoff gives it the other metal, and nothing else in the app wears it.
+ */
+export function SilverFrame({
+  children,
+  radius,
+  fill = colors.surface,
+  style,
+  innerStyle,
+}: {
+  children?: React.ReactNode;
+  radius: number;
+  fill?: string;
+  style?: StyleProp<ViewStyle>;
+  innerStyle?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <LinearGradient
+      colors={silverGradient}
+      locations={silverGradientLocations}
+      start={GOLD_ANGLE.start}
+      end={GOLD_ANGLE.end}
+      style={[{ borderRadius: radius, padding: 1 }, style]}>
+      <View style={[{ borderRadius: radius - 1, backgroundColor: fill }, innerStyle]}>
+        {children}
+      </View>
+    </LinearGradient>
+  );
+}
+
 export function GoldFrame({
   children,
   radius,

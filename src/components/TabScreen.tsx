@@ -1,10 +1,20 @@
-import React, { useRef } from 'react';
+import React, { createContext, useContext, useRef } from 'react';
 import { Animated, Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { spacing } from '../theme/tokens';
 import { BackgroundCards } from './BackgroundCards';
 import { useVerifyBanner } from './VerifyBanner';
+
+/**
+ * The pane's scroll offset, for anything that has to know where it is on screen.
+ *
+ * The value is fed with the native driver so the parallax stays off the JS thread —
+ * read it with `addListener`, never by swapping the driver off.
+ */
+const ScrollOffset = createContext<Animated.Value | null>(null);
+
+export const useScrollOffset = () => useContext(ScrollOffset);
 
 /**
  * One tab's pane: the parallax aces, then a scroller whose offset drives them.
@@ -24,6 +34,7 @@ export function TabScreen({
   const banner = useVerifyBanner();
 
   return (
+    <ScrollOffset.Provider value={scrollY}>
     <View style={styles.pane}>
       <BackgroundCards scrollY={scrollY} />
       <Animated.ScrollView
@@ -44,6 +55,7 @@ export function TabScreen({
         <View style={styles.column}>{children}</View>
       </Animated.ScrollView>
     </View>
+    </ScrollOffset.Provider>
   );
 }
 
