@@ -110,6 +110,57 @@ export function Shake({ children, style, duration = 400, replayKey }: AnimProps)
   );
 }
 
+/**
+ * A refusal: `shake` at half the amplitude and twice the rate, played on demand.
+ *
+ * `Shake` answers a wrong answer, so it plays the moment it mounts and every time its
+ * key changes. This one answers a press on something locked, which means it must *not*
+ * play on mount — a grid of locked cards would all shiver on arrival — so the first
+ * render is skipped and only a change of `count` after that shakes anything.
+ */
+export function Nudge({
+  children,
+  style,
+  duration = 320,
+  count,
+}: AnimProps & { count: number }) {
+  const t = useRef(new Animated.Value(0)).current;
+  const mounted = useRef(false);
+
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    t.setValue(0);
+    Animated.timing(t, {
+      toValue: 1,
+      duration,
+      easing: Easing.linear,
+      useNativeDriver: NATIVE,
+    }).start();
+  }, [t, duration, count]);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          transform: [
+            {
+              translateX: t.interpolate({
+                inputRange: [0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1],
+                outputRange: [0, -5, 5, -4, 4, -2, 2, 0],
+              }),
+            },
+          ],
+        },
+      ]}>
+      {children}
+    </Animated.View>
+  );
+}
+
 /** `chipdrop` — translateY(-18px) rotate(-12deg) → 0. */
 export function ChipDrop({ children, style, delay = 0, duration = 350, replayKey }: AnimProps) {
   const t = useRef(new Animated.Value(0)).current;

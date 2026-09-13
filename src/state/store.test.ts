@@ -29,7 +29,14 @@ import type { ChipCase } from '../server/chipCase';
 import { ServerError, type AnswerOutcome, type PlayerState } from '../server/client';
 import { clearOutbox, pending } from '../server/outbox';
 import { beginRun, finishLesson, recordAnswer, syncOutbox } from './drill';
-import { FOREGROUND_REFRESH_MS, caseOf, initialState, onForeground, reducer } from './store';
+import {
+  FOREGROUND_REFRESH_MS,
+  caseOf,
+  initialState,
+  onForeground,
+  reducer,
+  payingDouble,
+} from './store';
 
 const CHAPTER = COURSE[0];
 const LESSON = CHAPTER.lessons[0];
@@ -94,6 +101,9 @@ function fakeServer({ hearts = 5, key = RIGHT }: { hearts?: number; key?: string
         storedStreak: 12,
         streakDay: '2026-09-05',
         xp: answered.filter((a) => a.correct).length * XP_PER_ANSWER,
+        cleanRun: 0,
+        doubleLive: false,
+        doubleToday: false,
         accuracy: 1,
         completedLessons: [input.lessonId],
         week: [],
@@ -367,6 +377,9 @@ describe('the streak', () => {
     storedStreak: stored,
     streakDay,
     xp: 0,
+    cleanRun: 0,
+    doubleLive: false,
+    doubleToday: false,
     accuracy: 1,
     completedLessons: [],
     week: [],
@@ -493,6 +506,50 @@ describe('opening a lesson', () => {
 
     expect(s.state.outOfHearts).toBe(false);
     expect(s.state.tab).toBe('home');
+  });
+});
+
+/**
+ * The client's copy of the side-bet rule. The server is the authority — it holds the
+ * completions — but the drill's own tally has to be right while it is being played, so
+ * the two have to agree on when a drill is paying double.
+ *
+ * Mirrors B2–B5 in supabase/tests/side_bet.test.sql.
+ */
+describe('the side bet, from the drill in progress', () => {
+  const at = (cleanRun: number, drillClean = true, doubleLive = false) => ({
+    cleanRun,
+    drillClean,
+    doubleLive,
+  });
+
+  it('pays the ordinary rate on the first two of a run', () => {
+    expect(payingDouble(at(0))).toBe(false);
+    expect(payingDouble(at(1))).toBe(false);
+  });
+
+  it('pays double once this drill would be the third', () => {
+    expect(payingDouble(at(2))).toBe(true);
+  });
+
+  it('keeps paying deeper into the run', () => {
+    expect(payingDouble(at(7))).toBe(true);
+  });
+
+  it('stops the moment the drill is blemished, however long the run was', () => {
+    expect(payingDouble(at(9, false))).toBe(false);
+  });
+
+  it('takes a wrong answer out of the running, and stops doubling from there', () => {
+    let state = reducer(
+      { ...initialState, hydrated: true, cleanRun: 5, drillClean: true },
+      { type: 'startLesson', ref: REF },
+    );
+    expect(state.drillClean).toBe(true);
+
+    state = reducer(state, { type: 'pick', id: WRONG, at: NOW });
+    expect(state.drillClean).toBe(false);
+    expect(payingDouble(state)).toBe(false);
   });
 });
 
@@ -714,5 +771,64 @@ describe('the chip case the server sends back', () => {
 
     expect(state.result).toBe(dealt.result);
     expect(caseOf(state)).toEqual(caseOf(initialState));
+  });
+});
+
+/**
+ * The ante, from the drill in progress — the client's half of what
+ * `supabase/tests/double_xp.test.sql` proves on the server.
+ */
+describe('the ante, from the drill in progress', () => {
+  const at = (doubleLive: boolean, drillClean = true, cleanRun = 0) => ({
+    cleanRun,
+    drillClean,
+    doubleLive,
+  });
+
+  it('pays double for the whole run, not only from the third drill', () => {
+    expect(payingDouble(at(true))).toBe(true);
+    expect(payingDouble(at(false))).toBe(false);
+  });
+
+  it('stops the moment the drill is blemished', () => {
+    expect(payingDouble(at(true, false))).toBe(false);
+  });
+
+  it('does not stack with the side bet — one multiplier or the other', () => {
+    // both live: still just "double", because the answer is worth 16 either way
+    expect(payingDouble(at(true, true, 9))).toBe(true);
+  });
+
+  it('counts every answer of the drill at the doubled rate', () => {
+    // the whole tally, not only the first answer: this is the "+N XP" the finished drill
+    // shows, and it has to come to what the server will pay for the same answers
+    // hearts, or `startLesson` refuses and the drill never opens — `initialState` holds a
+    // nought that means "not asked yet", and a hydrated one of those is out of hearts
+    let state = reducer(
+      { ...initialState, hydrated: true, hearts: 5, doubleLive: true },
+      { type: 'startLesson', ref: REF },
+    );
+
+    const questions = LESSON.kind === 'drill' ? LESSON.questions : [];
+    for (const question of questions) {
+      state = reducer(state, { type: 'pick', id: question.correct, at: NOW });
+      state = reducer(state, { type: 'nextQuestion' });
+    }
+
+    expect(state.gained).toBe(questions.length * XP_PER_ANSWER * 2);
+  });
+
+  it('takes a wrong answer out of the ante as well as the side bet', () => {
+    let state = reducer(
+      { ...initialState, hydrated: true, hearts: 5, doubleLive: true, drillClean: true },
+      { type: 'startLesson', ref: REF },
+    );
+    expect(payingDouble(state)).toBe(true);
+    // the drill really is open, so the pick below is a pick at a question rather than at
+    // nothing — which would take it out of the running whatever the answer was
+    expect(state.activeLesson).toEqual(REF);
+
+    state = reducer(state, { type: 'pick', id: WRONG, at: NOW });
+    expect(payingDouble(state)).toBe(false);
   });
 });

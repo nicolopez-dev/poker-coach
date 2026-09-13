@@ -20,8 +20,15 @@ import { RANKS, SUITS, toCard } from '../lib/holdem';
 /** Questions per lesson by tier — the ladder set out in course.ts. */
 const questionsForUnit = (index: number): number => (index < 4 ? 4 : index < 8 ? 5 : 6);
 
-/** Five is what the drill's card fan fits across a phone without clipping. */
-const MAX_FAN = 5;
+/**
+ * Five is what the board row fits across a phone without clipping.
+ *
+ * It used to cap the whole fan, because hand and board shared one row — which is why
+ * questions with a full board had to name the hold in words instead of dealing it.
+ * Since handoff 02 §2.1 the hand is dealt separately, above the answers, so a question
+ * can carry both: five on the board and two in hand.
+ */
+const MAX_BOARD = 5;
 
 const drills: { unit: number; lesson: DrillLesson }[] = COURSE.flatMap((chapter, unit) =>
   chapter.lessons.filter(isDrill).map((lesson) => ({ unit, lesson })),
@@ -104,11 +111,12 @@ describe('the cards on screen', () => {
     }
   });
 
-  it('fits the fan across a phone', () => {
+  it('fits the board across a phone, and deals a fan at all', () => {
     for (const { at, question } of questions) {
       if (!question.cards) continue;
-      const n = question.cards.length;
-      expect(tag(at, n >= 1 && n <= MAX_FAN)).toBe(tag(at, true));
+      const board = question.cards.filter((c) => (c.offset ?? 0) !== 0).length;
+      expect(tag(at, question.cards.length >= 1)).toBe(tag(at, true));
+      expect(tag(at, board <= MAX_BOARD)).toBe(tag(at, true));
     }
   });
 

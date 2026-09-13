@@ -81,8 +81,18 @@ export function signedPoints(net: number): string {
   return sign + fmt(Math.abs(net));
 }
 
-/** Signed units to two decimals, using a real minus sign (U+2212). */
-export function signedUnits(units: number): string {
+/**
+ * Signed units to two decimals and nothing else, using a real minus sign (U+2212).
+ *
+ * The Balance table leads with this figure under a "Units" header, where repeating the
+ * word on every row would only be noise.
+ */
+export function unitFigure(units: number): string {
   const sign = units > 0 ? '+' : units < 0 ? '−' : '';
-  return `${sign}${Math.abs(units).toFixed(2)} units`;
+  return `${sign}${Math.abs(units).toFixed(2)}`;
+}
+
+/** The same figure carrying its unit, for anywhere a column header does not say it. */
+export function signedUnits(units: number): string {
+  return `${unitFigure(units)} units`;
 }

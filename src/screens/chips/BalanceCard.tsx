@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Rise } from '../../components/anim';
 import { Chip, ChipEdge } from '../../components/Chip';
@@ -10,11 +10,12 @@ import {
   POINTS_PER_UNIT,
   seatBalance,
   signedPoints,
-  signedUnits,
   tally,
+  unitFigure,
 } from '../../lib/balance';
 import type { DealResult, DealtRow } from '../../lib/chips';
 import { NAME_MAX_LENGTH, shortName } from '../../lib/names';
+import { flushSeats } from '../../server/games';
 import { useStore } from '../../state/store';
 import { colors, font, ls, radius, shadows, type } from '../../theme/tokens';
 
@@ -30,6 +31,19 @@ export function BalanceCard({
   rows: DealtRow[];
 }) {
   const { players, buyIn, ends, names, editingName, setEnd, setName, setEditingName } = useStore();
+
+  // Settling is a moment, not a state worth keeping: it belongs to this panel, and the
+  // panel closes with the deal. Editing any seat total after saving takes it back —
+  // what was filed is no longer what is on screen.
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    setSaved(false);
+  }, [ends, names]);
+
+  const settle = async () => {
+    await flushSeats();
+    setSaved(true);
+  };
 
   const dealtStack = result.val;
   const scale = pointScale(buyIn, dealtStack);
@@ -78,17 +92,31 @@ export function BalanceCard({
         <Text style={[styles.tableLabel, { width: 58 }]}>Seat</Text>
         <Text style={[styles.tableLabel, { width: 62, textAlign: 'center' }]}>End pts</Text>
         <Text style={[styles.tableLabel, { flex: 1, textAlign: 'right' }]}>Counts as</Text>
-        <Text style={[styles.tableLabel, { width: 70, textAlign: 'right' }]}>Balance</Text>
+        <Text style={[styles.tableLabel, { width: 70, textAlign: 'right' }]}>Units</Text>
       </View>
 
       <View style={{ gap: 7 }}>
         {ends.map((end, i) => {
           const seat = seatBalance(end, buyIn, dealtStack);
           const full = names[i] ?? '';
-          const bg =
-            seat.net > 0 ? colors.redTintDeep : seat.net < 0 ? colors.surfaceLocked : colors.surface;
+          // The winner takes the house's "good" dressing — near-black under a gold
+          // hairline — and red moves to the seats that lost units (handoff 02 §4.2).
+          const won = seat.net > 0;
+          const lost = seat.net < 0;
           return (
-            <View key={i} style={[styles.seatRow, { backgroundColor: bg }]}>
+            <View
+              key={i}
+              style={[
+                styles.seatRow,
+                {
+                  backgroundColor: won
+                    ? colors.rewardAlt
+                    : lost
+                      ? colors.redTintDeep
+                      : colors.surface,
+                },
+                won && styles.seatRowWon,
+              ]}>
               <TextInput
                 value={editingName === i ? full : shortName(full)}
                 onChangeText={(v) => setName(i, v)}
@@ -113,22 +141,19 @@ export function BalanceCard({
                 accessibilityLabel={`Seat ${i + 1} end points`}
               />
               <Text style={styles.countsAs}>{fmt(seat.countsAs)} pts</Text>
+              {/* Units lead, points follow: the table is settled in units, and the
+                  point count is the working that got there. */}
               <View style={styles.balanceCell}>
                 <Text
                   style={[
                     styles.balanceValue,
                     {
-                      color:
-                        seat.net > 0
-                          ? colors.redSoft
-                          : seat.net < 0
-                            ? colors.textSecondary
-                            : colors.textFaint,
+                      color: won ? colors.gold : lost ? colors.textSecondary : colors.textFaint,
                     },
                   ]}>
-                  {signedPoints(seat.net)}
+                  {unitFigure(seat.units)}
                 </Text>
-                <Text style={styles.balanceUnits}>{signedUnits(seat.units)}</Text>
+                <Text style={styles.balanceUnits}>{signedPoints(seat.net)} pts</Text>
               </View>
             </View>
           );
@@ -151,6 +176,43 @@ export function BalanceCard({
           {summary.unitsInPlay.toFixed(2)} units in play
         </Text>
       </View>
+
+      {/* Handoff 02 §4.3. The evening is already being written as it is played — the row
+          when the stacks are dealt, the seats 800ms after the last count typed — so this
+          is not what *causes* the game to be saved. What it does is end the debounce: the
+          counts go now rather than presently, and the player gets told the night is
+          filed instead of having to trust that it was. `games.ts` swallows a failed
+          write by design, so this reports what the app did, not what the server holds. */}
+      <Pressable
+        onPress={settle}
+        disabled={!summary.balanced || saved}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !summary.balanced, checked: saved }}
+        style={[
+          styles.settle,
+          saved ? styles.settleSaved : summary.balanced ? styles.settleReady : styles.settleBlocked,
+        ]}>
+        <Text
+          style={[
+            styles.settleLabel,
+            {
+              color: saved
+                ? colors.greenLight
+                : summary.balanced
+                  ? colors.rewardAlt
+                  : colors.textFaint,
+            },
+          ]}>
+          {saved ? 'Game saved ✓' : 'Settle game'}
+        </Text>
+      </Pressable>
+      <Text style={styles.settleHelp}>
+        {saved
+          ? 'Filed under Your games on the You tab.'
+          : summary.balanced
+            ? 'Every point accounted for. Settling saves this game.'
+            : 'Recount — the chips on the table do not match the points dealt.'}
+      </Text>
     </Rise>
   );
 }
@@ -227,6 +289,35 @@ const styles = StyleSheet.create({
     letterSpacing: ls(9, 0.1),
     textTransform: 'uppercase',
     color: colors.textFaint,
+  },
+  /** the winning seat, dressed as every other "good" state in the app is */
+  seatRowWon: { borderWidth: 1, borderColor: colors.goldRule },
+  settle: {
+    marginTop: 16,
+    minHeight: 54,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  settleBlocked: { backgroundColor: colors.surfaceInput },
+  settleReady: { backgroundColor: colors.gold },
+  settleSaved: { backgroundColor: colors.greenDeep },
+  settleHelp: {
+    fontFamily: font.regular,
+    fontSize: 10,
+    lineHeight: 10 * 1.4,
+    color: colors.textFaint,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  settleLabel: {
+    fontFamily: font.bold,
+    fontSize: 12,
+    lineHeight: 14,
+    letterSpacing: ls(12, 0.08),
+    textTransform: 'uppercase',
+    textAlign: 'center',
   },
   seatRow: {
     flexDirection: 'row',

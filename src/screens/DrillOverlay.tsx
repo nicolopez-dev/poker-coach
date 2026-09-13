@@ -4,8 +4,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChipDrop, Flip, Pop, Rise, Shake } from '../components/anim';
 import { Felt } from '../components/Felt';
+import { HeldHand } from '../components/HeldHand';
 import { CloseIcon } from '../components/icons';
 import { HeartsPill, RewardButton, Suit, pressable } from '../components/ui';
+import { boardLabel, splitCards } from '../content/cards';
 import { COURSE } from '../content/course';
 import { drillKicker, findLesson, isDrill } from '../content/progress';
 import { XP_PER_ANSWER, type FaceCard } from '../content/types';
@@ -26,6 +28,7 @@ export function DrillOverlay() {
     completing,
     completionError,
     gained,
+    drillClean,
     pick,
     nextQuestion,
     closeDrill,
@@ -44,6 +47,7 @@ export function DrillOverlay() {
 
   const questions = lesson.questions;
   const question = questions[qi];
+  const { hole, board } = splitCards(question);
   const answered = chosen !== null;
   const right = answered && chosen === question.correct;
   const last = qi >= questions.length - 1;
@@ -103,10 +107,18 @@ export function DrillOverlay() {
                   <Text style={styles.doneKicker}>Hand played</Text>
                   <Text style={[type.bigNumber, { marginBottom: 10 }]}>+{gained} XP</Text>
                   <Text style={styles.doneNote}>
-                    {gained === questions.length * XP_PER_ANSWER
+                    {/* A clean sweep is a drill with nothing missed in it, which is what
+                        `drillClean` carries — not a total. Reading it off the XP stopped
+                        being true the moment an answer could be worth 16: a perfect
+                        doubled drill pays twice the tally this used to compare against,
+                        and told the player they had missed some. */}
+                    {drillClean
                       ? `Clean sweep. One more session and ${chapter?.title ?? 'this unit'} is yours.`
                       : 'The ones you missed come back tomorrow.'}
                   </Text>
+                  {gained > questions.length * XP_PER_ANSWER && (
+                    <Text style={styles.doneDouble}>Paid double</Text>
+                  )}
                 </>
               )}
               <RewardButton label="Back to today" glyph="♥" onPress={closeDrill} />
@@ -124,20 +136,27 @@ export function DrillOverlay() {
                   </Text>
                 </View>
                 <Text style={styles.prompt}>{question.prompt}</Text>
-                {question.cards && question.cards.length > 0 && (
+                {/* The board only. When the player is holding two cards those are
+                    dealt below instead, and the caption drops the hold it used to
+                    have to spell out. */}
+                {board.length > 0 && (
                   <>
                     <View style={styles.fan}>
-                      {question.cards.map((c, i) => (
+                      {board.map((c, i) => (
                         <ChipDrop key={i} duration={400} replayKey={qi}>
                           <PlayingCard card={c} />
                         </ChipDrop>
                       ))}
                     </View>
-                    <Text style={styles.fanLabel}>{question.cardsLabel}</Text>
+                    <Text style={styles.fanLabel}>
+                      {hole.length === 2 ? boardLabel(question.cardsLabel) : question.cardsLabel}
+                    </Text>
                   </>
                 )}
                 <Text style={styles.context}>{question.context}</Text>
               </Flip>
+
+              {hole.length === 2 && <HeldHand hole={hole} replayKey={qi} />}
 
               <View style={styles.spacer} />
 
@@ -453,6 +472,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 14 * 1.45,
     color: colors.textSecondary,
+    marginBottom: 24,
+  },
+  /** the multiplier, named where it was paid — a doubled tally is not a typo */
+  doneDouble: {
+    fontFamily: font.bold,
+    fontSize: 10,
+    lineHeight: 12,
+    letterSpacing: ls(10, 0.14),
+    textTransform: 'uppercase',
+    color: colors.gold,
+    marginTop: -14,
     marginBottom: 24,
   },
 });

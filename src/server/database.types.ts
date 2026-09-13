@@ -202,6 +202,7 @@ export type Database = {
       }
       player_state: {
         Row: {
+          double_from: string | null
           hearts: number
           hearts_settled_at: string
           longest_streak: number
@@ -211,6 +212,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          double_from?: string | null
           hearts?: number
           hearts_settled_at?: string
           longest_streak?: number
@@ -220,6 +222,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          double_from?: string | null
           hearts?: number
           hearts_settled_at?: string
           longest_streak?: number
@@ -259,6 +262,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      clean_run: { Args: { p_user: string }; Returns: number }
+      clean_run_positions: {
+        Args: { p_user: string }
+        Returns: {
+          clean: boolean
+          day: string
+          lesson_id: string
+          n: number
+          pos: number
+        }[]
+      }
       complete_lesson: {
         Args: {
           p_chapter_id: string
@@ -269,7 +283,21 @@ export type Database = {
         }
         Returns: Json
       }
+      daily_goal: { Args: never; Returns: number }
       delete_account: { Args: never; Returns: undefined }
+      double_window: {
+        Args: { p_user: string }
+        Returns: {
+          ends: string
+          starts: string
+        }[]
+      }
+      doubled_lessons: {
+        Args: { p_user: string }
+        Returns: {
+          lesson_id: string
+        }[]
+      }
       get_export: { Args: never; Returns: Json }
       get_state: { Args: never; Returns: Json }
       live_streak: {
@@ -280,6 +308,8 @@ export type Database = {
         }
         Returns: number
       }
+      player_day: { Args: { p_at: string; p_user: string }; Returns: string }
+      player_xp: { Args: { p_user: string }; Returns: number }
       set_profile: {
         Args: { p_avatar_id: string; p_display_name: string }
         Returns: Json
@@ -302,6 +332,7 @@ export type Database = {
         }
         Returns: Json
       }
+      take_double: { Args: never; Returns: Json }
     }
     Enums: {
       [_ in never]: never

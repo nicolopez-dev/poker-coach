@@ -13,6 +13,7 @@ import {
   type ChapterProgress,
   type LessonRef,
 } from '../content/progress';
+import type { DailyHand } from '../content/daily';
 import { XP_PER_ANSWER, type Question } from '../content/types';
 import {
   DEFAULT_CASE,
@@ -39,7 +40,7 @@ import {
   saveChipCase,
   type ChipCase,
 } from '../server/chipCase';
-import { tzOffsetMin, type PlayerState, type WeekDay } from '../server/client';
+import { takeDouble, tzOffsetMin, type PlayerState, type WeekDay } from '../server/client';
 import {
   fetchGames,
   forgetGames,
@@ -48,6 +49,12 @@ import {
   type GameDeal,
   type RecordedGame,
 } from '../server/games';
+import {
+  forgetPlayedHand,
+  readPlayedHand,
+  writePlayedHand,
+  type PlayedHand,
+} from '../server/dailyHand';
 import { fetchProfile, type Profile } from '../server/profile';
 import { useHydrate, type HydrateAction } from '../server/useHydrate';
 import { beginRun, finishLesson, recordAnswer, syncOutbox, type DrillAction } from './drill';
@@ -106,7 +113,7 @@ export type State = {
   week: WeekDay[];
   /** lessons finished today, against the goal of three */
   lessonsToday: number;
-  /** games recorded — real, and zero for everyone until P19 writes them */
+  /** games recorded — real, from the `games` table */
   games: number;
 
   /** lesson ids the player has finished */
@@ -131,6 +138,14 @@ export type State = {
    * total is not: it is derived from `answers` server-side and arrives with the state.
    */
   gained: number;
+  /** drills finished clean back to back, from the server — the side bet's run */
+  cleanRun: number;
+  /** the day's ante is running: correct answers pay double until one is missed */
+  doubleLive: boolean;
+  /** it has been taken today, so the offer is spent whether or not it is still live */
+  doubleToday: boolean;
+  /** no wrong answer in the drill open right now, so it is still in the running */
+  drillClean: boolean;
 
   players: number;
   /** entry in points (units × 100) */
@@ -160,9 +175,36 @@ export type State = {
 
   gamesOpen: boolean;
 
+  /** today's hand of the day, once it has been played on this device */
+  playedHand: PlayedHand | null;
+
   /** the verify-email strip is dismissible for the session; `reset` brings it back */
   verifyDismissed: boolean;
 };
+
+/** Where a clean drill has to land in the run before the side bet pays. */
+export const SIDE_BET_RUN = 3;
+
+/**
+ * Is the drill in progress going to pay double?
+ *
+ * Two ways it can, and they do not stack — sixteen either way, never thirty-two:
+ *
+ *   · the **side bet**, on the `SIDE_BET_RUN`th clean drill or later — the run already
+ *     behind the player, plus this one;
+ *   · the **ante**, taken once the day's chips were all in, which runs until a wrong
+ *     answer anywhere.
+ *
+ * Both end the moment this drill is blemished, which is what `drillClean` carries. The
+ * server works all of it out from the answers it holds; this is only the client's copy,
+ * and it exists so the drill's own "+N XP" is right while it is being played.
+ */
+export function payingDouble(
+  state: Pick<State, 'cleanRun' | 'drillClean' | 'doubleLive'>,
+): boolean {
+  if (!state.drillClean) return false;
+  return state.doubleLive || state.cleanRun + 1 >= SIDE_BET_RUN;
+}
 
 /** Exported for `store.test.ts`, which drives the reducer without mounting React. */
 export const initialState: State = {
@@ -205,6 +247,10 @@ export const initialState: State = {
   qi: 0,
   chosen: null,
   gained: 0,
+  cleanRun: 0,
+  doubleLive: false,
+  doubleToday: false,
+  drillClean: true,
 
   // the case an account starts with, until the server sends one of its own
   ...DEFAULT_CASE,
@@ -220,6 +266,7 @@ export const initialState: State = {
   editingName: null,
 
   gamesOpen: false,
+  playedHand: null,
 
   verifyDismissed: false,
 };
@@ -230,6 +277,7 @@ type Action =
   | { type: 'reset' }
   | { type: 'setProfile'; profile: Profile }
   | { type: 'chipCaseLoaded'; chipCase: ChipCase }
+  | { type: 'handPlayed'; played: PlayedHand }
   | { type: 'go'; tab: Tab }
   | { type: 'startLesson'; ref: LessonRef | undefined }
   | { type: 'closeDrill' }
@@ -381,6 +429,9 @@ function fromServer(state: State, player: PlayerState, clockOffset: number): Sta
     storedStreak: player.storedStreak,
     streakDay: player.streakDay,
     xp: player.xp,
+    cleanRun: player.cleanRun,
+    doubleLive: player.doubleLive,
+    doubleToday: player.doubleToday,
     accuracy: player.accuracy,
     week: player.week,
     lessonsToday: player.lessonsToday,
@@ -409,6 +460,9 @@ export function reducer(state: State, action: Action): State {
     // lose by it. An edit made while the read was in flight keeps the tool — that edit
     // is on its way to the server already, and last write wins — and a case that has
     // been dealt from is left alone, because replacing it would void the deal on screen.
+    case 'handPlayed':
+      return { ...state, playedHand: action.played };
+
     case 'chipCaseLoaded':
       if (state.result || !sameCase(caseOf(state), DEFAULT_CASE)) return state;
       return {
@@ -481,6 +535,8 @@ export function reducer(state: State, action: Action): State {
         completionError: null,
         outOfHearts: false,
         gained: 0,
+        // every drill starts in the running for the side bet
+        drillClean: true,
       };
 
     case 'closeDrill':
@@ -501,15 +557,33 @@ export function reducer(state: State, action: Action): State {
       const question = activeQuestions(state)[state.qi];
       const right = !!question && action.id === question.correct;
       if (right) {
-        return { ...state, chosen: action.id, gained: state.gained + XP_PER_ANSWER };
+        // The side bet doubles a drill that lands third or later in a clean run. The
+        // server decides it, from completions the client cannot see — but the client can
+        // work out whether *this* drill qualifies: the run it started on, plus this
+        // drill, provided nothing has been missed yet. Only `gained` moves; `xp` still
+        // comes back derived, so a disagreement corrects itself on the next read.
+        return {
+          ...state,
+          chosen: action.id,
+          gained: state.gained + XP_PER_ANSWER * (payingDouble(state) ? 2 : 1),
+        };
       }
 
+      // A missed answer takes the drill out of the running for the side bet, whatever
+      // then happens to the heart.
       const at = new Date(action.at);
       try {
-        return { ...state, chosen: action.id, ...spent(state, at) };
+        return { ...state, chosen: action.id, drillClean: false, ...spent(state, at) };
       } catch {
         // nothing left to spend, and no server needed to know it
-        return { ...state, chosen: action.id, hearts: 0, outOfHearts: true, drillOpen: false };
+        return {
+          ...state,
+          chosen: action.id,
+          drillClean: false,
+          hearts: 0,
+          outOfHearts: true,
+          drillOpen: false,
+        };
       }
     }
 
@@ -770,6 +844,10 @@ export type Store = State & {
   setEnd: (index: number, value: string) => void;
   setName: (index: number, value: string) => void;
   setEditingName: (index: number | null) => void;
+  /** take the day's ante — double XP until a wrong answer */
+  takeDouble: () => void;
+  /** answer the hand of the day for real: marked, paid and spent like any other */
+  answerDailyHand: (hand: DailyHand, day: string, optionId: string) => void;
   toggleGames: () => void;
   /** leaves the out-of-hearts screen for Home */
   dismissHearts: () => void;
@@ -810,6 +888,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     // and the row they were being written to; all of it goes with them
     forgetChipCase();
     forgetGames();
+    if (userId) void forgetPlayedHand(userId);
     dispatch({ type: 'reset' });
   }, [status]);
 
@@ -880,6 +959,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       live = false;
     };
   }, [status]);
+
+  // What the player already did with today's hand, so the card comes back locked
+  // rather than offering a second go at it.
+  useEffect(() => {
+    if (!userId) return;
+    let live = true;
+
+    readPlayedHand(userId).then((played) => {
+      if (live && played) dispatch({ type: 'handPlayed', played });
+    });
+
+    return () => {
+      live = false;
+    };
+  }, [userId]);
 
   // The chip case, read once per sign-in. Whether it is adopted is the reducer's call:
   // an edit made while this was in flight keeps the tool it is holding.
@@ -1027,6 +1121,43 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setEnd: (index, value) => dispatch({ type: 'setEnd', index, value }),
       setName: (index, value) => dispatch({ type: 'setName', index, value }),
       setEditingName: (index) => dispatch({ type: 'setEditingName', index }),
+      // The server decides whether the bet may be taken at all — the client's idea of
+      // how much of the day is done is optimistic, and the table's is not. A refusal is
+      // not worth announcing: re-reading the state is what corrects the offer.
+      takeDouble: () => {
+        void takeDouble()
+          .then((next) =>
+            dispatch({
+              type: 'hydrate',
+              state: next,
+              clockOffset: Date.parse(next.serverNow) - Date.now(),
+              source: 'server',
+            }),
+          )
+          .catch(() => refresh());
+      },
+      /**
+       * The day's hand goes through `submit_answer` like every other question: the
+       * server marks it against `content_questions`, spends a heart if it was wrong, and
+       * the XP follows from the answer row rather than from anything counted here.
+       *
+       * The card is locked locally the moment it is answered — before the round trip,
+       * and whether or not the round trip lands. A player who is offline has still
+       * played today's hand, and the outbox will carry it when there is a network.
+       */
+      answerDailyHand: (hand, day, optionId) => {
+        if (!userId) return;
+        dispatch({ type: 'handPlayed', played: { day, optionId } });
+        void writePlayedHand(userId, { day, optionId });
+        void recordAnswer(dispatch, {
+          userId,
+          ref: { chapterId: hand.chapterId, lessonId: hand.lessonId },
+          questionIndex: hand.questionIndex,
+          optionId,
+          clockOffset: state.clockOffset,
+          clientEventId: Crypto.randomUUID(),
+        }).then(() => refresh());
+      },
       toggleGames: () => dispatch({ type: 'toggleGames' }),
       dismissHearts: () => dispatch({ type: 'dismissHearts' }),
       refresh,

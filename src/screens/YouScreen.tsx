@@ -1,19 +1,29 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '../auth/AuthProvider';
-import { Rise } from '../components/anim';
+import { Pop, Rise } from '../components/anim';
 import { Avatar } from '../components/Avatar';
 import { LegalLinks } from '../components/LegalLinks';
+import { ChipDisc, RankChip } from '../components/RankChip';
 import { TabScreen } from '../components/TabScreen';
-import { OutlineButton, PENDING, ProgressBar } from '../components/ui';
+import { OutlineButton, PENDING, ProgressBar, pressable } from '../components/ui';
 import { currentChapter } from '../content/progress';
+import {
+  RANKS,
+  levelLabel,
+  nextRankFrom,
+  rankIndexFor,
+  rankPct,
+  shownRankIndex,
+} from '../data/ranks';
 import { fmt, POINTS_PER_UNIT } from '../lib/balance';
 import { gameDate, gameDetail } from '../lib/games';
 import { exportData } from '../server/account';
 import { useProgress, useStore } from '../state/store';
 import { colors, font, ls, radius, shadows, TOUCH } from '../theme/tokens';
 import { DeleteAccountSheet } from './DeleteAccountSheet';
+import { Mastery } from './you/Mastery';
 
 export function YouScreen() {
   const {
@@ -73,32 +83,49 @@ export function YouScreen() {
     (hydrated && games === 0 && recentGames.length === 0) ||
     (gamesLoaded && recentGames.length === 0);
 
+  // The ladder selection, and the one piece of state the handoff is emphatic about: it
+  // belongs to this card alone. Home renders the live rank and must not follow it (§1.4).
+  const [viewRank, setViewRank] = useState<number | null>(null);
+  const [ladderOpen, setLadderOpen] = useState(false);
+
+  const liveIndex = rankIndexFor(xp);
+  const shownIndex = shownRankIndex(liveIndex, viewRank);
+  const viewingPast = shownIndex !== liveIndex;
+  const nextRank = nextRankFrom(liveIndex);
+
+  const rankNote = viewingPast
+    ? 'Mastered · tap your current chip to go back'
+    : nextRank
+      ? `${fmt(nextRank.at - xp)} XP to ${nextRank.name}`
+      : 'Top of the ladder. Keep the streak honest.';
+
   const stats = [
     {
       value: hydrated ? fmt(xp) : PENDING,
       label: 'Total XP',
-      bg: colors.greenDeep,
-      ink: colors.text,
+      dot: colors.green,
+      note: hydrated ? RANKS[liveIndex].name : undefined,
     },
     {
-      value: hydrated ? String(streak) : PENDING,
+      value: hydrated ? `${streak}d` : PENDING,
       label: 'Day streak',
-      bg: colors.rewardAlt,
-      ink: colors.gold,
+      dot: colors.gold,
       // a lost run is still a run that happened; the best one keeps its place here
-      note: hydrated && longestStreak > 0 ? `Best ${longestStreak}` : undefined,
+      note: hydrated && longestStreak > 0 ? `Best ${longestStreak}d` : undefined,
     },
     {
       value: hydrated ? `${Math.round(accuracy * 100)}%` : PENDING,
       label: 'Accuracy',
-      bg: colors.surface,
-      ink: colors.text,
+      dot: colors.greenLight,
+      // The handoff says "Last 50 drills". `get_state()` derives accuracy from every
+      // answer ever given, so that note would describe a window nothing computes.
+      note: 'All answers',
     },
     {
       value: hydrated ? String(games) : PENDING,
       label: 'Games set up',
-      bg: colors.surface,
-      ink: colors.text,
+      dot: colors.textMuted,
+      note: 'All time',
     },
   ];
 
@@ -121,26 +148,120 @@ export function YouScreen() {
           </View>
         </View>
 
+        {/* One card cut by hairlines rather than four floating tiles: the inner edges get
+            a rule, the outer ones do not, so the grid reads as a single object. */}
         <View style={styles.statGrid}>
-          {stats.map((s) => (
-            <View key={s.label} style={[styles.statCard, { backgroundColor: s.bg }]}>
-              <Text style={[styles.statValue, { color: s.ink }]}>{s.value}</Text>
-              <Text style={styles.statLabel}>{s.label}</Text>
-              {s.note ? <Text style={styles.statNote}>{s.note}</Text> : null}
+          {stats.map((s, i) => (
+            <View
+              key={s.label}
+              style={[
+                styles.statCell,
+                i > 1 && styles.statCellRuleTop,
+                i % 2 === 1 && styles.statCellRuleLeft,
+              ]}>
+              <View style={styles.statHead}>
+                <View style={[styles.statDot, { backgroundColor: s.dot }]} />
+                <Text style={styles.statLabel}>{s.label}</Text>
+              </View>
+              <Text style={styles.statValue}>{s.value}</Text>
+              <Text style={styles.statNote}>{hydrated ? (s.note ?? '') : ''}</Text>
             </View>
           ))}
         </View>
 
-        <Text style={styles.sectionLabel}>Mastery</Text>
-        {progress.map(({ chapter, pct }) => (
-          <View key={chapter.id} style={styles.masteryRow}>
-            <View style={styles.masteryHead}>
-              <Text style={styles.masteryName}>{chapter.title}</Text>
-              <Text style={styles.masteryPct}>{hydrated ? `${pct}%` : PENDING}</Text>
-            </View>
-            <ProgressBar pct={pct} height={9} />
+        <View style={styles.rankCard}>
+          <RankChip
+            rankIndex={shownIndex}
+            accessibilityLabel={`${RANKS[shownIndex].name}, level ${shownIndex + 1}`}
+          />
+          <View style={styles.rankBody}>
+            <Text style={styles.sectionLabelTight}>Your rank</Text>
+            <Text style={styles.rankName}>{RANKS[shownIndex].name}</Text>
+            <ProgressBar
+              pct={viewingPast ? 100 : rankPct(xp)}
+              height={8}
+              fill={viewingPast ? colors.goldRule : colors.green}
+              style={styles.rankBar}
+            />
+            <Text style={styles.rankNote}>{hydrated ? rankNote : PENDING}</Text>
           </View>
-        ))}
+        </View>
+
+        {/* The toggle belongs to the section, so it sits on the section's own line
+            rather than hanging off the bottom of the carousel it governs. */}
+        <View style={styles.sectionHead}>
+          <Text style={styles.sectionLabelFlush}>The chip ladder</Text>
+          <Pressable
+            onPress={() => setLadderOpen((open) => !open)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: ladderOpen }}
+            style={styles.ladderHint}>
+            <Text style={styles.ladderHintLabel}>{ladderOpen ? 'Hide ladder' : 'Show ladder'}</Text>
+          </Pressable>
+        </View>
+        {/* Cleared chips, the current one, and a glimpse of the next — the rest of the
+            ladder is behind "Show ladder" rather than dangling as a wall of locks. */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.ladderRow}>
+          {RANKS.slice(0, liveIndex + 2).map((rank, i) => {
+            const reached = i <= liveIndex;
+            const selected = i === shownIndex;
+            return (
+              <Pressable
+                key={rank.name}
+                disabled={!reached}
+                accessibilityRole="button"
+                accessibilityState={{ selected, disabled: !reached }}
+                onPress={() => setViewRank(i === liveIndex ? null : i)}
+                style={[styles.ladderCard, selected && styles.ladderCardSelected]}>
+                <ChipDisc rankIndex={i} size={34} dimmed={!reached} />
+                <Text style={[styles.ladderLevel, !reached && styles.ladderLocked]}>
+                  {levelLabel(i)}
+                </Text>
+                <Text style={[styles.ladderName, !reached && styles.ladderLocked]}>
+                  {rank.name}
+                </Text>
+                <Text style={styles.ladderMeta}>
+                  {i < liveIndex
+                    ? 'Cleared'
+                    : reached
+                      ? 'You are here'
+                      : `Locked · ${fmt(rank.at)} XP`}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        {ladderOpen && (
+          <Pop duration={300} style={styles.ladderAll}>
+            {RANKS.map((rank, i) => (
+              <View
+                key={rank.name}
+                style={[styles.ladderAllRow, i === liveIndex && styles.ladderAllRowCurrent]}>
+                <View
+                  style={[
+                    styles.ladderAllDot,
+                    { backgroundColor: rank.swatch },
+                    i > liveIndex && styles.ladderAllDotLocked,
+                  ]}
+                />
+                <Text style={styles.ladderAllLevel}>{levelLabel(i)}</Text>
+                <Text style={[styles.ladderAllName, i > liveIndex && styles.ladderLocked]}>
+                  {rank.name}
+                </Text>
+                <Text style={styles.ladderAllState}>
+                  {i < liveIndex ? 'Cleared' : i === liveIndex ? 'Current' : `${fmt(rank.at)} XP`}
+                </Text>
+              </View>
+            ))}
+          </Pop>
+        )}
+
+        <Text style={styles.sectionLabel}>Mastery</Text>
+        <Mastery />
 
         <OutlineButton
           label="Your games"
@@ -212,51 +333,66 @@ export function YouScreen() {
         )}
 
         {/*
-          The account itself, in one quiet block. Deletion sits here in the same
-          treatment as logging out rather than under a red button — Apple 5.1.1(v) asks
-          for it to be reachable, not for it to be shouted, and red is spoken for by the
-          chip action, hearts and the "Playing" badge. What makes it deliberate is the
-          word the sheet asks to be typed.
-        */}
-        <View style={styles.account}>
-          {/* wrapped, not passed by reference: the press event is not a sign-out scope */}
-          <Pressable
-            onPress={() => signOut()}
-            accessibilityRole="button"
-            style={styles.accountAction}>
-            <Text style={styles.accountLabel}>Log out</Text>
-          </Pressable>
+          The footer: the account and the legal pages, one line each and the same ink.
+          Deletion sits here in the same treatment as logging out rather than under a red
+          button — Apple 5.1.1(v) asks for it to be reachable, not for it to be shouted,
+          and red is spoken for by the chip action, hearts and the "Playing" badge. What
+          makes it deliberate is the word the sheet asks to be typed.
 
-          <Pressable
-            onPress={exportNow}
-            disabled={exporting}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: exporting, busy: exporting }}
-            style={styles.accountAction}>
-            <Text style={[styles.accountLabel, exporting && styles.accountLabelBusy]}>
-              {exporting ? 'Gathering your data…' : 'Export my data'}
-            </Text>
-          </Pressable>
+          Three stacked 44px rows made the quietest thing on the screen the tallest; side
+          by side they read as what they are — the small print. Each still carries the
+          legal links' own 8px of padding, which is the touch target the app already
+          ships for a footer link.
+        */}
+        <View style={styles.footer}>
+          <View style={styles.footerRow}>
+            {/* wrapped, not passed by reference: the press event is not a sign-out scope */}
+            <FooterAction label="Log out" onPress={() => signOut()} />
+            <Text style={styles.footerDot}>·</Text>
+            <FooterAction
+              label={exporting ? 'Gathering your data…' : 'Export my data'}
+              onPress={exportNow}
+              busy={exporting}
+            />
+            <Text style={styles.footerDot}>·</Text>
+            <FooterAction label="Delete account" onPress={() => setConfirmingDelete(true)} />
+          </View>
+
           {exportError && (
             <Text style={styles.accountError} accessibilityRole="alert">
               {exportError}
             </Text>
           )}
 
-          <Pressable
-            onPress={() => setConfirmingDelete(true)}
-            accessibilityRole="button"
-            style={styles.accountAction}>
-            <Text style={styles.accountLabel}>Delete account</Text>
-          </Pressable>
+          <LegalLinks style={styles.legal} />
         </View>
-
-        <LegalLinks style={styles.legal} />
         <View style={{ height: 20 }} />
       </TabScreen>
 
       {confirmingDelete && <DeleteAccountSheet onClose={() => setConfirmingDelete(false)} />}
     </>
+  );
+}
+
+/** One word of the small print. Sized and spaced as the legal links beside it. */
+function FooterAction({
+  label,
+  onPress,
+  busy = false,
+}: {
+  label: string;
+  onPress: () => void;
+  busy?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={busy}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: busy, busy }}
+      style={pressable()}>
+      <Text style={[styles.footerLabel, busy && styles.footerLabelBusy]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -293,34 +429,142 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 5,
   },
-  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 },
-  statCard: {
-    flexBasis: '48%',
-    flexGrow: 1,
-    borderRadius: radius.smallCard,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+  statGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 12,
+    borderRadius: 24,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
   },
-  statValue: { fontFamily: font.bold, fontSize: 24, lineHeight: 26 },
+  statCell: { width: '50%', paddingVertical: 18, paddingHorizontal: 16, gap: 7 },
+  /** hairlines on the inner edges only, so the card keeps one outline */
+  statCellRuleTop: { borderTopWidth: 1, borderTopColor: colors.hairlineCell },
+  statCellRuleLeft: { borderLeftWidth: 1, borderLeftColor: colors.hairlineCell },
+  statHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statDot: { width: 6, height: 6, borderRadius: 3 },
+  statValue: {
+    fontFamily: font.bold,
+    fontSize: 27,
+    lineHeight: 27,
+    letterSpacing: ls(27, -0.02),
+    color: colors.text,
+  },
   statLabel: {
     fontFamily: font.regular,
-    fontSize: 10,
-    lineHeight: 12,
-    letterSpacing: ls(10, 0.08),
+    fontSize: 9,
+    lineHeight: 11,
+    letterSpacing: ls(9, 0.14),
     textTransform: 'uppercase',
     color: colors.textMuted,
-    marginTop: 5,
   },
-  /** the longest run, under its stat at the same micro scale */
-  statNote: {
+  /** the rank, the best run, the window a number covers */
+  statNote: { fontFamily: font.regular, fontSize: 10, lineHeight: 12, color: colors.textFaint },
+
+  rankCard: {
+    marginTop: 12,
+    borderRadius: radius.card,
+    backgroundColor: colors.surfaceDeep,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  rankBody: { flex: 1, minWidth: 0 },
+  rankName: {
+    fontFamily: font.bold,
+    fontSize: 18,
+    lineHeight: 18 * 1.1,
+    color: colors.text,
+    marginBottom: 9,
+  },
+  rankBar: { marginBottom: 7 },
+  rankNote: { fontFamily: font.regular, fontSize: 11, lineHeight: 14, color: colors.textFaint },
+
+  ladderRow: { gap: 10, paddingVertical: 12, paddingRight: 18 },
+  ladderCard: {
+    width: 108,
+    borderRadius: radius.row,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    padding: 13,
+    gap: 9,
+  },
+  ladderCardSelected: { backgroundColor: colors.rewardAlt, borderColor: colors.goldRule },
+  ladderLevel: {
+    fontFamily: font.bold,
+    fontSize: 9,
+    lineHeight: 11,
+    letterSpacing: ls(9, 0.12),
+    color: colors.gold,
+  },
+  ladderName: { fontFamily: font.bold, fontSize: 12, lineHeight: 12 * 1.2, color: colors.text },
+  ladderMeta: { fontFamily: font.regular, fontSize: 10, lineHeight: 12, color: colors.textMuted },
+  /** a rank not reached yet — the swatch dims, the words go quiet */
+  ladderLocked: { color: colors.textFaint },
+
+  /** the full touch target, taken out of the section line's own height */
+  ladderHint: {
+    minHeight: TOUCH,
+    justifyContent: 'center',
+    paddingLeft: 12,
+    marginVertical: -(TOUCH - 12) / 2,
+  },
+  ladderHintLabel: {
+    fontFamily: font.bold,
+    fontSize: 10,
+    lineHeight: 12,
+    letterSpacing: ls(10, 0.1),
+    textTransform: 'uppercase',
+    color: colors.gold,
+  },
+  ladderAll: {
+    marginTop: 10,
+    borderRadius: radius.row,
+    backgroundColor: colors.rewardAlt,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  ladderAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    paddingVertical: 11,
+    paddingHorizontal: 8,
+    marginHorizontal: -8,
+    borderRadius: radius.input,
+  },
+  ladderAllRowCurrent: { backgroundColor: 'rgba(232,207,160,.07)' },
+  ladderAllDot: { width: 11, height: 11, borderRadius: 6 },
+  ladderAllDotLocked: { opacity: 0.3 },
+  ladderAllLevel: {
+    width: 20,
+    fontFamily: font.bold,
+    fontSize: 10,
+    lineHeight: 12,
+    letterSpacing: ls(10, 0.06),
+    color: colors.textMuted,
+  },
+  ladderAllName: {
+    flex: 1,
+    minWidth: 0,
+    fontFamily: font.bold,
+    fontSize: 12,
+    lineHeight: 14,
+    color: colors.text,
+  },
+  ladderAllState: {
     fontFamily: font.regular,
     fontSize: 10,
     lineHeight: 12,
-    letterSpacing: ls(10, 0.08),
-    textTransform: 'uppercase',
-    color: colors.textFaint,
-    marginTop: 3,
+    color: colors.textMuted,
   },
+
   sectionLabel: {
     fontFamily: font.regular,
     fontSize: 10,
@@ -331,10 +575,35 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 12,
   },
-  masteryRow: { marginBottom: 13 },
-  masteryHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  masteryName: { fontFamily: font.bold, fontSize: 12, lineHeight: 14, color: colors.text },
-  masteryPct: { fontFamily: font.regular, fontSize: 12, lineHeight: 14, color: colors.textMuted },
+  /** a section whose label shares its line with a control */
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 20,
+    marginBottom: 12,
+  },
+  sectionLabelFlush: {
+    flex: 1,
+    minWidth: 0,
+    fontFamily: font.regular,
+    fontSize: 10,
+    lineHeight: 12,
+    letterSpacing: ls(10, 0.12),
+    textTransform: 'uppercase',
+    color: colors.textMuted,
+  },
+  /** the same kicker inside a card, where the section's margins would be wrong */
+  sectionLabelTight: {
+    fontFamily: font.regular,
+    fontSize: 10,
+    lineHeight: 12,
+    letterSpacing: ls(10, 0.12),
+    textTransform: 'uppercase',
+    color: colors.textMuted,
+    marginBottom: 6,
+  },
   gamesToggle: { marginTop: 20 },
   gamesPanel: {
     marginTop: 10,
@@ -406,21 +675,24 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   reuse: { paddingHorizontal: 14 },
-  account: { marginTop: 14 },
-  accountAction: { minHeight: TOUCH, justifyContent: 'center' },
-  accountLabel: {
+
+  footer: { marginTop: 16 },
+  footerRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  /** the legal links' own type, so the whole footer reads as one line of small print */
+  footerLabel: {
     fontFamily: font.regular,
     fontSize: 11,
     lineHeight: 13,
-    letterSpacing: ls(11, 0.08),
-    textTransform: 'uppercase',
+    letterSpacing: ls(11, 0.02),
     color: colors.textFaint,
+    paddingVertical: 8,
   },
   /**
-   * In flight. These rows already sit at the quietest ink the app has, so working is
-   * shown by lifting one step rather than dimming into nothing.
+   * In flight. These already sit at the quietest ink the app has, so working is shown by
+   * lifting one step rather than dimming into nothing.
    */
-  accountLabelBusy: { color: colors.textMuted },
+  footerLabelBusy: { color: colors.textMuted },
+  footerDot: { fontFamily: font.regular, fontSize: 11, lineHeight: 13, color: colors.textFaint },
   /** red for a failed action, as on the auth screens */
   accountError: {
     fontFamily: font.regular,
@@ -429,5 +701,5 @@ const styles = StyleSheet.create({
     color: colors.red,
     paddingBottom: 6,
   },
-  legal: { marginTop: 10, justifyContent: 'flex-start' },
+  legal: { justifyContent: 'flex-start' },
 });

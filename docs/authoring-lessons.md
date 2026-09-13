@@ -148,8 +148,13 @@ server holds, so no sync is needed. The hash covers the key, not the copy.
 
 ### Showing cards
 
-Add a fan above the context line. Hole cards sit level; give board cards `offset: 10` so they
-drop away from the hand.
+Write the fan as one array. Hole cards sit level; give board cards `offset: 10` so they drop away
+from the hand.
+
+**They are drawn in two places.** Since handoff 02 §2 the drill splits the array back apart: the
+board stays in the row under the prompt, and a hand of exactly two hole cards is dealt in above the
+answer options, where it can be tapped open. `src/content/cards.ts` does the splitting — you
+author one fan, as below, and never a separate `hole` field.
 
 ```ts
 cards: [
@@ -166,17 +171,27 @@ Rules the test enforces:
 - **`offset: 0` means your hand.** At most two cards sit level, and every board card drops —
   including in a board-only fan, where all of them carry `offset: 10`.
 - **Board cards come last**, so offsets never go back up across a fan.
-- **Five cards maximum.** That is what the row fits across a narrow phone without clipping.
-- **Never show a partial board.** A fan is either *your hand plus a complete flop* (2 + 3) or
-  *a complete board on its own* (3, 4 or 5 cards), with the hole cards named in the caption —
-  `'The finished board — you hold A♠ 5♠'`. Showing three of five board cards and describing the
-  other two in prose is how a reader ends up misreading the hand. `the-game-full-hand` walks a
-  hand from preflop to river this way: hole cards alone, then hand + flop, then board only.
+- **Five board cards maximum.** That is what the row fits across a narrow phone without clipping.
+  The hand is not in that row and does not count towards it, so a question may carry all seven:
+  two in hand, five on the board.
+- **Never show a partial board.** A fan is either your hand plus a complete flop, or your hand
+  plus a complete board (4 or 5), or a board on its own. Showing three of five board cards and
+  describing the other two in prose is how a reader ends up misreading the hand.
+- **If the player holds two known cards, deal them.** Never name them in prose instead —
+  `'The board — you hold A♠ 5♠'` was a workaround from when hand and board shared one five-card
+  row, and there is no longer any reason for it. A hand the question talks about but does not show
+  is a hand the reader has to hold in their head.
 - **Every fan is captioned** with `cardsLabel`, and the caption says what the reader is looking at.
+- **Don't name the hold in the caption when the hand is drawn.** With two hole cards on screen,
+  `'The board — you hold A♠ 5♠'` is saying what the picture already says, so the app trims it back
+  to `'The board'` (and `'Your two cards, then the flop'` to `'The flop'`). Write the short form
+  for new questions; the trim is there for the ones written before the hand existed. A caption
+  carrying something the cards *cannot* show — `'The flop — you defended the big blind'` — is kept
+  as written, and so is any caption on a question with fewer than two hole cards.
 
-Seven-card fans — your hand *and* a full board — need the fan to shrink to fit first, in
-[`DrillOverlay.tsx`](../src/screens/DrillOverlay.tsx). Until then the two-fan rule above covers
-every street.
+Seven-card questions — your hand *and* a full board — used to need the row to shrink to fit, and
+that is why so many boards named the hold in words instead. They no longer do: the hand is dealt
+below the question, so the row only ever carries the five it always fitted.
 
 ## Table lessons (future scope)
 

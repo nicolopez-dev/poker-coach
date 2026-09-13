@@ -1,36 +1,62 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Rise } from '../components/anim';
-import { RewardCard } from '../components/Gold';
+import { CardBack } from '../components/CardBack';
+import { RankChip } from '../components/RankChip';
 import { TabScreen } from '../components/TabScreen';
-import { PENDING, ProgressBar, RewardButton, StatPill, Suit, pressable } from '../components/ui';
+import { PENDING, ProgressBar, Suit, pressable } from '../components/ui';
 import { useCountdown } from '../components/useCountdown';
+import { handOfTheDay } from '../content/daily';
 import { currentChapter } from '../content/progress';
-import { COACH_NOTE } from '../data/profile';
+import { RANKS, nextRankFrom, rankIndexFor, rankPct } from '../data/ranks';
 import { fmt } from '../lib/balance';
 import { formatCountdown } from '../lib/hearts';
-import { barHeights, dayLetter } from '../lib/week';
+import { dayFace, dayLetter } from '../lib/week';
+import { SIDE_BET_RUN, useProgress, useStore } from '../state/store';
+import { colors, font, ls, radius, shadows, spacing, TOUCH } from '../theme/tokens';
+import { HandOfTheDay } from './home/HandOfTheDay';
 import { StreakLapseCard } from './home/StreakLapseCard';
-import { useProgress, useStore } from '../state/store';
-import { colors, font, ls, radius, shadows, type } from '../theme/tokens';
+import { StreakCard } from './home/StreakCard';
 
-/** Three drills is the day's work — the goal the hero counts towards. */
-const DAILY_GOAL = 3;
+/**
+ * Five drills is the day's work — the chips the streak card counts out.
+ *
+ * It is a **target**, not the streak rule: `complete_lesson` extends a run on the first
+ * finished lesson of the day, so one drill already keeps today. Nothing on this screen
+ * may say otherwise.
+ */
+const DAILY_GOAL = 5;
 
-/** The hero's line, from what has actually been played today. */
-function goalCopy(done: number): { title: string; label: string } {
+function headlineFor(done: number): string {
   const left = DAILY_GOAL - done;
+  if (left <= 0) return 'Streak locked. Anything else today is profit.';
+  return `${left} ${left === 1 ? 'drill' : 'drills'} left to finish today`;
+}
 
-  if (done === 0) return { title: 'Three drills and the day is yours', label: 'None yet today' };
-  if (left === 1) return { title: 'One more drill and the day is yours', label: '2 of 3 drills' };
-  if (left > 0) {
-    return { title: `${left} more drills and the day is yours`, label: `${done} of 3 drills` };
+/** What the side bet is worth saying, from the run the player is on. */
+function sideBetNote(cleanRun: number): string {
+  if (cleanRun >= SIDE_BET_RUN) {
+    return 'Every drill you finish clean is worth double. Slip one and the run ends.';
   }
-  return {
-    title: "Today's three are done. Anything now is a bonus",
-    label: `${done} of 3 drills`,
-  };
+  const left = SIDE_BET_RUN - cleanRun;
+  return `Win ${left} more drill${left === 1 ? '' : 's'} without a wrong answer and they start paying double.`;
+}
+
+/**
+ * The rule both multipliers share, said once and said here.
+ *
+ * The two of them can be running at the same time and a player seeing "paying double" on
+ * one card and "double XP running" on the other has every reason to expect four times.
+ * They do not stack — `player_xp` is a single `when/when/else` — so the card says so
+ * rather than leaving the arithmetic to be discovered.
+ */
+const DOUBLE_RULE =
+  'Never stacks with the ante — double, not quadruple. A wrong answer ends both; midnight starts them over.';
+
+function runLine(done: number, streak: number): string {
+  if (done >= DAILY_GOAL) return "Today's work is done. Come back tomorrow to keep the run alive.";
+  if (done > 0) return `Today is safe. ${DAILY_GOAL - done} to go for the full five.`;
+  return streak > 0 ? 'Miss a day and the run resets. One drill keeps it.' : 'One drill starts a run.';
 }
 
 export function HomeScreen() {
@@ -44,144 +70,233 @@ export function HomeScreen() {
     streakAtRisk,
     streakExpiresAt,
     clockOffset,
-    accuracy,
     week,
     lessonsToday,
-    completedLessons,
+    cleanRun,
+    doubleLive,
+    doubleToday,
+    takeDouble,
     startNextLesson,
     go,
   } = useStore();
-  // The hero is the one place the at-risk state is a sentence rather than a pill: a run
-  // alive but untouched today has a deadline, and saying it is more use than the
-  // generic daily goal.
+
   const untilMidnight = useCountdown(streakAtRisk ? streakExpiresAt : null, clockOffset);
   const atRisk = streakAtRisk && untilMidnight > 0;
   const progress = useProgress();
-  // Until the server answers, the course reads as untouched — which for a returning
-  // player is a lie about where they are. Withhold the unit rather than name the wrong
-  // one; the CTA and the card already have copy for having no chapter yet.
   const chapter = hydrated ? currentChapter(progress) : undefined;
 
-  const goal = goalCopy(lessonsToday);
-  const heights = barHeights(week.map((d) => d.answers));
-  const played = week.reduce((n, d) => n + d.answers, 0);
-
-  // Three pills, all of them real. The handoff's fourth was a "Level", which nothing in
-  // the app has ever computed — inventing one from this data would be making it up.
-  const stats = [
-    { value: hydrated ? `${Math.round(accuracy * 100)}%` : PENDING, label: 'Sharp' },
-    { value: hydrated ? String(completedLessons.length) : PENDING, label: 'Drills' },
-    { value: hydrated ? String(streak) : PENDING, label: 'Streak' },
-  ];
+  const done = Math.min(lessonsToday, DAILY_GOAL);
+  const rankIndex = rankIndexFor(xp);
+  const next = nextRankFrom(rankIndex);
+  const today = week[week.length - 1]?.day ?? '';
+  const hand = handOfTheDay(chapter?.chapter, today);
+  const paying = cleanRun >= SIDE_BET_RUN;
 
   return (
-    <TabScreen>
-      <Rise duration={450}>
-        <RewardCard radius={radius.hero} innerStyle={styles.hero}>
-          <Suit glyph="♠" size={150} color="rgba(240,239,233,.08)" style={styles.heroSuit} />
-          <Text style={styles.heroKicker}>Today's hand</Text>
-          <Text style={[type.heroTitle, styles.heroTitle]}>
-            {atRisk
-              ? `Your ${streak}-day streak ends in ${formatCountdown(untilMidnight)}`
-              : goal.title}
+    <TabScreen contentStyle={styles.pane}>
+      <View style={styles.bleedGuard}>
+        <Text style={styles.kicker}>Your run</Text>
+        <View style={styles.runHead}>
+          <Text style={styles.runTitle}>
+            {!hydrated
+              ? 'Taking your seat'
+              : streak === 1
+                ? '1 day at the table'
+                : `${streak} days at the table`}
           </Text>
-          <ProgressBar
-            pct={Math.min(100, (lessonsToday / DAILY_GOAL) * 100)}
-            height={12}
-            track="rgba(240,239,233,.18)"
-            style={styles.heroBar}
-          />
-          <View style={styles.heroFooter}>
-            <Text style={styles.heroFooterText}>
-              {atRisk ? 'One hand keeps it' : goal.label}
-            </Text>
-            <Text style={styles.heroFooterText}>{hydrated ? fmt(xp) : PENDING} XP</Text>
-          </View>
-        </RewardCard>
-      </Rise>
-
-      <StreakLapseCard />
-
-      {/* Out of hearts the CTA stays pressable — it is how you get to the countdown —
-          but it stops glowing and stops promising a lesson it cannot open. */}
-      <RewardButton
-        label={
-          !canPlay
-            ? 'Out of hearts'
-            : chapter
-              ? `Deal me in — ${chapter.chapter.title}`
-              : 'Deal me in'
-        }
-        glyph={canPlay ? '♠' : '♥'}
-        glyphColor={canPlay ? colors.textOnReward : colors.red}
-        onPress={startNextLesson}
-        glow={canPlay}
-        style={styles.cta}
-      />
-
-      <View style={styles.quickGrid}>
-        <Pressable onPress={() => go('path')} style={pressable(styles.quickCard, 0.99)}>
-          <Suit glyph="♣" size={22} color={colors.text} />
-          <Text style={styles.quickTitle}>
-            {chapter ? `Unit ${chapter.index + 1} · ${chapter.chapter.title}` : 'The path'}
-          </Text>
-          <Text style={styles.quickSub}>
-            {chapter
-              ? `${chapter.done} of ${chapter.total} lessons`
-              : hydrated
-                ? 'No lessons yet'
-                : 'Finding your place'}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => go('chips')}
-          style={pressable([styles.quickCard, styles.quickCardRed], 0.99)}>
-          <Suit glyph="♦" size={22} color={colors.red} />
-          <Text style={styles.quickTitle}>Chips for tonight</Text>
-          <Text style={styles.quickSub}>
-            {players} players · {Math.round(buyIn / 100)} units in
-          </Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.stats}>
-        {stats.map((s) => (
-          <StatPill key={s.label} value={s.value} label={s.label} />
-        ))}
-      </View>
-
-      <View style={styles.coachCard}>
-        <Text style={styles.coachTitle}>{COACH_NOTE.title}</Text>
-        <Text style={styles.coachBody}>{COACH_NOTE.body}</Text>
-      </View>
-
-      {/* Seven local days ending today, scaled to the player's own busiest one. A quiet
-          week keeps its columns and sits on the baseline rather than reading as broken. */}
-      <View style={styles.weekCard}>
-        <View style={styles.weekHead}>
-          <Text style={styles.weekLabel}>This week</Text>
-          <Text style={styles.weekTotal}>
-            {!hydrated ? PENDING : played === 1 ? '1 hand' : `${played} hands`}
-          </Text>
+          <Suit glyph="♠" size={26} color={colors.gold} />
         </View>
-        <View style={styles.weekChart}>
-          {week.map((d, i) => (
-            <View key={d.day} style={styles.weekColumn}>
+        <Text style={styles.runLine}>
+          {atRisk
+            ? `Your ${streak}-day run ends in ${formatCountdown(untilMidnight)}. One drill keeps it.`
+            : hydrated
+              ? runLine(done, streak)
+              : ' '}
+        </Text>
+      </View>
+
+      {/* The week as a hand: a day played turns face up. What each card *is* carries no
+          meaning — see `dayFace` — the row says which days you sat down. */}
+      <View style={styles.week}>
+        {week.map((d, i) => {
+          const face = dayFace(d.day);
+          const played = d.answers > 0;
+          const isToday = i === week.length - 1;
+          const red = face.suit === '♥' || face.suit === '♦';
+          return (
+            <View
+              key={d.day}
+              accessibilityLabel={`${dayLetter(d.day)}: ${played ? `${d.answers} answered` : 'nothing played'}`}
+              style={styles.weekColumn}>
               <View
                 style={[
-                  styles.weekBar,
-                  {
-                    height: heights[i],
-                    backgroundColor: d.answers > 0 ? colors.text : colors.greenSpent,
-                  },
-                ]}
-              />
-              <Text style={[styles.weekDay, i === week.length - 1 && styles.weekToday]}>
-                {dayLetter(d.day)}
+                  styles.weekCard,
+                  { borderColor: isToday ? colors.goldRule : played ? 'rgba(0,0,0,.35)' : colors.hairlineStrong },
+                  played ? styles.weekCardUp : null,
+                ]}>
+                {!played && <CardBack radius={8} />}
+                {played && (
+                  <>
+                    <Text
+                      style={[styles.weekRank, { color: red ? colors.cardRed : colors.cardInk }]}>
+                      {face.rank}
+                    </Text>
+                    <Suit
+                      glyph={face.suit}
+                      size={13}
+                      color={red ? colors.cardRed : colors.cardInk}
+                      style={styles.weekSuit}
+                    />
+                  </>
+                )}
+              </View>
+              <Text
+                style={[
+                  styles.weekLabel,
+                  isToday && styles.weekLabelToday,
+                  !played && !isToday && styles.weekLabelQuiet,
+                ]}>
+                {isToday ? 'Today' : dayLetter(d.day)}
               </Text>
             </View>
-          ))}
+          );
+        })}
+      </View>
+
+      <View style={[styles.bleedGuard, styles.tiltRoom]}>
+        <StreakCard
+          done={done}
+          goal={DAILY_GOAL}
+          headline={hydrated ? headlineFor(done) : 'Finding your place'}
+          cta={
+            !canPlay
+              ? 'Out of hearts'
+              : chapter
+                ? `${done > 0 ? 'Keep dealing' : 'Deal me in'} — ${chapter.chapter.title}`
+                : 'Deal me in'
+          }
+          onDeal={startNextLesson}
+          onDouble={takeDouble}
+          // the row is full, and the day's one bet is still there to take
+          offerDouble={hydrated && done >= DAILY_GOAL && !doubleToday}
+          doubleLive={doubleLive}
+          streak={streak}
+          dailyLabel={hydrated ? `${done} of ${DAILY_GOAL} drills` : PENDING}
+          canPlay={canPlay}
+        />
+
+        <StreakLapseCard />
+
+        {hand && (
+          <View style={styles.hotd}>
+            <HandOfTheDay hand={hand} day={today} />
+          </View>
+        )}
+
+        {/* Home's rank is always the live one. The You tab's ladder retargets its own
+            card and must never reach this — handoff 02 §1.4. */}
+        <View style={styles.rankCard}>
+          <RankChip rankIndex={rankIndex} accessibilityLabel={RANKS[rankIndex].name} />
+          <View style={styles.rankBody}>
+            <Text style={styles.kickerTight}>Your rank</Text>
+            <Text style={styles.rankName}>{RANKS[rankIndex].name}</Text>
+            <ProgressBar pct={rankPct(xp)} height={8} style={styles.rankBar} />
+            <Text style={styles.rankNote}>
+              {!hydrated
+                ? PENDING
+                : next
+                  ? `${fmt(next.at - xp)} XP to ${next.name}`
+                  : 'Top of the ladder. Keep the streak honest.'}
+            </Text>
+          </View>
         </View>
+
+        {/* Three drills clean in a row and the third pays double, as does every clean
+            one after it. The run is the server's — it holds the completions — and the
+            dots count it out. */}
+        {hydrated && (
+          <View style={styles.sideBet}>
+            <View style={styles.sideBetHead}>
+              <Text style={styles.sideBetTitle}>
+                {paying ? 'Side bet: paying double' : 'Side bet: three in a row'}
+              </Text>
+              <View style={styles.sideBetDots}>
+                {Array.from({ length: SIDE_BET_RUN }, (_, i) => (
+                  <View
+                    key={i}
+                    style={[styles.sideBetDot, i < Math.min(cleanRun, SIDE_BET_RUN) && styles.sideBetDotOn]}
+                  />
+                ))}
+              </View>
+            </View>
+            <Text style={styles.sideBetNote}>{sideBetNote(cleanRun)}</Text>
+            <Text style={styles.sideBetRule}>{DOUBLE_RULE}</Text>
+          </View>
+        )}
+
+        <View style={styles.tablesHead}>
+          <Text style={styles.kicker}>Pick a table</Text>
+          <Pressable onPress={() => go('path')} accessibilityRole="button" style={styles.seeAll}>
+            <Text style={styles.seeAllLabel}>See all</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tables}>
+        {progress.map(({ chapter: c, index, done: lessonsDone, total, pct, state }) => {
+          const locked = state === 'locked';
+          const now = state === 'now';
+          return (
+            <Pressable
+              key={c.id}
+              onPress={() => go('path')}
+              disabled={locked}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: locked }}
+              style={[
+                styles.table,
+                now && styles.tableNow,
+                locked && styles.tableLocked,
+              ]}>
+              <View style={[styles.tableGlyph, !locked && styles.tableGlyphUp]}>
+                {locked ? (
+                  <CardBack radius={7} />
+                ) : (
+                  <Suit glyph={c.glyph} size={16} color={colors.cardInk} />
+                )}
+              </View>
+              <Text style={[styles.tableTitle, locked && styles.tableTitleLocked]}>{c.title}</Text>
+              <Text style={styles.tableMeta}>
+                {locked
+                  ? 'Locked'
+                  : state === 'done'
+                    ? 'Mastered'
+                    : `${lessonsDone} of ${total} lessons`}
+              </Text>
+              <ProgressBar pct={pct} height={6} />
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      <View style={styles.bleedGuard}>
+        <Pressable
+          onPress={() => go('chips')}
+          accessibilityRole="button"
+          style={pressable(styles.chipsStrip, 0.99)}>
+          <View style={styles.chipsStripBody}>
+            <Text style={styles.chipsStripTitle}>Playing tonight?</Text>
+            <Text style={styles.chipsStripMeta}>
+              {players} players · {Math.round(buyIn / 100)} units in
+            </Text>
+          </View>
+          <View style={styles.chipsStripGlyph}>
+            <Suit glyph="♦" size={15} color={colors.red} />
+          </View>
+        </Pressable>
       </View>
 
       <View style={{ height: 40 }} />
@@ -190,102 +305,238 @@ export function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: { paddingTop: 22, paddingHorizontal: 20, paddingBottom: 20, ...shadows.big },
-  heroSuit: { position: 'absolute', right: -14, bottom: -18, lineHeight: 150 },
-  heroKicker: {
+  /** the pane goes edge to edge; sections that need the margin ask for it */
+  pane: { paddingHorizontal: 0 },
+  bleedGuard: { paddingHorizontal: spacing.screen.paddingHorizontal },
+  /**
+   * Room for the streak card to lean.
+   *
+   * `Tilt` runs it through ±4px of vertical drift and a couple of degrees about both
+   * axes, and none of that is in the layout — at the top of its travel the card was
+   * riding up over the week row. The gap is the drift plus what the rotation lifts the
+   * near corner by.
+   */
+  tiltRoom: { paddingTop: 12 },
+
+  kicker: {
     fontFamily: font.regular,
     fontSize: 10,
     lineHeight: 12,
     letterSpacing: ls(10, 0.14),
     textTransform: 'uppercase',
-    color: 'rgba(240,239,233,.6)',
-    marginBottom: 10,
-  },
-  /** the design caps the title at 16ch */
-  heroTitle: { marginBottom: 16, maxWidth: 300 },
-  heroBar: { marginBottom: 9 },
-  heroFooter: { flexDirection: 'row', justifyContent: 'space-between' },
-  heroFooterText: {
-    fontFamily: font.regular,
-    fontSize: 11,
-    lineHeight: 13,
-    color: 'rgba(240,239,233,.65)',
-  },
-  cta: { marginTop: 14 },
-  quickGrid: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  quickCard: {
-    flex: 1,
-    borderRadius: radius.smallCard,
-    backgroundColor: colors.surface,
-    padding: 14,
-    gap: 6,
-    ...shadows.row,
-  },
-  quickCardRed: { backgroundColor: colors.redTintDeep },
-  quickTitle: { fontFamily: font.bold, fontSize: 13, lineHeight: 15, color: colors.text },
-  quickSub: {
-    fontFamily: font.regular,
-    fontSize: 11,
-    lineHeight: 13,
     color: colors.textMuted,
+    marginBottom: 7,
   },
-  stats: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16 },
-  coachCard: {
-    marginTop: 16,
-    borderRadius: 24,
-    backgroundColor: colors.redTintDeep,
-    borderWidth: 2,
-    borderColor: colors.redBorder,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-  },
-  coachTitle: {
-    fontFamily: font.bold,
-    fontSize: 15,
-    lineHeight: 15 * 1.25,
-    color: colors.text,
-    marginBottom: 6,
-  },
-  coachBody: {
-    fontFamily: font.regular,
-    fontSize: 12,
-    lineHeight: 12 * 1.45,
-    color: colors.redBody,
-  },
-  weekCard: {
-    marginTop: 16,
-    borderRadius: 24,
-    backgroundColor: colors.surface,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    ...shadows.row,
-  },
-  weekHead: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  weekLabel: {
+  kickerTight: {
     fontFamily: font.regular,
     fontSize: 10,
     lineHeight: 12,
     letterSpacing: ls(10, 0.12),
     textTransform: 'uppercase',
     color: colors.textMuted,
+    marginBottom: 6,
   },
-  weekTotal: {
+  runHead: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  runTitle: {
+    flex: 1,
+    fontFamily: font.bold,
+    fontSize: 30,
+    lineHeight: 30,
+    letterSpacing: ls(30, -0.03),
+    color: colors.text,
+  },
+  runLine: {
     fontFamily: font.regular,
+    fontSize: 12,
+    lineHeight: 12 * 1.45,
+    color: colors.textMuted,
+    marginTop: 8,
+  },
+
+  week: {
+    flexDirection: 'row',
+    gap: 5,
+    paddingHorizontal: spacing.screen.paddingHorizontal,
+    paddingTop: 14,
+    paddingBottom: 2,
+  },
+  weekColumn: { flex: 1, alignItems: 'center', gap: 7 },
+  weekCard: {
+    width: '100%',
+    height: 66,
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 5,
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+    ...shadows.row,
+  },
+  weekCardUp: { backgroundColor: colors.cardFace },
+  weekRank: { fontFamily: font.bold, fontSize: 13, lineHeight: 13 },
+  weekSuit: { alignSelf: 'flex-end' },
+  weekLabel: {
+    fontFamily: font.bold,
+    fontSize: 8,
+    lineHeight: 10,
+    letterSpacing: ls(8, 0.06),
+    textTransform: 'uppercase',
+    color: colors.textSecondary,
+  },
+  weekLabelToday: { color: colors.gold },
+  weekLabelQuiet: { color: colors.textFaint },
+
+  hotd: { marginTop: 6 },
+
+  rankCard: {
+    marginTop: 16,
+    borderRadius: radius.card,
+    backgroundColor: colors.surfaceDeep,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  rankBody: { flex: 1, minWidth: 0 },
+  rankName: {
+    fontFamily: font.bold,
+    fontSize: 18,
+    lineHeight: 18 * 1.1,
+    color: colors.text,
+    marginBottom: 9,
+  },
+  rankBar: { marginBottom: 7 },
+  rankNote: { fontFamily: font.regular, fontSize: 11, lineHeight: 14, color: colors.textFaint },
+
+  sideBet: {
+    marginTop: 14,
+    borderRadius: 24,
+    backgroundColor: colors.redTintDeep,
+    borderWidth: 1,
+    borderColor: colors.redBorder,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+  },
+  sideBetHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 9,
+  },
+  sideBetTitle: {
+    flex: 1,
+    fontFamily: font.bold,
+    fontSize: 14,
+    lineHeight: 14 * 1.2,
+    color: colors.text,
+  },
+  sideBetDots: { flexDirection: 'row', gap: 4 },
+  sideBetDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.greenSpent },
+  sideBetDotOn: { backgroundColor: colors.red },
+  sideBetNote: {
+    fontFamily: font.regular,
+    fontSize: 12,
+    lineHeight: 12 * 1.45,
+    color: colors.redBody,
+  },
+  /** the rule under the state: quieter, and the same whatever the card is saying */
+  sideBetRule: {
+    fontFamily: font.regular,
+    fontSize: 11,
+    lineHeight: 11 * 1.4,
+    color: colors.redFaint,
+    marginTop: 7,
+  },
+
+  tablesHead: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  seeAll: { minHeight: TOUCH, justifyContent: 'center', paddingHorizontal: 4, marginRight: -4 },
+  seeAllLabel: {
+    fontFamily: font.bold,
     fontSize: 10,
     lineHeight: 12,
-    letterSpacing: ls(10, 0.06),
+    letterSpacing: ls(10, 0.08),
     textTransform: 'uppercase',
-    color: colors.textFaint,
+    color: colors.gold,
   },
-  weekChart: { flexDirection: 'row', alignItems: 'flex-end', gap: 7, height: 74 },
-  weekColumn: { flex: 1, alignItems: 'center', gap: 6 },
-  weekBar: { width: '100%', borderRadius: 8 },
-  weekDay: { fontFamily: font.regular, fontSize: 9, lineHeight: 11, color: colors.textMuted },
-  /** today, so the row reads left-to-right towards now */
-  weekToday: { color: colors.text },
+  tables: {
+    gap: 10,
+    paddingHorizontal: spacing.screen.paddingHorizontal,
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+  table: {
+    width: 152,
+    borderRadius: radius.smallCard,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    backgroundColor: colors.surface,
+    padding: 14,
+    gap: 9,
+  },
+  tableNow: { backgroundColor: colors.redTintDeep, borderColor: colors.redBorder },
+  tableLocked: { backgroundColor: colors.surfaceInputAlt },
+  tableGlyph: {
+    width: 34,
+    height: 46,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    ...shadows.playingCard,
+  },
+  tableGlyphUp: { backgroundColor: colors.cardFace },
+  tableTitle: { fontFamily: font.bold, fontSize: 14, lineHeight: 14 * 1.15, color: colors.text },
+  tableTitleLocked: { color: colors.textFaint },
+  tableMeta: {
+    fontFamily: font.regular,
+    fontSize: 10,
+    lineHeight: 10 * 1.3,
+    color: colors.textMuted,
+  },
+
+  chipsStrip: {
+    marginTop: 14,
+    minHeight: 56,
+    borderRadius: radius.row,
+    borderWidth: 1,
+    borderColor: 'rgba(240,239,233,.14)',
+    backgroundColor: colors.surface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingLeft: 16,
+    paddingRight: 14,
+  },
+  chipsStripBody: { gap: 4, flex: 1, minWidth: 0 },
+  chipsStripTitle: { fontFamily: font.bold, fontSize: 13, lineHeight: 13 * 1.15, color: colors.text },
+  chipsStripMeta: {
+    fontFamily: font.regular,
+    fontSize: 11,
+    lineHeight: 11 * 1.2,
+    color: colors.textMuted,
+  },
+  chipsStripGlyph: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.redTintDeep,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

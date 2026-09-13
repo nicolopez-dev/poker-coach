@@ -64,6 +64,23 @@ The two Supabase commands need Docker running and `npx supabase start` done once
 drops and replays every migration, so it is the way to check a migration actually applies;
 `test db` runs `supabase/tests/*.sql` against the result.
 
+> **`db reset` empties `content_questions`, and you have to put it back.** There is no
+> `seed.sql`: the answer key is generated, so a reset leaves the table at zero rows and
+> `submit_answer` has nothing to mark against. The app then fails in three places at once and
+> none of them mentions content — answers are refused, so nothing saves; hearts are never
+> actually spent server-side, so the optimistic count on screen drifts down to zero and the
+> player is locked out; and the next `get_state()` — the one a deal triggers — replaces that
+> zero with the untouched five, so hearts appear to restore themselves.
+>
+> **`npm run sync:content` alone will not fix it**, and this is the sharp edge: credentials come
+> from `.env.admin`, which points at the **hosted** project, so the obvious recovery command
+> reseeds production and leaves your local stack exactly as broken. Point it at local explicitly
+> — `process.env` wins over the file:
+>
+> ```bash
+> SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_ROLE_KEY="$(npx supabase status -o json | npx --yes json SERVICE_ROLE_KEY)" npx tsx scripts/sync-content.ts
+> ```
+
 `gen:types` needs the same local stack — run it after every migration, since the generated file
 is what types `supabase` and every wrapper in `src/server/`. Swap `--local` for `--linked` to
 generate against the hosted project instead, but only once its migrations are pushed: an
@@ -324,11 +341,75 @@ Supabase's side of the account rather than the app's.
 - **The solver retries for full spread.** Where the prototype could silently deal zero of a
   colour, a fit that leaves one out is retried with one of every denomination reserved, and any
   colour that still can't be dealt is named on the result card.
-- **You and Login carry account and legal rows the handoff has no design for.** "Export my data"
-  and "Delete account" sit under "Log out" in the same restrained treatment — 11px uppercase and
-  no red button — and a "Privacy policy · Terms" line closes both screens. None of it is
-  decoration: Apple 5.1.1(v) wants deletion in the app, GDPR wants both, and neither store takes
-  a build whose privacy policy cannot be reached.
+- **You and Login carry account and legal rows the handoff has no design for.** "Log out",
+  "Export my data" and "Delete account" close the You tab as one line of small print, in the
+  legal links' own type and beside them rather than stacked above them — three 44px rows made
+  the quietest thing on the screen the tallest. No red button anywhere in it: Apple 5.1.1(v)
+  wants deletion in the app, GDPR wants both, and neither store takes a build whose privacy
+  policy cannot be reached, but none of that makes them things to shout.
+- **Mastery is the course, as cards.** The handoff draws four name-and-bar rows; the course has
+  fourteen units, and a list that long says how far along each one is while being the one place
+  on the screen you cannot open any of it. It is a grid of the Path's own cards instead — a
+  face-up suit for a unit you can sit at, a card back for one you cannot — and a card deals that
+  unit's next lesson. A locked card shakes and stops there, which answers the tap without
+  spending a dialog on it. [`Mastery.tsx`](src/screens/you/Mastery.tsx).
+
+### From handoff 02
+
+- **The rank chip projects itself.** The handoff builds it from `transform-style: preserve-3d`,
+  faces pushed apart with `translateZ`, and a rim standing in space; React Native has none of those,
+  and stacking two flat faces gives a disc with no edge. So the chip is modelled as the short
+  cylinder it is and projected in JS — rotated about Y then X, divided through by a camera distance,
+  drawn as SVG paths, each facet of the milled edge shaded by how it meets the light. The milling is
+  cut into the face as well as the edge, which is what the conic gradient was doing and what carries
+  the chip square on, where a real chip shows no rim. The geometry depends on the angle, so it is
+  recomputed per frame rather than handed to the native driver. See the note at the top of
+  [`RankChip.tsx`](src/components/RankChip.tsx); the shape is pinned by
+  [`RankChip.test.ts`](src/components/RankChip.test.ts).
+- **Five drills is the day's work, not the streak.** The handoff's streak card says "Five drills is
+  the streak" and "all five chips in, and today turns face-up". The server extends a run on the
+  **first** completed lesson of the day, so Home says one drill keeps it and five is the target.
+- **Accuracy is over every answer**, not the handoff's "Last 50 drills" — `get_state()` derives it
+  from the whole `answers` table, and no window over the last fifty is computed anywhere.
+- **Settling ends a debounce; it is not what saves the game.** The evening is written as it is
+  played — the row when the stacks are dealt, the seats 800ms after the last count typed. §4.3's
+  button sends the pending counts immediately (`flushSeats`) and confirms the night is filed, so
+  all three of its states are real. A failed write stays silent, as everything in
+  [`games.ts`](src/server/games.ts) does by design.
+- **The board caption is derived, not re-authored.** With the hand drawn separately, captions that
+  named the hold are trimmed to the board they now label — but only where the hand actually renders.
+  See [`src/content/cards.ts`](src/content/cards.ts).
+- **A day's card face is decoration.** The week row turns a day face up when it was played; which
+  card it turns up is a hash of the date, so it holds still. The answer count the old bar chart
+  carried lives on in the row's accessibility label.
+- **The hand of the day counts.** It is drawn from the unit the player is on, so it has an address
+  in `content_questions` and goes through `submit_answer` like any other question — marked by the
+  server, paid in XP if right, a heart short if wrong. The card then locks until tomorrow; that
+  lock is local ([`dailyHand.ts`](src/server/dailyHand.ts)), since it gates a card rather than
+  deciding anything.
+- **The day's hand deals the whole fan.** The card drew the hole cards *or* the board, whichever
+  it found first, so a question about a five-card board arrived three cards short and could only
+  be guessed at. It splits the fan the way the drill does — the board under the prompt, the pair
+  in hand over the answers.
+- **Its cover wears a heart, not the joker.** The handoff prints a joker portrait across the
+  cover. Two cards above it the streak card already carries an oversized spade, and a second
+  full-bleed illustration was the loudest thing on Home; the cover takes the same treatment
+  instead, in the suit the card is named for. `assets/joker-face.png` stays in the repo, unused.
+- **Two ways to double XP, and they never stack.** Three drills in a row without a wrong answer
+  (the side bet), or filling the day's row of chips and taking the ante — either makes an answer
+  worth 16, both together still 16. `player_xp` is a `when/when/else` for exactly that reason, and
+  the side-bet card says so, because a player holding both has every reason to expect four times.
+- **Both doublings are a day's affair.** A wrong answer ends either, and so does the player's own
+  midnight: a clean run is counted within one local day, and the ante closes at the earlier of the
+  next wrong answer and the end of the day it was taken in. Cutting the run at midnight is also
+  what keeps a past day's payouts from moving — a late completion can only ever change the day it
+  was played in. [`20260913120000_doubles_reset_at_midnight.sql`](supabase/migrations/20260913120000_doubles_reset_at_midnight.sql).
+- **The side bet is a real mechanic, not a card.** The handoff advertises XP that doubles; nothing
+  doubled XP, so the rule was built rather than the promise printed. Three drills in a row with no
+  wrong answer and the third pays double, as does every clean one after it. Derived on read from
+  `lesson_completions`, never banked —
+  [`20260908120000_side_bet.sql`](supabase/migrations/20260908120000_side_bet.sql), pinned by
+  [`side_bet.test.sql`](supabase/tests/side_bet.test.sql).
 
 ### React Native equivalents
 

@@ -1,5 +1,15 @@
 # Handoff: Poker Coach — lessons + chip counter (MVP)
 
+> **This is package 01.** It still describes the app as a whole — every screen, the tokens, the
+> flows — and stays the spec for anything a later package does not mention.
+>
+> [`docs/design-handoff-02/`](../design-handoff-02/README.md) carries the deltas delivered on
+> 2026-09-08 (Home, Drill, Chips, You). Where the two disagree, **update 02 wins**, and its
+> `design/Poker Coach v3 felt.dc.html` is the authoritative full-state prototype — the copy in
+> *this* directory is the older one and is kept for the history, not to build from.
+>
+> [`docs/design-update-02-plan.md`](../design-update-02-plan.md) is the running order for landing it.
+
 ## Overview
 
 A mobile poker **utility** — not a game. Two pillars:

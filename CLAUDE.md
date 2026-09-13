@@ -14,10 +14,21 @@ and must not be ported.
 Every value in `src/theme/tokens.ts` comes from that README. Add new design values there rather
 than inline, and keep the names the handoff uses (`reward`, `gold hairline`, `felt`, `surface`).
 
+`docs/design-handoff-02/` is the second bundle — the deltas for Home, Drill, Chips and You. Where
+the two disagree it wins, and **its** `design/Poker Coach v3 felt.dc.html` is the authoritative
+full-state prototype (package 01's copy of that filename is the older one). The prototype runs:
+start the `prototype` config in `.claude/launch.json` and open it over HTTP, not as a file — it
+needs the origin to load `support.js`.
+
 The design has since been taken further in a few places — always aces in the background, a
 carmesí "Deal the stacks", and a Path driven by real progress. Those are listed under
 "Deviations from the handoff" in the README; keep that list current when the design and the app
 part ways again.
+
+**Where the handoff and the server disagree, the server wins and the copy changes.** Update 02
+said five drills lock the streak and accuracy covers the last fifty drills; `complete_lesson`
+extends a run on the first lesson of the day and `get_state()` derives accuracy from every answer
+ever given. Check what the SQL actually does before writing a number into a screen.
 
 ## Content
 
@@ -73,9 +84,10 @@ screens / components  →  src/state/store.tsx  →  src/server/  →  src/auth/
 
 ## Conventions
 
-- **Colour semantics matter.** Red is only for the chip action, hearts, the "Playing" badge and
-  chip-tool focus rings. "Good" states are near-black + white text + a 1px gold hairline
-  (`GoldFrame`), never green fills. Green is felt/surfaces and thin progress fills.
+- **Colour semantics matter.** Red is only for the chip action, hearts, the "Playing" badge,
+  chip-tool focus rings, and the Balance rows of seats that **lost** units (handoff 02 §4.2 — the
+  winning seat takes the gold hairline instead). "Good" states are near-black + white text + a 1px
+  gold hairline (`GoldFrame`), never green fills. Green is felt/surfaces and thin progress fills.
 - **Suit pips render in the platform font** via `<Suit>` — Archivo ships no card glyphs, and a
   missing glyph in a named family is tofu on Android.
 - **Letter spacing** is in em in CSS and points in RN: use `ls(fontSize, em)`.
@@ -119,6 +131,21 @@ npx supabase test db
 
 `db reset` is what proves a migration applies; run `npm run gen:types` after it, since
 `src/server/database.types.ts` is generated and types every wrapper in `src/server/`.
+
+**And re-seed the answer key, or you break the app in three places that never mention content.**
+`db reset` empties `content_questions` and there is no `seed.sql` to refill it. With that table
+at zero rows `submit_answer` has nothing to mark against, so: answers are refused and drills
+report "not saved"; hearts are never spent server-side, so the optimistic count on screen falls
+to zero and locks the player out; and the next `get_state()` — the one dealing stacks triggers —
+replaces that zero with the untouched five, so hearts look like they restore themselves.
+
+`npm run sync:content` **does not** fix a local reset: its credentials come from `.env.admin`,
+which points at the hosted project, so it reseeds production instead. Override the target —
+`process.env` wins over the file — and take the service-role key from `npx supabase status`:
+
+```bash
+SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SERVICE_ROLE_KEY=<local key> npx tsx scripts/sync-content.ts
+```
 
 ## Editing files on Windows
 
