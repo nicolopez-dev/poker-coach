@@ -7,7 +7,7 @@ import { Avatar } from '../components/Avatar';
 import { LegalLinks } from '../components/LegalLinks';
 import { ChipDisc, RankChip } from '../components/RankChip';
 import { TabScreen } from '../components/TabScreen';
-import { OutlineButton, PENDING, ProgressBar } from '../components/ui';
+import { OutlineButton, PENDING, ProgressBar, pressable } from '../components/ui';
 import { currentChapter } from '../content/progress';
 import {
   RANKS,
@@ -23,6 +23,7 @@ import { exportData } from '../server/account';
 import { useProgress, useStore } from '../state/store';
 import { colors, font, ls, radius, shadows, TOUCH } from '../theme/tokens';
 import { DeleteAccountSheet } from './DeleteAccountSheet';
+import { Mastery } from './you/Mastery';
 
 export function YouScreen() {
   const {
@@ -186,7 +187,18 @@ export function YouScreen() {
           </View>
         </View>
 
-        <Text style={styles.sectionLabel}>The chip ladder</Text>
+        {/* The toggle belongs to the section, so it sits on the section's own line
+            rather than hanging off the bottom of the carousel it governs. */}
+        <View style={styles.sectionHead}>
+          <Text style={styles.sectionLabelFlush}>The chip ladder</Text>
+          <Pressable
+            onPress={() => setLadderOpen((open) => !open)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: ladderOpen }}
+            style={styles.ladderHint}>
+            <Text style={styles.ladderHintLabel}>{ladderOpen ? 'Hide ladder' : 'Show ladder'}</Text>
+          </Pressable>
+        </View>
         {/* Cleared chips, the current one, and a glimpse of the next — the rest of the
             ladder is behind "Show ladder" rather than dangling as a wall of locks. */}
         <ScrollView
@@ -223,17 +235,6 @@ export function YouScreen() {
           })}
         </ScrollView>
 
-        <View style={styles.ladderHintRow}>
-          <Pressable
-            onPress={() => setLadderOpen((open) => !open)}
-            accessibilityRole="button"
-            style={styles.ladderHint}>
-            <Text style={styles.ladderHintLabel}>
-              {ladderOpen ? 'Hide ladder' : 'Show ladder'}
-            </Text>
-          </Pressable>
-        </View>
-
         {ladderOpen && (
           <Pop duration={300} style={styles.ladderAll}>
             {RANKS.map((rank, i) => (
@@ -260,15 +261,7 @@ export function YouScreen() {
         )}
 
         <Text style={styles.sectionLabel}>Mastery</Text>
-        {progress.map(({ chapter, pct }) => (
-          <View key={chapter.id} style={styles.masteryRow}>
-            <View style={styles.masteryHead}>
-              <Text style={styles.masteryName}>{chapter.title}</Text>
-              <Text style={styles.masteryPct}>{hydrated ? `${pct}%` : PENDING}</Text>
-            </View>
-            <ProgressBar pct={pct} height={9} />
-          </View>
-        ))}
+        <Mastery />
 
         <OutlineButton
           label="Your games"
@@ -340,51 +333,66 @@ export function YouScreen() {
         )}
 
         {/*
-          The account itself, in one quiet block. Deletion sits here in the same
-          treatment as logging out rather than under a red button — Apple 5.1.1(v) asks
-          for it to be reachable, not for it to be shouted, and red is spoken for by the
-          chip action, hearts and the "Playing" badge. What makes it deliberate is the
-          word the sheet asks to be typed.
-        */}
-        <View style={styles.account}>
-          {/* wrapped, not passed by reference: the press event is not a sign-out scope */}
-          <Pressable
-            onPress={() => signOut()}
-            accessibilityRole="button"
-            style={styles.accountAction}>
-            <Text style={styles.accountLabel}>Log out</Text>
-          </Pressable>
+          The footer: the account and the legal pages, one line each and the same ink.
+          Deletion sits here in the same treatment as logging out rather than under a red
+          button — Apple 5.1.1(v) asks for it to be reachable, not for it to be shouted,
+          and red is spoken for by the chip action, hearts and the "Playing" badge. What
+          makes it deliberate is the word the sheet asks to be typed.
 
-          <Pressable
-            onPress={exportNow}
-            disabled={exporting}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: exporting, busy: exporting }}
-            style={styles.accountAction}>
-            <Text style={[styles.accountLabel, exporting && styles.accountLabelBusy]}>
-              {exporting ? 'Gathering your data…' : 'Export my data'}
-            </Text>
-          </Pressable>
+          Three stacked 44px rows made the quietest thing on the screen the tallest; side
+          by side they read as what they are — the small print. Each still carries the
+          legal links' own 8px of padding, which is the touch target the app already
+          ships for a footer link.
+        */}
+        <View style={styles.footer}>
+          <View style={styles.footerRow}>
+            {/* wrapped, not passed by reference: the press event is not a sign-out scope */}
+            <FooterAction label="Log out" onPress={() => signOut()} />
+            <Text style={styles.footerDot}>·</Text>
+            <FooterAction
+              label={exporting ? 'Gathering your data…' : 'Export my data'}
+              onPress={exportNow}
+              busy={exporting}
+            />
+            <Text style={styles.footerDot}>·</Text>
+            <FooterAction label="Delete account" onPress={() => setConfirmingDelete(true)} />
+          </View>
+
           {exportError && (
             <Text style={styles.accountError} accessibilityRole="alert">
               {exportError}
             </Text>
           )}
 
-          <Pressable
-            onPress={() => setConfirmingDelete(true)}
-            accessibilityRole="button"
-            style={styles.accountAction}>
-            <Text style={styles.accountLabel}>Delete account</Text>
-          </Pressable>
+          <LegalLinks style={styles.legal} />
         </View>
-
-        <LegalLinks style={styles.legal} />
         <View style={{ height: 20 }} />
       </TabScreen>
 
       {confirmingDelete && <DeleteAccountSheet onClose={() => setConfirmingDelete(false)} />}
     </>
+  );
+}
+
+/** One word of the small print. Sized and spaced as the legal links beside it. */
+function FooterAction({
+  label,
+  onPress,
+  busy = false,
+}: {
+  label: string;
+  onPress: () => void;
+  busy?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={busy}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: busy, busy }}
+      style={pressable()}>
+      <Text style={[styles.footerLabel, busy && styles.footerLabelBusy]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -498,8 +506,13 @@ const styles = StyleSheet.create({
   /** a rank not reached yet — the swatch dims, the words go quiet */
   ladderLocked: { color: colors.textFaint },
 
-  ladderHintRow: { flexDirection: 'row', justifyContent: 'flex-end' },
-  ladderHint: { minHeight: TOUCH, justifyContent: 'center', paddingHorizontal: 2 },
+  /** the full touch target, taken out of the section line's own height */
+  ladderHint: {
+    minHeight: TOUCH,
+    justifyContent: 'center',
+    paddingLeft: 12,
+    marginVertical: -(TOUCH - 12) / 2,
+  },
   ladderHintLabel: {
     fontFamily: font.bold,
     fontSize: 10,
@@ -562,6 +575,25 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 12,
   },
+  /** a section whose label shares its line with a control */
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 20,
+    marginBottom: 12,
+  },
+  sectionLabelFlush: {
+    flex: 1,
+    minWidth: 0,
+    fontFamily: font.regular,
+    fontSize: 10,
+    lineHeight: 12,
+    letterSpacing: ls(10, 0.12),
+    textTransform: 'uppercase',
+    color: colors.textMuted,
+  },
   /** the same kicker inside a card, where the section's margins would be wrong */
   sectionLabelTight: {
     fontFamily: font.regular,
@@ -572,10 +604,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginBottom: 6,
   },
-  masteryRow: { marginBottom: 13 },
-  masteryHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  masteryName: { fontFamily: font.bold, fontSize: 12, lineHeight: 14, color: colors.text },
-  masteryPct: { fontFamily: font.regular, fontSize: 12, lineHeight: 14, color: colors.textMuted },
   gamesToggle: { marginTop: 20 },
   gamesPanel: {
     marginTop: 10,
@@ -647,21 +675,24 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   reuse: { paddingHorizontal: 14 },
-  account: { marginTop: 14 },
-  accountAction: { minHeight: TOUCH, justifyContent: 'center' },
-  accountLabel: {
+
+  footer: { marginTop: 16 },
+  footerRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  /** the legal links' own type, so the whole footer reads as one line of small print */
+  footerLabel: {
     fontFamily: font.regular,
     fontSize: 11,
     lineHeight: 13,
-    letterSpacing: ls(11, 0.08),
-    textTransform: 'uppercase',
+    letterSpacing: ls(11, 0.02),
     color: colors.textFaint,
+    paddingVertical: 8,
   },
   /**
-   * In flight. These rows already sit at the quietest ink the app has, so working is
-   * shown by lifting one step rather than dimming into nothing.
+   * In flight. These already sit at the quietest ink the app has, so working is shown by
+   * lifting one step rather than dimming into nothing.
    */
-  accountLabelBusy: { color: colors.textMuted },
+  footerLabelBusy: { color: colors.textMuted },
+  footerDot: { fontFamily: font.regular, fontSize: 11, lineHeight: 13, color: colors.textFaint },
   /** red for a failed action, as on the auth screens */
   accountError: {
     fontFamily: font.regular,
@@ -670,5 +701,5 @@ const styles = StyleSheet.create({
     color: colors.red,
     paddingBottom: 6,
   },
-  legal: { marginTop: 10, justifyContent: 'flex-start' },
+  legal: { justifyContent: 'flex-start' },
 });

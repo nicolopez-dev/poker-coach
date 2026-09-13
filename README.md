@@ -341,11 +341,18 @@ Supabase's side of the account rather than the app's.
 - **The solver retries for full spread.** Where the prototype could silently deal zero of a
   colour, a fit that leaves one out is retried with one of every denomination reserved, and any
   colour that still can't be dealt is named on the result card.
-- **You and Login carry account and legal rows the handoff has no design for.** "Export my data"
-  and "Delete account" sit under "Log out" in the same restrained treatment — 11px uppercase and
-  no red button — and a "Privacy policy · Terms" line closes both screens. None of it is
-  decoration: Apple 5.1.1(v) wants deletion in the app, GDPR wants both, and neither store takes
-  a build whose privacy policy cannot be reached.
+- **You and Login carry account and legal rows the handoff has no design for.** "Log out",
+  "Export my data" and "Delete account" close the You tab as one line of small print, in the
+  legal links' own type and beside them rather than stacked above them — three 44px rows made
+  the quietest thing on the screen the tallest. No red button anywhere in it: Apple 5.1.1(v)
+  wants deletion in the app, GDPR wants both, and neither store takes a build whose privacy
+  policy cannot be reached, but none of that makes them things to shout.
+- **Mastery is the course, as cards.** The handoff draws four name-and-bar rows; the course has
+  fourteen units, and a list that long says how far along each one is while being the one place
+  on the screen you cannot open any of it. It is a grid of the Path's own cards instead — a
+  face-up suit for a unit you can sit at, a card back for one you cannot — and a card deals that
+  unit's next lesson. A locked card shakes and stops there, which answers the tap without
+  spending a dialog on it. [`Mastery.tsx`](src/screens/you/Mastery.tsx).
 
 ### From handoff 02
 

@@ -152,7 +152,7 @@ export function HomeScreen() {
         })}
       </View>
 
-      <View style={styles.bleedGuard}>
+      <View style={[styles.bleedGuard, styles.tiltRoom]}>
         <StreakCard
           done={done}
           goal={DAILY_GOAL}
@@ -296,6 +296,15 @@ const styles = StyleSheet.create({
   /** the pane goes edge to edge; sections that need the margin ask for it */
   pane: { paddingHorizontal: 0 },
   bleedGuard: { paddingHorizontal: spacing.screen.paddingHorizontal },
+  /**
+   * Room for the streak card to lean.
+   *
+   * `Tilt` runs it through ±4px of vertical drift and a couple of degrees about both
+   * axes, and none of that is in the layout — at the top of its travel the card was
+   * riding up over the week row. The gap is the drift plus what the rotation lifts the
+   * near corner by.
+   */
+  tiltRoom: { paddingTop: 12 },
 
   kicker: {
     fontFamily: font.regular,
