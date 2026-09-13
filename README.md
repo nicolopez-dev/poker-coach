@@ -380,6 +380,14 @@ Supabase's side of the account rather than the app's.
   server, paid in XP if right, a heart short if wrong. The card then locks until tomorrow; that
   lock is local ([`dailyHand.ts`](src/server/dailyHand.ts)), since it gates a card rather than
   deciding anything.
+- **The day's hand deals the whole fan.** The card drew the hole cards *or* the board, whichever
+  it found first, so a question about a five-card board arrived three cards short and could only
+  be guessed at. It splits the fan the way the drill does — the board under the prompt, the pair
+  in hand over the answers.
+- **Its cover wears a heart, not the joker.** The handoff prints a joker portrait across the
+  cover. Two cards above it the streak card already carries an oversized spade, and a second
+  full-bleed illustration was the loudest thing on Home; the cover takes the same treatment
+  instead, in the suit the card is named for. `assets/joker-face.png` stays in the repo, unused.
 - **Two ways to double XP, and they never stack.** Three drills in a row without a wrong answer
   (the side bet), or filling the day's row of chips and taking the ante — either makes an answer
   worth 16, both together still 16. `player_xp` is a `when/when/else` for exactly that reason.
