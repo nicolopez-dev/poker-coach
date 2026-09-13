@@ -28,6 +28,7 @@ export function DrillOverlay() {
     completing,
     completionError,
     gained,
+    drillClean,
     pick,
     nextQuestion,
     closeDrill,
@@ -106,10 +107,18 @@ export function DrillOverlay() {
                   <Text style={styles.doneKicker}>Hand played</Text>
                   <Text style={[type.bigNumber, { marginBottom: 10 }]}>+{gained} XP</Text>
                   <Text style={styles.doneNote}>
-                    {gained === questions.length * XP_PER_ANSWER
+                    {/* A clean sweep is a drill with nothing missed in it, which is what
+                        `drillClean` carries — not a total. Reading it off the XP stopped
+                        being true the moment an answer could be worth 16: a perfect
+                        doubled drill pays twice the tally this used to compare against,
+                        and told the player they had missed some. */}
+                    {drillClean
                       ? `Clean sweep. One more session and ${chapter?.title ?? 'this unit'} is yours.`
                       : 'The ones you missed come back tomorrow.'}
                   </Text>
+                  {gained > questions.length * XP_PER_ANSWER && (
+                    <Text style={styles.doneDouble}>Paid double</Text>
+                  )}
                 </>
               )}
               <RewardButton label="Back to today" glyph="♥" onPress={closeDrill} />
@@ -463,6 +472,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 14 * 1.45,
     color: colors.textSecondary,
+    marginBottom: 24,
+  },
+  /** the multiplier, named where it was paid — a doubled tally is not a typo */
+  doneDouble: {
+    fontFamily: font.bold,
+    fontSize: 10,
+    lineHeight: 12,
+    letterSpacing: ls(10, 0.14),
+    textTransform: 'uppercase',
+    color: colors.gold,
+    marginTop: -14,
     marginBottom: 24,
   },
 });

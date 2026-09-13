@@ -46,6 +46,8 @@ export const colors = {
   redBorder: '#7a3324',
   redInk: '#f7e9e4',
   redBody: '#ffc4b8',
+  /** the small print on a red card — `redBody`, stood back a step */
+  redFaint: 'rgba(255,196,184,.62)',
 
   green: '#57b183',
   greenLight: '#7fd6a5',

@@ -267,6 +267,7 @@ export type Database = {
         Args: { p_user: string }
         Returns: {
           clean: boolean
+          day: string
           lesson_id: string
           n: number
           pos: number
@@ -307,6 +308,7 @@ export type Database = {
         }
         Returns: number
       }
+      player_day: { Args: { p_at: string; p_user: string }; Returns: string }
       player_xp: { Args: { p_user: string }; Returns: number }
       set_profile: {
         Args: { p_avatar_id: string; p_display_name: string }

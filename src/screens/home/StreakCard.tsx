@@ -194,7 +194,7 @@ const STEPS = [
   { lead: 'One drill keeps the run.', rest: 'Finish a single lesson and today counts.' },
   {
     lead: 'A chip a drill, five to fill the row.',
-    rest: 'Fill it and you can ante up: every answer worth double until you miss one.',
+    rest: 'Fill it and you can ante up: every answer worth double until you miss one, or the day turns.',
   },
   { lead: 'Skip a day and the run resets.', rest: 'Your XP and rank stay where they are.' },
 ];

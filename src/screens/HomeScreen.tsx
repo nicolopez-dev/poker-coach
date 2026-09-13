@@ -42,6 +42,17 @@ function sideBetNote(cleanRun: number): string {
   return `Win ${left} more drill${left === 1 ? '' : 's'} without a wrong answer and they start paying double.`;
 }
 
+/**
+ * The rule both multipliers share, said once and said here.
+ *
+ * The two of them can be running at the same time and a player seeing "paying double" on
+ * one card and "double XP running" on the other has every reason to expect four times.
+ * They do not stack — `player_xp` is a single `when/when/else` — so the card says so
+ * rather than leaving the arithmetic to be discovered.
+ */
+const DOUBLE_RULE =
+  'Never stacks with the ante — double, not quadruple. A wrong answer ends both; midnight starts them over.';
+
 function runLine(done: number, streak: number): string {
   if (done >= DAILY_GOAL) return "Today's work is done. Come back tomorrow to keep the run alive.";
   if (done > 0) return `Today is safe. ${DAILY_GOAL - done} to go for the full five.`;
@@ -219,6 +230,7 @@ export function HomeScreen() {
               </View>
             </View>
             <Text style={styles.sideBetNote}>{sideBetNote(cleanRun)}</Text>
+            <Text style={styles.sideBetRule}>{DOUBLE_RULE}</Text>
           </View>
         )}
 
@@ -433,6 +445,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 12 * 1.45,
     color: colors.redBody,
+  },
+  /** the rule under the state: quieter, and the same whatever the card is saying */
+  sideBetRule: {
+    fontFamily: font.regular,
+    fontSize: 11,
+    lineHeight: 11 * 1.4,
+    color: colors.redFaint,
+    marginTop: 7,
   },
 
   tablesHead: {

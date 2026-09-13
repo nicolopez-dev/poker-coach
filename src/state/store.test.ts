@@ -799,12 +799,34 @@ describe('the ante, from the drill in progress', () => {
     expect(payingDouble(at(true, true, 9))).toBe(true);
   });
 
+  it('counts every answer of the drill at the doubled rate', () => {
+    // the whole tally, not only the first answer: this is the "+N XP" the finished drill
+    // shows, and it has to come to what the server will pay for the same answers
+    // hearts, or `startLesson` refuses and the drill never opens — `initialState` holds a
+    // nought that means "not asked yet", and a hydrated one of those is out of hearts
+    let state = reducer(
+      { ...initialState, hydrated: true, hearts: 5, doubleLive: true },
+      { type: 'startLesson', ref: REF },
+    );
+
+    const questions = LESSON.kind === 'drill' ? LESSON.questions : [];
+    for (const question of questions) {
+      state = reducer(state, { type: 'pick', id: question.correct, at: NOW });
+      state = reducer(state, { type: 'nextQuestion' });
+    }
+
+    expect(state.gained).toBe(questions.length * XP_PER_ANSWER * 2);
+  });
+
   it('takes a wrong answer out of the ante as well as the side bet', () => {
     let state = reducer(
-      { ...initialState, hydrated: true, doubleLive: true, drillClean: true },
+      { ...initialState, hydrated: true, hearts: 5, doubleLive: true, drillClean: true },
       { type: 'startLesson', ref: REF },
     );
     expect(payingDouble(state)).toBe(true);
+    // the drill really is open, so the pick below is a pick at a question rather than at
+    // nothing — which would take it out of the running whatever the answer was
+    expect(state.activeLesson).toEqual(REF);
 
     state = reducer(state, { type: 'pick', id: WRONG, at: NOW });
     expect(payingDouble(state)).toBe(false);

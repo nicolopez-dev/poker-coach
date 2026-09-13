@@ -11,6 +11,7 @@
 --   D4  a wrong answer closes it, and what follows is back to the ordinary rate
 --   D5  one shot a day
 --   D6  the two doublings do not stack — a clean-run drill inside an ante is still 16
+--   D7  and midnight closes it even if nothing was ever missed
 --
 -- Run with: npx supabase test db
 
@@ -19,7 +20,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(13);
+select plan(16);
 
 insert into auth.users (
   id, instance_id, aud, role, email, encrypted_password,
@@ -70,11 +71,24 @@ select throws_ok(
 
 -- ─────────────────────────────────────────────────────── D2 · the row fills up
 
+-- The fixture's clock. Every event has to be **today** — the ante is only offered on the
+-- day's own work, and both doublings now end at midnight — and also in the **past**: an
+-- answer the wall clock has not reached is not one the player has given, which is what
+-- `double_live` is asking about. So the whole timeline is laid out inside the part of
+-- today that has already happened, however much of it there is when the suite runs.
+create temporary table clock as
+  select pg_catalog.date_trunc('day', now()) as midnight,
+         (now() - pg_catalog.date_trunc('day', now())) / 20 as tick;
+
+create or replace function pg_temp.at(p_tick int) returns timestamptz language sql as $$
+  select (select c.midnight + c.tick * p_tick from clock c)
+$$;
+
 -- four drills is not five, however clean they are
-select pg_temp.play('l1', 2, 1, now() - interval '50 minutes');
-select pg_temp.play('l2', 2, 1, now() - interval '45 minutes');
-select pg_temp.play('l3', 2, 1, now() - interval '40 minutes');
-select pg_temp.play('l4', 2, 1, now() - interval '35 minutes');
+select pg_temp.play('l1', 2, 1, pg_temp.at(1));
+select pg_temp.play('l2', 2, 1, pg_temp.at(2));
+select pg_temp.play('l3', 2, 1, pg_temp.at(3));
+select pg_temp.play('l4', 2, 1, pg_temp.at(4));
 
 select throws_ok(
   $$ select public.take_double() $$,
@@ -82,7 +96,7 @@ select throws_ok(
   'D2 · four of five is still not the day'
 );
 
-select pg_temp.play('l5', 2, 1, now() - interval '30 minutes');
+select pg_temp.play('l5', 2, 1, pg_temp.at(5));
 
 select is(
   (public.take_double() ->> 'double_live')::boolean, true,
@@ -93,15 +107,17 @@ select is(
 -- before the ante, and taking a bet does not pay out backwards.
 select is(public.player_xp((select id from u)), 80, 'D2 · and pays nothing for the past');
 
--- Everything from here hangs off the instant the ante opened rather than off the wall
--- clock, so the cases say what they mean: *after* the bet, not merely "recently".
-create temporary table anted as
-  select double_from as t from public.player_state where user_id = (select id from u);
+-- `take_double` stamps the bet at `now()`, which leaves no room after it for the drills
+-- these cases play. Wound back onto the fixture's clock — still today, still after the
+-- day's work — so that everything which follows the bet can also be behind us.
+update public.player_state
+   set double_from = pg_temp.at(6)
+ where user_id = (select id from u);
 
 
 -- ──────────────────────────────────────────────────────────── D3 · paying double
 
-select pg_temp.play('l6', 2, 0, (select t from anted) + interval '1 minute');
+select pg_temp.play('l6', 2, 0, pg_temp.at(8));
 
 select is(public.player_xp((select id from u)), 80 + 32, 'D3 · answers inside it are worth 16');
 
@@ -113,7 +129,7 @@ select is(
 
 -- ─────────────────────────────────────────────────────────────── D4 · missing one
 
-select pg_temp.play('l7', 1, 1, (select t from anted) + interval '2 minutes');
+select pg_temp.play('l7', 1, 1, pg_temp.at(10));
 
 select is(
   (public.get_state() ->> 'double_live')::boolean, false,
@@ -124,7 +140,7 @@ select is(
 -- window on the boundary the function draws: `< ends`, not `<=`.
 select is(public.player_xp((select id from u)), 80 + 32 + 8, 'D4 · the drill that missed pays 8');
 
-select pg_temp.play('l8', 2, 0, (select t from anted) + interval '3 minutes');
+select pg_temp.play('l8', 2, 0, pg_temp.at(12));
 select is(
   public.player_xp((select id from u)), 80 + 32 + 8 + 16,
   'D4 · and everything after it is back to the ordinary rate'
@@ -153,19 +169,19 @@ values ('cccccccc-0000-4000-8000-000000000002', '00000000-0000-0000-0000-0000000
         now(), now(), '{}'::jsonb, '{}'::jsonb);
 
 update public.player_state
-   set double_from = now() - interval '1 hour'
+   set double_from = pg_temp.at(6)
  where user_id = 'cccccccc-0000-4000-8000-000000000002';
 
 insert into public.answers
   (user_id, lesson_id, question_index, chosen_option_id, is_correct, occurred_at, client_event_id)
 select 'cccccccc-0000-4000-8000-000000000002', 'm' || g, 0, 'a', true,
-       now() - interval '30 minutes', gen_random_uuid()
+       pg_temp.at(8), gen_random_uuid()
   from generate_series(1, 3) g;
 
 insert into public.lesson_completions
   (user_id, lesson_id, chapter_id, correct_count, question_count, occurred_at, client_event_id)
 select 'cccccccc-0000-4000-8000-000000000002', 'm' || g, 'c1', 1, 1,
-       now() - interval '30 minutes' + (g || ' seconds')::interval, gen_random_uuid()
+       pg_temp.at(8 + g), gen_random_uuid()
   from generate_series(1, 3) g;
 
 select is(
@@ -179,6 +195,54 @@ select is(
 select is(
   public.player_xp('cccccccc-0000-4000-8000-000000000002'::uuid), 48,
   'D6 · and it still pays 16, never 32'
+);
+
+
+-- ──────────────────────────────────────────────────────── D7 · last call
+
+-- The bet is the day's. Only the instant it was taken is stored, so without a close of
+-- its own a player who took one and then never missed would still be on it a week later
+-- — which is the shape this pins: an ante taken yesterday pays for yesterday and stops
+-- at midnight, whatever today's answers do.
+insert into auth.users (
+  id, instance_id, aud, role, email, encrypted_password,
+  created_at, updated_at, raw_app_meta_data, raw_user_meta_data
+)
+values ('cccccccc-0000-4000-8000-000000000003', '00000000-0000-0000-0000-000000000000',
+        'authenticated', 'authenticated', 'e@pokercoach.test', '',
+        now(), now(), '{}'::jsonb, '{}'::jsonb);
+
+update public.player_state
+   set double_from = (select c.midnight - interval '14 hours' from clock c)  -- yesterday
+ where user_id = 'cccccccc-0000-4000-8000-000000000003';
+
+insert into public.answers
+  (user_id, lesson_id, question_index, chosen_option_id, is_correct, occurred_at, client_event_id)
+values
+  -- inside yesterday's ante
+  ('cccccccc-0000-4000-8000-000000000003', 'n1', 0, 'a', true,
+   (select c.midnight - interval '13 hours' from clock c), gen_random_uuid()),
+  -- this morning, long after it closed, and nothing was ever answered wrong
+  ('cccccccc-0000-4000-8000-000000000003', 'n2', 0, 'a', true,
+   pg_temp.at(1), gen_random_uuid());
+
+select is(
+  (select w.ends from public.double_window('cccccccc-0000-4000-8000-000000000003'::uuid) w),
+  (select c.midnight from clock c),
+  'D7 · with nothing missed, the ante closes at the end of its own day'
+);
+
+select is(
+  public.player_xp('cccccccc-0000-4000-8000-000000000003'::uuid), 16 + 8,
+  'D7 · so yesterday''s answer is doubled and this morning''s is not'
+);
+
+select set_config('request.jwt.claims',
+  '{"sub":"cccccccc-0000-4000-8000-000000000003","role":"authenticated"}', true);
+
+select is(
+  (public.get_state() ->> 'double_live')::boolean, false,
+  'D7 · and the card stops saying it is running'
 );
 
 select * from finish();
