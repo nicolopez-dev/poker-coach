@@ -10,6 +10,9 @@
 --       hangs off `auth.users` by `on delete cascade`. The cascades are the thing under
 --       test: they have never been fired before, only declared.
 --   D2  and it takes exactly one account with it — B is untouched
+--   D3  the cascade is declared on every table that could need it, which is what D1
+--       cannot see: D1 only fires the seven tables it seeds, so a table added later and
+--       never seeded here would pass it while orphaning its rows for ever
 --
 -- Run with: npx supabase test db
 
@@ -18,7 +21,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(17);
+select plan(20);
 
 
 -- ──────────────────────────────────────────────────────────────────── seeding
@@ -271,6 +274,62 @@ select is_empty(
      select 'game_seats' where not exists (
        select 1 from public.game_seats where user_id = 'bbbbbbbb-0000-4000-8000-000000000002') $$,
   'D2 · B still has every row it had'
+);
+
+
+-- D3 · The declarations behind all of the above.
+--
+-- D1 proves the cascade for the seven tables it seeds, and that is the whole of what it
+-- can prove: a table added next month and never written into the seeding above would sail
+-- through it while quietly keeping a deleted player's rows for ever. So the schema is
+-- held to the rule directly, and an eighth table has to satisfy it on the day it is
+-- written rather than on the day somebody remembers this file.
+select is_empty(
+  $$ select t.relname || '.' || c.conname
+       from pg_constraint c
+       join pg_class t on t.oid = c.conrelid
+       join pg_namespace n on n.oid = t.relnamespace
+      where c.contype = 'f'
+        and n.nspname = 'public'
+        and c.confrelid = 'auth.users'::regclass
+        and c.confdeltype <> 'c' $$,
+  'D3 · every foreign key from public into auth.users deletes by cascade'
+);
+
+-- And the case the check above cannot see at all: a `user_id` with no foreign key behind
+-- it references nothing, so nothing cascades to it and no delete will ever reach it.
+select is_empty(
+  $$ select c.relname
+       from pg_class c
+       join pg_namespace n on n.oid = c.relnamespace
+       join pg_attribute a on a.attrelid = c.oid
+        and a.attname = 'user_id' and a.attnum > 0 and not a.attisdropped
+      where n.nspname = 'public'
+        and c.relkind = 'r'
+        and not exists (
+          select 1
+            from pg_constraint fk
+           where fk.conrelid = c.oid
+             and fk.contype = 'f'
+             and fk.confrelid = 'auth.users'::regclass
+             and fk.confdeltype = 'c'
+             and a.attnum = any (fk.conkey)
+        ) $$,
+  'D3 · and every user_id column in public is held there by one of them'
+);
+
+-- Seven, because that is how many D1 fires and how many `get_export()` carries. An
+-- eighth belongs in both, and this fails until it is in them.
+select is(
+  (select count(*)::int
+     from pg_constraint c
+     join pg_class t on t.oid = c.conrelid
+     join pg_namespace n on n.oid = t.relnamespace
+    where c.contype = 'f'
+      and n.nspname = 'public'
+      and c.confrelid = 'auth.users'::regclass),
+  7,
+  'D3 · and there are exactly seven of them, as X1 and D1 both assume'
 );
 
 
