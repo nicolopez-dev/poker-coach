@@ -230,12 +230,25 @@ profiles — `development` (a dev client), `preview` (an installable `.apk`) and
 
 That gap has to be closed before the first cloud build or the app throws on launch:
 [`src/auth/supabase.ts`](../src/auth/supabase.ts) raises when the URL is missing, and `.env` is
-gitignored while EAS uploads from git, so nothing reaches the build by itself. Push them to EAS
-once per profile:
+gitignored while EAS uploads from git, so nothing reaches the build by itself.
+
+**Done, as of 20 September 2026.** All four — `EXPO_PUBLIC_SUPABASE_URL`,
+`EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` and
+`EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` — are set on `production` and `preview` at project scope,
+`plaintext` visibility. `development` is deliberately empty: a dev client loads its bundle from
+Metro, so it reads the `.env` on the machine running it. Read them back with
+`eas env:list --environment production`, and add or change one with:
 
 ```bash
-npx eas-cli@latest env:create --scope project --environment production
+npx eas-cli@latest env:set --scope project --environment production --name NAME --value VALUE --visibility plaintext
 ```
+
+`env:create` is deprecated in eas-cli 24; `env:set` creates or updates.
+
+> **Take these from `.env`, never from `.env.local`.** `.env.local` is what
+> `npm run env:local` points at the local Supabase stack — `http://127.0.0.1:54321` and the
+> local JWT anon key. Pushing those would produce a binary that talks to a laptop, and it would
+> build, install and launch before failing on every request.
 
 They could live in a profile's `env` block instead — the anon key and the client ids are public
 by design, and RLS is what protects the data — but this repository is public, and EAS
