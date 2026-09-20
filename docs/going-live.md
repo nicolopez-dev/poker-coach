@@ -75,11 +75,31 @@ neither of them writing — the first is done:
 > with `nslookup -type=MX pokercoach.app` — an unfilled placeholder shows up as an orange box on
 > the page, but a bouncing contact address looks exactly like a working one.
 
-**0.3 · The release build is signed with the debug keystore.**
-[`android/app/build.gradle:115`](../android/app/build.gradle:115) points `release` at
-`signingConfigs.debug`, which is fine for sideloading and fatal for Play — it rejects
-debug-signed uploads outright. Let EAS manage a real upload keystore (Stage 3), and never lose
-it: the upload key is how Play knows a future update is from you.
+**0.3 · No upload keystore exists yet — and the file that looks like the problem is not one.**
+`android/` is generated here, not committed: [`.gitignore`](../.gitignore) ignores `/android` and
+`/ios`, and `git ls-files android/` returns nothing at all. `app.json` is where native config
+lives and `expo run:android` prebuilds from it. So `android/app/build.gradle` — whose `release`
+block points at `signingConfigs.debug`, the Expo template default — is a local build artifact.
+Prebuild rewrites it, and, for the same reason §3.2 gives about `.env`, **EAS uploads from git**,
+so it never reaches a cloud build in the first place. Editing that line changes nothing, and
+committing `android/` to make it stick would trade generated native projects for ones you
+maintain by hand. Leave it alone.
+
+What that default actually governs is a single thing: `npx expo run:android --variant release` on
+this machine. That is fine for sideloading and cannot produce a Play upload either way.
+
+The real item is that no upload key exists. EAS generates one on the first Android build, or on
+demand:
+
+```bash
+npx eas-cli@latest credentials -p android
+```
+
+Both routes need an Expo account, and neither is set up: `eas` is not installed here and
+`~/.expo/state.json` carries no session. So this is a login away, not a change away — which puts
+0.3 with the credential items rather than the code ones. Once the key exists, never lose it: it
+is how Play knows a future update is from you, and it is one half of the fingerprint pair in
+Stage 2.
 
 **0.4 · Decide the content rating honestly.** This is a poker app. The IARC questionnaire every
 store runs asks about simulated gambling, and a card game dealing chips is going to touch it even
