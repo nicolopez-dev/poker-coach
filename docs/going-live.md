@@ -57,20 +57,12 @@ still owes. Any static host will do.
 debug-signed uploads outright. Let EAS manage a real upload keystore (Stage 3), and never lose
 it: the upload key is how Play knows a future update is from you.
 
-**0.4 · `node` is a dependency.** `package.json` carries `"node": "^26.8.1"` — an entire Node
-distribution, almost certainly installed by a stray `npm i node`. Remove it before you build
-anything you intend to ship:
-
-```bash
-npm uninstall node
-```
-
-**0.5 · Decide the content rating honestly.** This is a poker app. The IARC questionnaire every
+**0.4 · Decide the content rating honestly.** This is a poker app. The IARC questionnaire every
 store runs asks about simulated gambling, and a card game dealing chips is going to touch it even
 with no real money, no wagering and no purchasable currency. Answer as the app behaves; a rating
 that does not match the content is a removal, not a warning. Expect something above "Everyone".
 
-**0.6 · iOS only — Sign in with Apple.** App Store guideline 4.8 requires it whenever you offer a
+**0.5 · iOS only — Sign in with Apple.** App Store guideline 4.8 requires it whenever you offer a
 third-party sign-in, and Google sign-in is wired. P10 is not built, so **iOS cannot ship until it
 is**. Android has no equivalent requirement; this does not block Play.
 
@@ -234,7 +226,7 @@ npx eas-cli@latest submit -p android --latest
 - **Account deletion URL** — a public page explaining what deletion removes, alongside the in-app
   path from Stage 0.
 - **Privacy policy URL** — same page as the consent screen uses.
-- **Content rating questionnaire** — Stage 0.5.
+- **Content rating questionnaire** — Stage 0.4.
 - **Target API level** — Expo SDK 57 already targets a current one; confirm it against Play's
   requirement for new apps at the time you submit, since it rises every year.
 - **Closed testing before production.** Personal (non-organisation) developer accounts must run a
@@ -270,7 +262,7 @@ answer and the server's verdict agreeing.
 
 ## The short version
 
-1. Fix the remaining blockers: legal pages (carrying the deletion URL), release signing, `npm uninstall node`
+1. Fix the remaining blockers: the legal pages, carrying the deletion URL, and real release signing
 2. Create or promote the production Supabase project — `db push`, `sync:content`, auth settings, SMTP
 3. Prove RLS (`npx supabase test db`), clear the Security Advisor, leave the free tier
 4. Register **both** SHA-1s with the Android OAuth client, publish the consent screen
