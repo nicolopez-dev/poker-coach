@@ -22,23 +22,41 @@ the You tab at them. They are extensionless, which is what `cleanUrls` in
 "Pretty URLs", Cloudflare Pages' automatic clean URLs, or a rewrite rule) — without it the app's
 legal links 404 and a store reviewer is the one who finds out.
 
-## Fill these in before publishing
+## The values on these pages
 
-Every placeholder renders as a loud orange dashed box, so an unfilled one is obvious on the page
-rather than something a reviewer discovers. Search the directory for `class="todo"`.
+Eight values across eighteen spans, **all filled**. An unfilled one renders as a loud orange
+dashed box, so it is obvious on the page rather than something a reviewer discovers;
+`grep -o 'class="todo"' *.html | wc -l` returns 0 today and is what to re-run after any edit
+(`grep -c` would count *lines*, and some lines carry two or three placeholders).
 
-| Placeholder | Where, and how many |
-| --- | --- |
-| `[LEGAL ENTITY NAME]` | index ×1, privacy ×1, terms ×2 |
-| `[POSTAL ADDRESS]` | privacy ×1, terms ×1 |
-| `[CONTACT EMAIL]` | privacy ×3, terms ×1, delete-account ×1 |
-| `[COUNTRY]` | privacy ×1 |
-| `[REGION]` — where the Supabase project actually is | privacy ×2 |
-| `[MINIMUM AGE]` — must match the store age rating | privacy ×1, terms ×1 |
-| `[JURISDICTION]` | terms ×1 |
-| `[N]` — days to answer an emailed deletion request | delete-account ×1 |
+The table stays because it is the map of where each value appears, which is what you want the day
+one of them changes.
 
-Fifteen in total. `grep -c 'class="todo"' *.html` counts what is left.
+| Value | Where, and how many | Now reads |
+| --- | --- | --- |
+| `[LEGAL ENTITY NAME]` | index ×1, privacy ×1, terms ×2 | NiLo S.L. |
+| `[POSTAL ADDRESS]` | privacy ×1, terms ×1 | Camí de la Reineta 11, 08017 Barcelona |
+| `[CONTACT EMAIL]` | privacy ×3, terms ×1, delete-account ×1 | contact@pokercoach.app — **does not receive yet**, see below |
+| `[COUNTRY]` | privacy ×1 | Spain |
+| `[REGION]` — where the Supabase project actually is | privacy ×2 | the European Union (`eu-central-1`) |
+| `[MINIMUM AGE]` — must match the store age rating | privacy ×1, terms ×1 | 18 |
+| `[JURISDICTION]` | terms ×1 | Spain |
+| `[N]` — days to answer an emailed deletion request | delete-account ×1 | 14 |
+
+> **`contact@pokercoach.app` is on the pages but does not receive mail.** As of 20 September 2026
+> `pokercoach.app` has no apex `MX` — the only one on the domain is `send.pokercoach.app`, which
+> is Amazon SES bounce feedback for Resend's *outbound* mail. Mail sent to `contact@` bounces.
+> **Add an apex `MX`** pointing at a mail host or a forwarder before this site is published; doing
+> so does not disturb the `send.` records. Check with `nslookup -type=MX pokercoach.app`.
+
+That address is the one these pages hand people for access and erasure requests, rectification,
+complaints, and reporting an account made by a child — the routes GDPR requires to stay open, and
+the deletion path Google Play checks for. It is also the only failure here with nothing to show
+for it: every other mistake on these pages appears as an orange box, while a bouncing contact
+address looks exactly like a working one.
+
+Two of the filled values are promises rather than facts, and both are now binding: **18** has to
+match the age rating on the store listing, and **14 days** is shorter than the month GDPR allows.
 
 > **These pages are a starting draft, not legal advice.** The factual parts — what is stored,
 > which processors touch it, what deletion removes — were written from the actual schema and the
@@ -61,3 +79,9 @@ The privacy policy enumerates what the app stores, table by table. That list is 
 `get_export()` returns, and `supabase/tests/account.test.sql` (X2) fails the build when a column
 is added to a user-owned table without being added to the export. It does **not** know about this
 directory — so when X2 sends you to `get_export()`, come here too.
+
+Two claims here have no test behind them at all, because they are about infrastructure rather
+than schema. The policy says data is stored in **the European Union**, which is true of
+`eu-central-1` and stops being true the day the project moves; and it gives an address for
+data-protection requests, which is only an address for as long as something is reading that
+mailbox. Nothing in CI will notice either one going stale.
