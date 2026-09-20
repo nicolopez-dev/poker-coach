@@ -41,24 +41,39 @@ which is now written and waiting to be served — see 0.2.
 files — privacy, terms, the public deletion page Play wants, and a front page so the domain is
 not a 404. They are served at the extensionless paths
 [`src/components/LegalLinks.tsx`](../src/components/LegalLinks.tsx) already compiles into the
-app, and they load nothing from anywhere, so the pages themselves collect nothing. Two things
-are left, and neither is writing:
+app, and they load nothing from anywhere, so the pages themselves collect nothing. Two steps,
+neither of them writing — the first is done:
 
-1. **Fill the placeholders.** Legal entity, address, contact email, the Supabase region, a
-   minimum age and a jurisdiction. Each renders as a loud orange box, so an unfilled one is
-   obvious on the page rather than a thing a store reviewer finds. [`site/README.md`](../site/README.md)
-   lists every one. The factual sections were written from the schema and `get_export()`; the
-   legal framing has not been near a lawyer, and should be.
-2. **Deploy it and point the domain.** Root directory `site/`, no build step. Whatever the host,
-   turn on clean URLs — [`site/vercel.json`](../site/vercel.json) does it for Vercel — or the
-   app's own legal links 404.
+1. **Fill the placeholders — done.** NiLo S.L., Camí de la Reineta 11, 08017 Barcelona, Spain;
+   `contact@pokercoach.app`; data in the European Union (`eu-central-1`); minimum age 18; Spanish
+   law; fourteen days to answer an emailed deletion request. All eighteen spans are filled and
+   `grep -o 'class="todo"' site/*.html | wc -l` returns 0. [`site/README.md`](../site/README.md)
+   is the map of which page carries which. The factual sections were written from the schema and
+   `get_export()`; the legal framing has not been near a lawyer, and should be.
+2. **Deploy it — the DNS half is already done.** `pokercoach.app` is on Vercel's nameservers and
+   the apex `A` records point at Vercel, but no project is attached: the apex answers **404 over
+   HTTP and has no TLS certificate at all**. So what is left is attaching this repo with **Root
+   Directory `site/`** and no build step, not a DNS change. Whatever the host, turn on clean URLs
+   — [`site/vercel.json`](../site/vercel.json) does it for Vercel — or the app's own legal links
+   404.
 
-> One trap if you put the site on Vercel and let it manage the domain: `pokercoach.app` carries
-> the Resend `MX` and `TXT` records from [`phase-0-setup.md`](phase-0-setup.md) §6. **Do not hand
-> Vercel the nameservers** without re-creating all three records on the other side first, or
-> password-reset email stops arriving silently — and you find out when a real user needs it. Add
-> only the `A` and `CNAME` records Vercel asks for, and check the Resend records still resolve
-> afterwards.
+> **The nameserver move already happened, and the mail survived it.** This section used to warn
+> against handing Vercel the nameservers while `pokercoach.app` carried the Resend records from
+> [`phase-0-setup.md`](phase-0-setup.md) §6. It was done anyway and the records came through:
+> `send.pokercoach.app` `MX` → `feedback-smtp.eu-west-1.amazonses.com`, the `send` SPF `TXT`, and
+> the `resend._domainkey` DKIM key all still resolve, so password-reset mail is intact. Verified
+> 20 September 2026 — re-check with `nslookup -type=MX send.pokercoach.app` after any future
+> change to the zone, because nothing else will tell you it broke.
+>
+> **The zone still needs one more record, and nothing on the page will tell you.** The privacy
+> policy, the terms and the deletion page now all give `contact@pokercoach.app`, and
+> `pokercoach.app` has no apex `MX` — the only one is on `send`, and that is Amazon SES bounce
+> feedback for Resend's *outbound* mail. **Mail to that address bounces today.** It is where the
+> pages send people for access and erasure requests, complaints, and reporting an account made by
+> a child, and it is the deletion route Play checks for, so **add an apex `MX`** pointing at a
+> mail host or a forwarder before publishing. It does not disturb the `send.` records. Confirm
+> with `nslookup -type=MX pokercoach.app` — an unfilled placeholder shows up as an orange box on
+> the page, but a bouncing contact address looks exactly like a working one.
 
 **0.3 · The release build is signed with the debug keystore.**
 [`android/app/build.gradle:115`](../android/app/build.gradle:115) points `release` at
