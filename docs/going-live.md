@@ -35,14 +35,23 @@ my data" sits beside it, and `supabase/tests/account.test.sql` proves both halve
 carries all seven user-owned tables and every column of them, and a delete empties all seven
 while leaving the player in the next seat untouched. That satisfies Apple 5.1.1(v) and GDPR
 Articles 15 and 20. What is still owed is Google Play's *other* half: a **public deletion URL**,
-which rides along with 0.2 below.
+which is now written and waiting to be served — see 0.2.
 
-**0.2 · The legal URLs resolve to nothing.** [`src/components/LegalLinks.tsx`](../src/components/LegalLinks.tsx)
-already points at `https://pokercoach.app/privacy` from the login screen and from You, which is
-the right shape — but no `site/` directory exists, so the links go nowhere. Both stores reject a
-build whose privacy policy cannot be reached, and the Google consent screen cannot be published
-without one. Three static pages settle it: privacy, terms, and the account-deletion page 0.1
-still owes. Any static host will do.
+**0.2 · The legal pages are written but not served.** [`site/`](../site) holds four static HTML
+files — privacy, terms, the public deletion page Play wants, and a front page so the domain is
+not a 404. They are served at the extensionless paths
+[`src/components/LegalLinks.tsx`](../src/components/LegalLinks.tsx) already compiles into the
+app, and they load nothing from anywhere, so the pages themselves collect nothing. Two things
+are left, and neither is writing:
+
+1. **Fill the placeholders.** Legal entity, address, contact email, the Supabase region, a
+   minimum age and a jurisdiction. Each renders as a loud orange box, so an unfilled one is
+   obvious on the page rather than a thing a store reviewer finds. [`site/README.md`](../site/README.md)
+   lists every one. The factual sections were written from the schema and `get_export()`; the
+   legal framing has not been near a lawyer, and should be.
+2. **Deploy it and point the domain.** Root directory `site/`, no build step. Whatever the host,
+   turn on clean URLs — [`site/vercel.json`](../site/vercel.json) does it for Vercel — or the
+   app's own legal links 404.
 
 > One trap if you put the site on Vercel and let it manage the domain: `pokercoach.app` carries
 > the Resend `MX` and `TXT` records from [`phase-0-setup.md`](phase-0-setup.md) §6. **Do not hand
@@ -262,7 +271,7 @@ answer and the server's verdict agreeing.
 
 ## The short version
 
-1. Fix the remaining blockers: the legal pages, carrying the deletion URL, and real release signing
+1. Fill in `site/`'s placeholders, deploy it, point the domain; sort out real release signing
 2. Create or promote the production Supabase project — `db push`, `sync:content`, auth settings, SMTP
 3. Prove RLS (`npx supabase test db`), clear the Security Advisor, leave the free tier
 4. Register **both** SHA-1s with the Android OAuth client, publish the consent screen

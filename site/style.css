@@ -1,0 +1,259 @@
+/*
+ * The felt, in three colours and no requests.
+ *
+ * These pages load nothing from anywhere — no fonts, no scripts, no analytics — which is
+ * both the fastest way to serve four static documents and the only way a privacy policy
+ * can honestly say the page you are reading it on collects nothing.
+ *
+ * Colours are the app's own tokens (src/theme/tokens.ts), so the pages read as the same
+ * product as the thing that links to them.
+ */
+
+:root {
+  --ground: #080d0a;
+  --surface: #16261e;
+  --surface-deep: #0f1c15;
+  --text: #f0efe9;
+  --text-secondary: #adc2b6;
+  --text-muted: #8ea79a;
+  --gold: #e8cf8a;
+  --gold-rule: #c9a75c;
+  --green: #57b183;
+  --hairline: rgba(240, 239, 233, 0.1);
+  --todo-ink: #ffd9a8;
+  --todo-bg: rgba(255, 150, 60, 0.16);
+  --todo-rule: rgba(255, 150, 60, 0.55);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0 20px 80px;
+  background: var(--ground);
+  color: var(--text-secondary);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-text-size-adjust: 100%;
+}
+
+main,
+header,
+footer {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+header {
+  padding: 48px 0 0;
+}
+
+/* the ♠ mark and wordmark, same pairing as the app header */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #1d4433;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.brand-word {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  color: var(--text);
+  font-size: 30px;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  margin: 28px 0 6px;
+}
+
+h2 {
+  color: var(--text);
+  font-size: 19px;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  margin: 38px 0 10px;
+  padding-top: 20px;
+  border-top: 1px solid var(--hairline);
+}
+
+h3 {
+  color: var(--text);
+  font-size: 15px;
+  margin: 24px 0 6px;
+}
+
+.updated {
+  color: var(--text-muted);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 28px;
+}
+
+.lede {
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+a {
+  color: var(--gold);
+  text-decoration-color: var(--gold-rule);
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  color: var(--text);
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--surface-deep);
+  border: 1px solid var(--hairline);
+  border-radius: 5px;
+  padding: 1px 5px;
+  color: var(--text);
+}
+
+ul {
+  padding-left: 20px;
+}
+
+li {
+  margin: 7px 0;
+}
+
+li strong {
+  color: var(--text);
+}
+
+/* the near-black panel with a gold hairline — the app's "reward" treatment */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 18px;
+  padding: 20px 22px;
+  margin: 24px 0;
+}
+
+.panel.gold {
+  border-color: var(--gold-rule);
+  background: #0b1210;
+}
+
+.panel h3 {
+  margin-top: 0;
+}
+
+.panel > :last-child {
+  margin-bottom: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 18px 0;
+  font-size: 14px;
+  display: block;
+  overflow-x: auto;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 9px 12px 9px 0;
+  border-bottom: 1px solid var(--hairline);
+  vertical-align: top;
+}
+
+th {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-weight: 400;
+}
+
+td strong {
+  color: var(--text);
+}
+
+/*
+ * An unfilled placeholder. Deliberately loud: publishing one of these by accident should
+ * be impossible to miss on the page itself, not something you find out from a reviewer.
+ */
+.todo {
+  background: var(--todo-bg);
+  border: 1px dashed var(--todo-rule);
+  border-radius: 4px;
+  padding: 0 5px;
+  color: var(--todo-ink);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+footer {
+  margin-top: 56px;
+  padding-top: 20px;
+  border-top: 1px solid var(--hairline);
+  color: var(--text-muted);
+  font-size: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+
+footer a {
+  color: var(--text-muted);
+}
+
+.home-links {
+  list-style: none;
+  padding: 0;
+}
+
+.home-links li {
+  margin: 12px 0;
+}
+
+.home-links a {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.home-links span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+@media (max-width: 480px) {
+  h1 {
+    font-size: 25px;
+  }
+  body {
+    font-size: 15px;
+  }
+}

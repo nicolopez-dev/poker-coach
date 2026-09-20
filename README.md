@@ -107,6 +107,7 @@ src/
   server/                the only module that talks to the database — RPCs, hydration, case, games
   components/            felt, gold frame, chip, ace card, header, tab bar, motion
   screens/               Login, Home, Path, Drill, Chips (+ Result, Balance), You
+site/                    the privacy, terms and deletion pages the stores require
 docs/design-handoff/     the design bundle — read-only reference
 docs/authoring-lessons.md  how to add chapters and lessons
 docs/going-live.md       the release runbook — backend, signing, the stores

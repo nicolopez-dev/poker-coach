@@ -8,10 +8,10 @@
       "port": 8081
     },
     {
-      "name": "prototype",
+      "name": "site",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["--yes", "serve", "--no-clipboard", "-l", "8090", "docs/design-handoff-02/design"],
-      "port": 8090
+      "runtimeArgs": ["--yes", "serve", "site", "--listen", "3000", "--no-clipboard"],
+      "port": 3000
     }
   ]
 }
