@@ -5,7 +5,9 @@ steps actually depend on each other. Android is the spine here; iOS differences 
 where they matter.
 
 [`phase-0-setup.md`](phase-0-setup.md) is the account-by-account setup that came before the
-code. This is the release.
+code, and [`environments.md`](environments.md) is where staging and production are meant to
+sit. This is the release. It stands on its own — where those two matter, what matters is
+repeated here rather than pointed at.
 
 ## What ships, and in what order
 

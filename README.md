@@ -109,6 +109,8 @@ src/
   screens/               Login, Home, Path, Drill, Chips (+ Result, Balance), You
 docs/design-handoff/     the design bundle — read-only reference
 docs/authoring-lessons.md  how to add chapters and lessons
+docs/going-live.md       the release runbook — backend, signing, the stores
+docs/environments.md     where local, staging and production each run
 ```
 
 ## Adding lessons
