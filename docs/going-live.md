@@ -4,8 +4,8 @@ From where the app is today to a Play Store listing real people can install, in 
 steps actually depend on each other. Android is the spine here; iOS differences are called out
 where they matter.
 
-[`phase-0-setup.md`](phase-0-setup.md) is the account-by-account setup that came before the code.
-[`environments.md`](environments.md) is where staging and production live. This is the release.
+[`phase-0-setup.md`](phase-0-setup.md) is the account-by-account setup that came before the
+code. This is the release.
 
 ## What ships, and in what order
 
@@ -40,8 +40,14 @@ already points at `https://pokercoach.app/privacy` from the login screen and fro
 the right shape — but no `site/` directory exists, so the links go nowhere. Both stores reject a
 build whose privacy policy cannot be reached, and the Google consent screen cannot be published
 without one. Three static pages settle it: privacy, terms, and the account-deletion page 0.1
-still owes. The Vercel setup in [`environments.md`](environments.md) §3 is the plan, but any host
-works.
+still owes. Any static host will do.
+
+> One trap if you put the site on Vercel and let it manage the domain: `pokercoach.app` carries
+> the Resend `MX` and `TXT` records from [`phase-0-setup.md`](phase-0-setup.md) §6. **Do not hand
+> Vercel the nameservers** without re-creating all three records on the other side first, or
+> password-reset email stops arriving silently — and you find out when a real user needs it. Add
+> only the `A` and `CNAME` records Vercel asks for, and check the Resend records still resolve
+> afterwards.
 
 **0.3 · The release build is signed with the debug keystore.**
 [`android/app/build.gradle:115`](../android/app/build.gradle:115) points `release` at
@@ -70,11 +76,14 @@ is**. Android has no equivalent requirement; this does not block Play.
 
 ## Stage 1 · The production backend
 
-**1.1 · Decide one project or two.** [`environments.md`](environments.md) §2 argues for
-`poker-coach-staging` alongside `poker-coach`, and that is right the moment anyone but you
-installs a build — you need somewhere to push a migration that is not the database holding real
-streaks. If it is still only you, one project is defensible; the discipline below is what makes
-it survivable either way.
+**1.1 · Decide one project or two.** A second project — `poker-coach-staging` beside
+`poker-coach` — earns its keep the moment anyone but you installs a build: you need somewhere to
+push a migration that is not the database holding real streaks. If it is still only you, one
+project is defensible; the discipline below is what makes it survivable either way. Keep the app
+as one binary pointed at different backends by `EXPO_PUBLIC_SUPABASE_URL` rather than two
+variants, until an external tester needs both installed on one phone — a second bundle
+identifier means a second set of Google OAuth clients, a second Apple App ID and a second SHA-1
+registration, which is all of [`phase-0-setup.md`](phase-0-setup.md) §4 and §5 done again.
 
 **1.2 · Push the schema.** Staging first, verify, then production:
 
