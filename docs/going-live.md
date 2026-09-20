@@ -180,31 +180,29 @@ verifies against.
 npm run env:hosted
 ```
 
-**3.2 · Write `eas.json`.** `.env` is gitignored and EAS uploads from git, so the values have to
-reach the build another way — either the profile's `env` block (they are public by design: the
-anon key ships in the bundle and RLS is what protects the data) or EAS environment variables,
-which is the better home once staging and production differ:
+**3.2 · Set the build's environment.** [`eas.json`](../eas.json) is in the repo with three
+profiles — `development` (a dev client), `preview` (an installable `.apk`) and `production` (the
+`.aab` Play takes). What it deliberately does **not** carry is the `EXPO_PUBLIC_*` values.
 
-```json
-{
-  "cli": { "version": ">= 12.0.0" },
-  "build": {
-    "development": { "developmentClient": true, "distribution": "internal" },
-    "preview": {
-      "distribution": "internal",
-      "android": { "buildType": "apk" }
-    },
-    "production": {
-      "autoIncrement": true,
-      "android": { "buildType": "app-bundle" }
-    }
-  },
-  "submit": { "production": {} }
-}
+That gap has to be closed before the first cloud build or the app throws on launch:
+[`src/auth/supabase.ts`](../src/auth/supabase.ts) raises when the URL is missing, and `.env` is
+gitignored while EAS uploads from git, so nothing reaches the build by itself. Push them to EAS
+once per profile:
+
+```bash
+npx eas-cli@latest env:create --scope project --environment production
 ```
 
-`autoIncrement` matters: `versionCode` is `1` in the generated project, and Play refuses a second
-upload at the same code. Bump `version` in `app.json` by hand for anything a human should notice.
+They could live in a profile's `env` block instead — the anon key and the client ids are public
+by design, and RLS is what protects the data — but this repository is public, and EAS
+environment variables are the better home anyway once staging and production differ in more than
+one value.
+
+Two things about versions. `appVersionSource` is `local`, so `app.json` stays the single place
+native config lives, exactly as it is for everything else here — `android.versionCode` is in it
+and `autoIncrement` raises that number, which you then commit. And Play refuses a second upload
+at the same `versionCode`, which is what makes `autoIncrement` load-bearing rather than
+convenient. Bump `version` by hand for anything a human should notice.
 
 **3.3 · Build and submit.**
 
@@ -266,6 +264,6 @@ answer and the server's verdict agreeing.
 2. Create or promote the production Supabase project — `db push`, `sync:content`, auth settings, SMTP
 3. Prove RLS (`npx supabase test db`), clear the Security Advisor, leave the free tier
 4. Register **both** SHA-1s with the Android OAuth client, publish the consent screen
-5. `npm run env:hosted`, write `eas.json`, build the `.aab`, submit
+5. `npm run env:hosted`, push the `EXPO_PUBLIC_*` values to EAS, build the `.aab`, submit
 6. Fill the Play Console forms honestly — data safety, content rating, deletion URL
 7. Internal → closed → production, staged rollout
