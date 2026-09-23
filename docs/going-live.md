@@ -169,8 +169,20 @@ npx supabase test db
 own hearts, answers or completions; `economy.test.sql`, `side_bet.test.sql` and
 `double_xp.test.sql` prove the economy against the SQL itself; `account.test.sql` proves the
 export carries everything and the delete leaves nothing. Same migrations, so a pass locally is a
-real signal about production. Then run Supabase's **Security Advisor** in the dashboard and clear
-what it flags.
+real signal about the **policies**. Then run Supabase's **Security Advisor** in the dashboard and
+clear what it flags.
+
+> **It is not a signal about grants, and that gap has already bitten once.** The local Supabase
+> image hands `service_role` blanket table privileges through default privileges; the hosted
+> project does not. Locally that role reads `content_questions`, `player_state`, `answers` and
+> `lesson_completions` alike — on the hosted project it was denied all four, which is why
+> `sync-content.ts` could not seed the answer key until `20260923120000_service_role_answer_key_grant.sql`
+> granted it explicitly. A full `db reset` and 135 passing tests said nothing about it, because
+> the permission model they run against is not the one the app ships on.
+>
+> So for anything involving a `grant`, `revoke` or a role, prove it against the hosted project
+> rather than the local stack. The cheapest check is a request with the key the caller will
+> really use — a 403 carrying `42501` names the table and the missing privilege in its own hint.
 
 **1.7 · Confirm the anon key is the anon key.** P21's instruction, and it is a good one: grep the
 *built* bundle for `service_role` / `sb_secret` rather than trusting that `.env.admin` never
@@ -205,9 +217,17 @@ Keep the debug fingerprint (`5E:8F:16:06:…:F6:25`) registered too while you ar
 debug builds. There is no cost to extra fingerprints and a very annoying cost to a missing one.
 
 **Publish the OAuth consent screen.** In Testing mode it admits only accounts on its test-user
-list, caps at 100 of them, and expires refresh tokens after seven days. Publishing needs the
-privacy policy URL from Stage 0. With only the `email` and `profile` scopes this app requests,
-no verification review is triggered; asking for anything more would change that.
+list, caps at 100 of them, and expires refresh tokens after seven days. With only the `email` and
+`profile` scopes this app requests, no verification review is triggered; asking for anything more
+would change that.
+
+> **This step is blocked until the site is actually served, not merely written.** Publishing asks
+> for a homepage and a privacy policy URL, and Google checks that they resolve. As of
+> 23 September 2026 `pokercoach.app` answers **404 over HTTP with no TLS certificate** — the
+> domain points at Vercel but no project is attached to it (§0.2). The pages are finished and
+> their placeholders are filled; they are simply not being served. Attach the project with Root
+> Directory `site/` first, confirm with `curl -s -o /dev/null -w "%{http_code}" https://pokercoach.app/privacy`,
+> and only then publish the consent screen.
 
 **Finally**, confirm the Google provider in Supabase → Authentication → Providers holds the **web**
 client id *and its secret* — that is the audience `src/auth/google.ts` sends and the one Supabase
@@ -317,10 +337,21 @@ answer and the server's verdict agreeing.
 
 ## The short version
 
-1. Fill in `site/`'s placeholders, deploy it, point the domain; sort out real release signing
-2. Create or promote the production Supabase project — `db push`, `sync:content`, auth settings, SMTP
-3. Prove RLS (`npx supabase test db`), clear the Security Advisor, leave the free tier
-4. Register **both** SHA-1s with the Android OAuth client, publish the consent screen
-5. `npm run env:hosted`, push the `EXPO_PUBLIC_*` values to EAS, build the `.aab`, submit
-6. Fill the Play Console forms honestly — data safety, content rating, deletion URL
+**✓** marks what had landed as of 23 September 2026. The order matters in one place especially:
+step 4 cannot be finished before step 1, because publishing the consent screen needs a privacy
+policy URL that resolves.
+
+1. **✓** `site/`'s placeholders are filled and an upload keystore exists — still to do: **attach
+   the Vercel project** with Root Directory `site/`, and add an **apex `MX`**, or the app's legal
+   links 404 and `contact@pokercoach.app` bounces
+2. **✓** the production project has the schema and all 720 answers — still to do: **auth settings
+   and custom SMTP**, both dashboard-only
+3. Prove RLS (`npx supabase test db` — passing), clear the **Security Advisor**, leave the free
+   tier before real users arrive
+4. Register **both** SHA-1s with the Android OAuth client, publish the consent screen — **after
+   step 1**; the upload key's fingerprint exists now, Play's does not until the first upload
+5. **✓** the four `EXPO_PUBLIC_*` values are on EAS — still to do: `npm run env:hosted`, build the
+   `.aab`, submit
+6. Fill the Play Console forms honestly — data safety, content rating (**18**, matching what the
+   published pages already promise), deletion URL
 7. Internal → closed → production, staged rollout
