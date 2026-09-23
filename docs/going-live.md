@@ -50,12 +50,15 @@ neither of them writing — the first is done:
    `grep -o 'class="todo"' site/*.html | wc -l` returns 0. [`site/README.md`](../site/README.md)
    is the map of which page carries which. The factual sections were written from the schema and
    `get_export()`; the legal framing has not been near a lawyer, and should be.
-2. **Deploy it — the DNS half is already done.** `pokercoach.app` is on Vercel's nameservers and
-   the apex `A` records point at Vercel, but no project is attached: the apex answers **404 over
-   HTTP and has no TLS certificate at all**. So what is left is attaching this repo with **Root
-   Directory `site/`** and no build step, not a DNS change. Whatever the host, turn on clean URLs
-   — [`site/vercel.json`](../site/vercel.json) does it for Vercel — or the app's own legal links
-   404.
+2. **Deploy it — everything is in place except the domain assignment.** `pokercoach.app` is on
+   Vercel's nameservers and the apex `A` records point at Vercel. A Vercel project exists and
+   builds this directory: as of 23 September 2026 it serves `/privacy` with a **200** on its
+   preview URL, so Root Directory and clean URLs are both right. What is missing is the custom
+   domain being assigned to that project — the apex still answers **404 over HTTP with no TLS
+   certificate at all**, because nothing claims it. Add `pokercoach.app` under the project's
+   Settings → Domains; it is not a DNS change and not a build change. On any other host, turn on
+   the clean-URL equivalent — [`site/vercel.json`](../site/vercel.json) does it for Vercel — or
+   the app's own legal links 404.
 
 > **The nameserver move already happened, and the mail survived it.** This section used to warn
 > against handing Vercel the nameservers while `pokercoach.app` carried the Resend records from
@@ -75,7 +78,7 @@ neither of them writing — the first is done:
 > with `nslookup -type=MX pokercoach.app` — an unfilled placeholder shows up as an orange box on
 > the page, but a bouncing contact address looks exactly like a working one.
 
-**0.3 · No upload keystore exists yet — and the file that looks like the problem is not one.**
+**0.3 · Done — and the file that looked like the problem never was one.**
 `android/` is generated here, not committed: [`.gitignore`](../.gitignore) ignores `/android` and
 `/ios`, and `git ls-files android/` returns nothing at all. `app.json` is where native config
 lives and `expo run:android` prebuilds from it. So `android/app/build.gradle` — whose `release`
@@ -88,18 +91,20 @@ maintain by hand. Leave it alone.
 What that default actually governs is a single thing: `npx expo run:android --variant release` on
 this machine. That is fine for sideloading and cannot produce a Play upload either way.
 
-The real item is that no upload key exists. EAS generates one on the first Android build, or on
+The real item was that no upload key existed. EAS generates one on the first Android build, or on
 demand:
 
 ```bash
 npx eas-cli@latest credentials -p android
 ```
 
-Both routes need an Expo account, and neither is set up: `eas` is not installed here and
-`~/.expo/state.json` carries no session. So this is a login away, not a change away — which puts
-0.3 with the credential items rather than the code ones. Once the key exists, never lose it: it
-is how Play knows a future update is from you, and it is one half of the fingerprint pair in
-Stage 2.
+**That was run on 23 September 2026** — the keystore exists, held by EAS against this project,
+and the EAS link it wrote lives in `app.json` as `extra.eas.projectId`. So 0.3 was never a code
+item at all: it was a credential one, and it is closed.
+
+Never lose that key: it is how Play knows a future update is from you. And having it is **not**
+the same as being done with Stage 2 — it is one fingerprint of the pair there, and Play's
+app-signing key does not exist until the first upload.
 
 **0.4 · Decide the content rating honestly.** This is a poker app. The IARC questionnaire every
 store runs asks about simulated gambling, and a card game dealing chips is going to touch it even
@@ -221,13 +226,13 @@ list, caps at 100 of them, and expires refresh tokens after seven days. With onl
 `profile` scopes this app requests, no verification review is triggered; asking for anything more
 would change that.
 
-> **This step is blocked until the site is actually served, not merely written.** Publishing asks
-> for a homepage and a privacy policy URL, and Google checks that they resolve. As of
-> 23 September 2026 `pokercoach.app` answers **404 over HTTP with no TLS certificate** — the
-> domain points at Vercel but no project is attached to it (§0.2). The pages are finished and
-> their placeholders are filled; they are simply not being served. Attach the project with Root
-> Directory `site/` first, confirm with `curl -s -o /dev/null -w "%{http_code}" https://pokercoach.app/privacy`,
-> and only then publish the consent screen.
+> **This step is blocked until the site is served on its own domain, not merely written and
+> building.** Publishing asks for a homepage and a privacy policy URL, and Google checks that they
+> resolve. The pages are finished, their placeholders are filled, and the Vercel project builds
+> them — but as of 23 September 2026 `pokercoach.app` itself answers **404 over HTTP with no TLS
+> certificate**, because the domain is not assigned to that project (§0.2). A preview URL will not
+> do here: the consent screen has to name the domain users will see. Assign it, confirm with
+> `curl -s -o /dev/null -w "%{http_code}" https://pokercoach.app/privacy`, and only then publish.
 
 **Finally**, confirm the Google provider in Supabase → Authentication → Providers holds the **web**
 client id *and its secret* — that is the audience `src/auth/google.ts` sends and the one Supabase
@@ -341,9 +346,9 @@ answer and the server's verdict agreeing.
 step 4 cannot be finished before step 1, because publishing the consent screen needs a privacy
 policy URL that resolves.
 
-1. **✓** `site/`'s placeholders are filled and an upload keystore exists — still to do: **attach
-   the Vercel project** with Root Directory `site/`, and add an **apex `MX`**, or the app's legal
-   links 404 and `contact@pokercoach.app` bounces
+1. **✓** `site/`'s placeholders are filled, an upload keystore exists, and the Vercel project
+   builds the directory — still to do: **assign `pokercoach.app` to that project**, and add an
+   **apex `MX`**, or the app's legal links 404 and `contact@pokercoach.app` bounces
 2. **✓** the production project has the schema and all 720 answers — still to do: **auth settings
    and custom SMTP**, both dashboard-only
 3. Prove RLS (`npx supabase test db` — passing), clear the **Security Advisor**, leave the free
