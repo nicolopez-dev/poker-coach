@@ -66,10 +66,18 @@ match the age rating on the store listing, and **14 days** is shorter than the m
 
 ## Deploying
 
-Any static host serves this directory as-is. On Vercel, set **Root Directory** to `site/` and
-leave the framework preset as Other — there is nothing to build.
+**Live since 23 September 2026** at [pokercoach.app](https://pokercoach.app) — a Vercel project
+with **Root Directory** `site/` and the framework preset left as Other, because there is nothing
+to build. All four routes answer 200 at their extensionless paths.
 
-Before pointing DNS anywhere, read the warning in
+The **apex is the primary** and `www` redirects to it. Keep it that way round:
+[`src/components/LegalLinks.tsx`](../src/components/LegalLinks.tsx) compiles
+`https://pokercoach.app/privacy` and `/terms` into the app, where they change only with a new
+build — so the host those constants name has to be the one that serves, never one that depends
+on a redirect continuing to exist.
+
+Any static host serves this directory as-is; on another one, turn on its clean-URL equivalent or
+the app's legal links 404. And before changing DNS, read
 [`docs/going-live.md`](../docs/going-live.md) §0.2: `pokercoach.app` carries the Resend `MX` and
 `TXT` records, and letting a host take over the nameservers stops password-reset email silently.
 

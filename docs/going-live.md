@@ -37,12 +37,12 @@ while leaving the player in the next seat untouched. That satisfies Apple 5.1.1(
 Articles 15 and 20. What is still owed is Google Play's *other* half: a **public deletion URL**,
 which is now written and waiting to be served — see 0.2.
 
-**0.2 · The legal pages are written but not served.** [`site/`](../site) holds four static HTML
+**0.2 · The legal pages are written, filled and live.** [`site/`](../site) holds four static HTML
 files — privacy, terms, the public deletion page Play wants, and a front page so the domain is
 not a 404. They are served at the extensionless paths
 [`src/components/LegalLinks.tsx`](../src/components/LegalLinks.tsx) already compiles into the
 app, and they load nothing from anywhere, so the pages themselves collect nothing. Two steps,
-neither of them writing — the first is done:
+neither of them writing, and both are done:
 
 1. **Fill the placeholders — done.** NiLo S.L., Camí de la Reineta 11, 08017 Barcelona, Spain;
    `contact@pokercoach.app`; data in the European Union (`eu-central-1`); minimum age 18; Spanish
@@ -50,15 +50,17 @@ neither of them writing — the first is done:
    `grep -o 'class="todo"' site/*.html | wc -l` returns 0. [`site/README.md`](../site/README.md)
    is the map of which page carries which. The factual sections were written from the schema and
    `get_export()`; the legal framing has not been near a lawyer, and should be.
-2. **Deploy it — everything is in place except the domain assignment.** `pokercoach.app` is on
-   Vercel's nameservers and the apex `A` records point at Vercel. A Vercel project exists and
-   builds this directory: as of 23 September 2026 it serves `/privacy` with a **200** on its
-   preview URL, so Root Directory and clean URLs are both right. What is missing is the custom
-   domain being assigned to that project — the apex still answers **404 over HTTP with no TLS
-   certificate at all**, because nothing claims it. Add `pokercoach.app` under the project's
-   Settings → Domains; it is not a DNS change and not a build change. On any other host, turn on
-   the clean-URL equivalent — [`site/vercel.json`](../site/vercel.json) does it for Vercel — or
-   the app's own legal links 404.
+2. **Deploy it — done, 23 September 2026.** `pokercoach.app` is on Vercel's nameservers, and a
+   Vercel project serves `site/` at it. All four routes answer **200 over HTTPS at their
+   extensionless paths**, so the clean URLs [`site/vercel.json`](../site/vercel.json) asks for
+   are working — without them the app's own legal links would 404, and a store reviewer would be
+   the one to find out. On any other host, turn on that host's equivalent.
+
+   **The apex is the primary and `www` redirects to it**, which is the direction that matters
+   rather than a preference. `LegalLinks.tsx` compiles `https://pokercoach.app/privacy` and
+   `/terms` into the binary, where they can only change with a new build — so the domain those
+   constants name has to be the one that serves, not one that depends on a redirect from a
+   `www` host continuing to exist. Register the apex with Google and Play for the same reason.
 
 > **The nameserver move already happened, and the mail survived it.** This section used to warn
 > against handing Vercel the nameservers while `pokercoach.app` carried the Resend records from
@@ -226,13 +228,11 @@ list, caps at 100 of them, and expires refresh tokens after seven days. With onl
 `profile` scopes this app requests, no verification review is triggered; asking for anything more
 would change that.
 
-> **This step is blocked until the site is served on its own domain, not merely written and
-> building.** Publishing asks for a homepage and a privacy policy URL, and Google checks that they
-> resolve. The pages are finished, their placeholders are filled, and the Vercel project builds
-> them — but as of 23 September 2026 `pokercoach.app` itself answers **404 over HTTP with no TLS
-> certificate**, because the domain is not assigned to that project (§0.2). A preview URL will not
-> do here: the consent screen has to name the domain users will see. Assign it, confirm with
-> `curl -s -o /dev/null -w "%{http_code}" https://pokercoach.app/privacy`, and only then publish.
+> **This step needs a privacy policy URL that resolves, and since 23 September 2026 one does.**
+> `https://pokercoach.app/privacy` answers 200 over HTTPS (§0.2), so publishing is no longer
+> gated on it. Give Google the **apex**, not `www` and not a Vercel preview URL: the apex is the
+> primary, it is what `LegalLinks.tsx` compiles into the app, and the consent screen should name
+> the domain users actually see. `/terms` is the other URL it asks for.
 
 **Finally**, confirm the Google provider in Supabase → Authentication → Providers holds the **web**
 client id *and its secret* — that is the audience `src/auth/google.ts` sends and the one Supabase
@@ -342,19 +342,20 @@ answer and the server's verdict agreeing.
 
 ## The short version
 
-**✓** marks what had landed as of 23 September 2026. The order matters in one place especially:
-step 4 cannot be finished before step 1, because publishing the consent screen needs a privacy
-policy URL that resolves.
+**✓** marks what had landed as of 23 September 2026. The dependency that used to bind — step 4
+waiting on step 1, because publishing the consent screen needs a privacy policy URL that resolves
+— is satisfied: the site is live on the apex.
 
-1. **✓** `site/`'s placeholders are filled, an upload keystore exists, and the Vercel project
-   builds the directory — still to do: **assign `pokercoach.app` to that project**, and add an
-   **apex `MX`**, or the app's legal links 404 and `contact@pokercoach.app` bounces
+1. **✓** `site/` is filled and **served at `https://pokercoach.app`**, all four routes 200 on
+   their clean URLs, apex primary with `www` redirecting to it; an upload keystore exists —
+   still to do: an **apex `MX`**, or `contact@pokercoach.app` bounces and the privacy policy
+   names an address nobody can reach
 2. **✓** the production project has the schema and all 720 answers — still to do: **auth settings
    and custom SMTP**, both dashboard-only
 3. Prove RLS (`npx supabase test db` — passing), clear the **Security Advisor**, leave the free
    tier before real users arrive
-4. Register **both** SHA-1s with the Android OAuth client, publish the consent screen — **after
-   step 1**; the upload key's fingerprint exists now, Play's does not until the first upload
+4. Register **both** SHA-1s with the Android OAuth client, publish the consent screen — the
+   upload key's fingerprint exists now, Play's does not until the first upload
 5. **✓** the four `EXPO_PUBLIC_*` values are on EAS — still to do: `npm run env:hosted`, build the
    `.aab`, submit
 6. Fill the Play Console forms honestly — data safety, content rating (**18**, matching what the
