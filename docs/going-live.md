@@ -75,11 +75,31 @@ neither of them writing — the first is done:
 > with `nslookup -type=MX pokercoach.app` — an unfilled placeholder shows up as an orange box on
 > the page, but a bouncing contact address looks exactly like a working one.
 
-**0.3 · The release build is signed with the debug keystore.**
-[`android/app/build.gradle:115`](../android/app/build.gradle:115) points `release` at
-`signingConfigs.debug`, which is fine for sideloading and fatal for Play — it rejects
-debug-signed uploads outright. Let EAS manage a real upload keystore (Stage 3), and never lose
-it: the upload key is how Play knows a future update is from you.
+**0.3 · No upload keystore exists yet — and the file that looks like the problem is not one.**
+`android/` is generated here, not committed: [`.gitignore`](../.gitignore) ignores `/android` and
+`/ios`, and `git ls-files android/` returns nothing at all. `app.json` is where native config
+lives and `expo run:android` prebuilds from it. So `android/app/build.gradle` — whose `release`
+block points at `signingConfigs.debug`, the Expo template default — is a local build artifact.
+Prebuild rewrites it, and, for the same reason §3.2 gives about `.env`, **EAS uploads from git**,
+so it never reaches a cloud build in the first place. Editing that line changes nothing, and
+committing `android/` to make it stick would trade generated native projects for ones you
+maintain by hand. Leave it alone.
+
+What that default actually governs is a single thing: `npx expo run:android --variant release` on
+this machine. That is fine for sideloading and cannot produce a Play upload either way.
+
+The real item is that no upload key exists. EAS generates one on the first Android build, or on
+demand:
+
+```bash
+npx eas-cli@latest credentials -p android
+```
+
+Both routes need an Expo account, and neither is set up: `eas` is not installed here and
+`~/.expo/state.json` carries no session. So this is a login away, not a change away — which puts
+0.3 with the credential items rather than the code ones. Once the key exists, never lose it: it
+is how Play knows a future update is from you, and it is one half of the fingerprint pair in
+Stage 2.
 
 **0.4 · Decide the content rating honestly.** This is a poker app. The IARC questionnaire every
 store runs asks about simulated gambling, and a card game dealing chips is going to touch it even
@@ -210,12 +230,25 @@ profiles — `development` (a dev client), `preview` (an installable `.apk`) and
 
 That gap has to be closed before the first cloud build or the app throws on launch:
 [`src/auth/supabase.ts`](../src/auth/supabase.ts) raises when the URL is missing, and `.env` is
-gitignored while EAS uploads from git, so nothing reaches the build by itself. Push them to EAS
-once per profile:
+gitignored while EAS uploads from git, so nothing reaches the build by itself.
+
+**Done, as of 20 September 2026.** All four — `EXPO_PUBLIC_SUPABASE_URL`,
+`EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` and
+`EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` — are set on `production` and `preview` at project scope,
+`plaintext` visibility. `development` is deliberately empty: a dev client loads its bundle from
+Metro, so it reads the `.env` on the machine running it. Read them back with
+`eas env:list --environment production`, and add or change one with:
 
 ```bash
-npx eas-cli@latest env:create --scope project --environment production
+npx eas-cli@latest env:set --scope project --environment production --name NAME --value VALUE --visibility plaintext
 ```
+
+`env:create` is deprecated in eas-cli 24; `env:set` creates or updates.
+
+> **Take these from `.env`, never from `.env.local`.** `.env.local` is what
+> `npm run env:local` points at the local Supabase stack — `http://127.0.0.1:54321` and the
+> local JWT anon key. Pushing those would produce a binary that talks to a laptop, and it would
+> build, install and launch before failing on every request.
 
 They could live in a profile's `env` block instead — the anon key and the client ids are public
 by design, and RLS is what protects the data — but this repository is public, and EAS

@@ -46,11 +46,8 @@ yarn-error.*
 .claude/settings.local.json
 .idea/
 
-# OAuth docs
-OAauth-docs/Clients/Android client - client_secret_9731935605-htm1ahojavpcjlssim7ieih3jeaatnv6.apps.googleusercontent.com.json
-OAauth-docs/Clients/Android client.png
-OAauth-docs/Clients/iOS client - client_9731935605-2hsh259h7an19o399totnerhp6ufv7ct.apps.googleusercontent.com.plist
-OAauth-docs/Clients/iOS client.png
-OAauth-docs/Clients/Web client - client_secret_9731935605-jtv027lpl262b1tu454t0ibror4cjier.apps.googleusercontent.com.json
-OAauth-docs/Clients/Web client.png
+# OAuth docs — the whole folder, not a list of filenames. It holds downloaded OAuth
+# client configs (the Web client's carries a secret) and console screenshots, and this
+# repository is public. Ignoring it by name means anything added later is ignored too.
+OAauth-docs/
 resend/sending-permission.png
