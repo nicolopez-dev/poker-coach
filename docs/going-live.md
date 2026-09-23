@@ -37,12 +37,12 @@ while leaving the player in the next seat untouched. That satisfies Apple 5.1.1(
 Articles 15 and 20. What is still owed is Google Play's *other* half: a **public deletion URL**,
 which is now written and waiting to be served — see 0.2.
 
-**0.2 · The legal pages are written but not served.** [`site/`](../site) holds four static HTML
+**0.2 · The legal pages are written, filled and live.** [`site/`](../site) holds four static HTML
 files — privacy, terms, the public deletion page Play wants, and a front page so the domain is
 not a 404. They are served at the extensionless paths
 [`src/components/LegalLinks.tsx`](../src/components/LegalLinks.tsx) already compiles into the
 app, and they load nothing from anywhere, so the pages themselves collect nothing. Two steps,
-neither of them writing — the first is done:
+neither of them writing, and both are done:
 
 1. **Fill the placeholders — done.** NiLo S.L., Camí de la Reineta 11, 08017 Barcelona, Spain;
    `contact@pokercoach.app`; data in the European Union (`eu-central-1`); minimum age 18; Spanish
@@ -50,12 +50,17 @@ neither of them writing — the first is done:
    `grep -o 'class="todo"' site/*.html | wc -l` returns 0. [`site/README.md`](../site/README.md)
    is the map of which page carries which. The factual sections were written from the schema and
    `get_export()`; the legal framing has not been near a lawyer, and should be.
-2. **Deploy it — the DNS half is already done.** `pokercoach.app` is on Vercel's nameservers and
-   the apex `A` records point at Vercel, but no project is attached: the apex answers **404 over
-   HTTP and has no TLS certificate at all**. So what is left is attaching this repo with **Root
-   Directory `site/`** and no build step, not a DNS change. Whatever the host, turn on clean URLs
-   — [`site/vercel.json`](../site/vercel.json) does it for Vercel — or the app's own legal links
-   404.
+2. **Deploy it — done, 23 September 2026.** `pokercoach.app` is on Vercel's nameservers, and a
+   Vercel project serves `site/` at it. All four routes answer **200 over HTTPS at their
+   extensionless paths**, so the clean URLs [`site/vercel.json`](../site/vercel.json) asks for
+   are working — without them the app's own legal links would 404, and a store reviewer would be
+   the one to find out. On any other host, turn on that host's equivalent.
+
+   **The apex is the primary and `www` redirects to it**, which is the direction that matters
+   rather than a preference. `LegalLinks.tsx` compiles `https://pokercoach.app/privacy` and
+   `/terms` into the binary, where they can only change with a new build — so the domain those
+   constants name has to be the one that serves, not one that depends on a redirect from a
+   `www` host continuing to exist. Register the apex with Google and Play for the same reason.
 
 > **The nameserver move already happened, and the mail survived it.** This section used to warn
 > against handing Vercel the nameservers while `pokercoach.app` carried the Resend records from
@@ -75,7 +80,7 @@ neither of them writing — the first is done:
 > with `nslookup -type=MX pokercoach.app` — an unfilled placeholder shows up as an orange box on
 > the page, but a bouncing contact address looks exactly like a working one.
 
-**0.3 · No upload keystore exists yet — and the file that looks like the problem is not one.**
+**0.3 · Done — and the file that looked like the problem never was one.**
 `android/` is generated here, not committed: [`.gitignore`](../.gitignore) ignores `/android` and
 `/ios`, and `git ls-files android/` returns nothing at all. `app.json` is where native config
 lives and `expo run:android` prebuilds from it. So `android/app/build.gradle` — whose `release`
@@ -88,18 +93,20 @@ maintain by hand. Leave it alone.
 What that default actually governs is a single thing: `npx expo run:android --variant release` on
 this machine. That is fine for sideloading and cannot produce a Play upload either way.
 
-The real item is that no upload key exists. EAS generates one on the first Android build, or on
+The real item was that no upload key existed. EAS generates one on the first Android build, or on
 demand:
 
 ```bash
 npx eas-cli@latest credentials -p android
 ```
 
-Both routes need an Expo account, and neither is set up: `eas` is not installed here and
-`~/.expo/state.json` carries no session. So this is a login away, not a change away — which puts
-0.3 with the credential items rather than the code ones. Once the key exists, never lose it: it
-is how Play knows a future update is from you, and it is one half of the fingerprint pair in
-Stage 2.
+**That was run on 23 September 2026** — the keystore exists, held by EAS against this project,
+and the EAS link it wrote lives in `app.json` as `extra.eas.projectId`. So 0.3 was never a code
+item at all: it was a credential one, and it is closed.
+
+Never lose that key: it is how Play knows a future update is from you. And having it is **not**
+the same as being done with Stage 2 — it is one fingerprint of the pair there, and Play's
+app-signing key does not exist until the first upload.
 
 **0.4 · Decide the content rating honestly.** This is a poker app. The IARC questionnaire every
 store runs asks about simulated gambling, and a card game dealing chips is going to touch it even
@@ -169,8 +176,20 @@ npx supabase test db
 own hearts, answers or completions; `economy.test.sql`, `side_bet.test.sql` and
 `double_xp.test.sql` prove the economy against the SQL itself; `account.test.sql` proves the
 export carries everything and the delete leaves nothing. Same migrations, so a pass locally is a
-real signal about production. Then run Supabase's **Security Advisor** in the dashboard and clear
-what it flags.
+real signal about the **policies**. Then run Supabase's **Security Advisor** in the dashboard and
+clear what it flags.
+
+> **It is not a signal about grants, and that gap has already bitten once.** The local Supabase
+> image hands `service_role` blanket table privileges through default privileges; the hosted
+> project does not. Locally that role reads `content_questions`, `player_state`, `answers` and
+> `lesson_completions` alike — on the hosted project it was denied all four, which is why
+> `sync-content.ts` could not seed the answer key until `20260923120000_service_role_answer_key_grant.sql`
+> granted it explicitly. A full `db reset` and 135 passing tests said nothing about it, because
+> the permission model they run against is not the one the app ships on.
+>
+> So for anything involving a `grant`, `revoke` or a role, prove it against the hosted project
+> rather than the local stack. The cheapest check is a request with the key the caller will
+> really use — a 403 carrying `42501` names the table and the missing privilege in its own hint.
 
 **1.7 · Confirm the anon key is the anon key.** P21's instruction, and it is a good one: grep the
 *built* bundle for `service_role` / `sb_secret` rather than trusting that `.env.admin` never
@@ -205,9 +224,15 @@ Keep the debug fingerprint (`5E:8F:16:06:…:F6:25`) registered too while you ar
 debug builds. There is no cost to extra fingerprints and a very annoying cost to a missing one.
 
 **Publish the OAuth consent screen.** In Testing mode it admits only accounts on its test-user
-list, caps at 100 of them, and expires refresh tokens after seven days. Publishing needs the
-privacy policy URL from Stage 0. With only the `email` and `profile` scopes this app requests,
-no verification review is triggered; asking for anything more would change that.
+list, caps at 100 of them, and expires refresh tokens after seven days. With only the `email` and
+`profile` scopes this app requests, no verification review is triggered; asking for anything more
+would change that.
+
+> **This step needs a privacy policy URL that resolves, and since 23 September 2026 one does.**
+> `https://pokercoach.app/privacy` answers 200 over HTTPS (§0.2), so publishing is no longer
+> gated on it. Give Google the **apex**, not `www` and not a Vercel preview URL: the apex is the
+> primary, it is what `LegalLinks.tsx` compiles into the app, and the consent screen should name
+> the domain users actually see. `/terms` is the other URL it asks for.
 
 **Finally**, confirm the Google provider in Supabase → Authentication → Providers holds the **web**
 client id *and its secret* — that is the audience `src/auth/google.ts` sends and the one Supabase
@@ -317,10 +342,22 @@ answer and the server's verdict agreeing.
 
 ## The short version
 
-1. Fill in `site/`'s placeholders, deploy it, point the domain; sort out real release signing
-2. Create or promote the production Supabase project — `db push`, `sync:content`, auth settings, SMTP
-3. Prove RLS (`npx supabase test db`), clear the Security Advisor, leave the free tier
-4. Register **both** SHA-1s with the Android OAuth client, publish the consent screen
-5. `npm run env:hosted`, push the `EXPO_PUBLIC_*` values to EAS, build the `.aab`, submit
-6. Fill the Play Console forms honestly — data safety, content rating, deletion URL
+**✓** marks what had landed as of 23 September 2026. The dependency that used to bind — step 4
+waiting on step 1, because publishing the consent screen needs a privacy policy URL that resolves
+— is satisfied: the site is live on the apex.
+
+1. **✓** `site/` is filled and **served at `https://pokercoach.app`**, all four routes 200 on
+   their clean URLs, apex primary with `www` redirecting to it; an upload keystore exists —
+   still to do: an **apex `MX`**, or `contact@pokercoach.app` bounces and the privacy policy
+   names an address nobody can reach
+2. **✓** the production project has the schema and all 720 answers — still to do: **auth settings
+   and custom SMTP**, both dashboard-only
+3. Prove RLS (`npx supabase test db` — passing), clear the **Security Advisor**, leave the free
+   tier before real users arrive
+4. Register **both** SHA-1s with the Android OAuth client, publish the consent screen — the
+   upload key's fingerprint exists now, Play's does not until the first upload
+5. **✓** the four `EXPO_PUBLIC_*` values are on EAS — still to do: `npm run env:hosted`, build the
+   `.aab`, submit
+6. Fill the Play Console forms honestly — data safety, content rating (**18**, matching what the
+   published pages already promise), deletion URL
 7. Internal → closed → production, staged rollout
