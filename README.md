@@ -420,6 +420,8 @@ Supabase's side of the account rather than the app's.
   equivalent, so tapping a chip's colour well opens a sheet of the case's own swatches.
 - **Header blur** — `backdrop-filter` has no Android equivalent; there the header falls back to a
   more opaque fill.
-- **`glow`** — React Native cannot animate a box shadow, so the drill CTA pulses a gold ring
-  instead.
+- **`glow`** — React Native cannot animate a box shadow, so a gold halo behind the drill CTA
+  grows past the pill instead: scaled on X and Y separately so it reaches the same distance on
+  every side, as a spread would. It peaks at 6px, tighter than the handoff's 9px — the earlier
+  uniform `scale` smeared it out sideways on a full-width pill.
 - **Week chart** — the day letters sit in their own row rather than overflowing the 74px bar box.

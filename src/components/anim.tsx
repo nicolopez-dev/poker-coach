@@ -2,8 +2,10 @@
  * The handoff's motion set, rebuilt on the React Native Animated API.
  * Names and timings match the "Motion" table in docs/design-handoff/README.md.
  */
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Platform, StyleProp, ViewStyle } from 'react-native';
+
+import { absoluteFill } from '../theme/tokens';
 
 /** react-native-web has no native driver; asking for one only logs a warning. */
 const NATIVE = Platform.OS !== 'web';
@@ -285,9 +287,22 @@ export function Tilt({
   );
 }
 
-/** `glow` — 2.6s pulse behind a pill button (a ring, since RN can't animate shadows). */
+/** How far the `glow` halo reaches past the pill at its peak, on every side. */
+const GLOW_SPREAD = 6;
+
+/**
+ * `glow` — 2.6s pulse behind a pill button. The handoff animates a box-shadow's spread,
+ * which RN cannot do, so a gold halo sits behind the button and grows past its edge.
+ *
+ * It grows by the same number of pixels on all four sides, like a spread would. A single
+ * `scale` cannot do that on a wide pill — 6% of 350px is 21px across but 3px down, which
+ * smeared the halo out sideways — so the button is measured and X and Y are scaled
+ * separately. The spread is tighter than the handoff's 9px (see README deviations).
+ */
 export function Glow({ children, style, radius = 999 }: AnimProps & { radius?: number }) {
   const t = useRef(new Animated.Value(0)).current;
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+
   useEffect(() => {
     const loop = Animated.loop(
       Animated.timing(t, {
@@ -301,28 +316,30 @@ export function Glow({ children, style, radius = 999 }: AnimProps & { radius?: n
     return () => loop.stop();
   }, [t]);
 
-  const ring = useMemo(
-    () => ({
-      position: 'absolute' as const,
-      left: 0,
-      right: 0,
-      top: 0,
-      bottom: 0,
+  const halo = useMemo(() => {
+    if (!size || size.width === 0 || size.height === 0) return null;
+    const peak = (length: number) => (length + 2 * GLOW_SPREAD) / length;
+    const pulse = (to: number) =>
+      t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, to, 1] });
+    return {
+      ...absoluteFill,
       pointerEvents: 'none' as const,
       borderRadius: radius,
-      borderWidth: 9,
-      borderColor: 'rgba(232,207,160,.30)',
-      opacity: t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0.9, 0] }),
-      transform: [
-        { scale: t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.06, 1] }) },
-      ],
-    }),
-    [t, radius],
-  );
+      backgroundColor: 'rgba(232,207,160,.30)',
+      // fades as it shrinks back, so no hairline of gold is left at the pill's edge
+      opacity: t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 1, 0] }),
+      transform: [{ scaleX: pulse(peak(size.width)) }, { scaleY: pulse(peak(size.height)) }],
+    };
+  }, [t, radius, size]);
 
   return (
-    <Animated.View style={style}>
-      <Animated.View style={ring} />
+    <Animated.View
+      style={style}
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        setSize((s) => (s && s.width === width && s.height === height ? s : { width, height }));
+      }}>
+      {halo ? <Animated.View style={halo} /> : null}
       {children}
     </Animated.View>
   );
