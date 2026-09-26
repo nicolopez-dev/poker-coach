@@ -1,0 +1,142 @@
+{
+  "projectId": "75f67686-0430-443d-a0ee-6605a5237d33",
+  "shape": "package",
+  "pkg": "poker-coach",
+  "globalName": "PokerCoach",
+  "buildCmd": "node .design-sync/build-dist.mjs",
+  "srcDir": "../../src",
+  "cssEntry": "styles/tokens.css",
+  "extraFonts": [
+    "fonts/fonts.css"
+  ],
+  "componentSrcMap": {
+    "Animated": null,
+    "AuthField": "../../src/components/ui.tsx",
+    "Brand": "../../src/components/ui.tsx",
+    "ChipDisc": "../../src/components/RankChip.tsx",
+    "ChipDrop": "../../src/components/anim.tsx",
+    "ChipEdge": "../../src/components/Chip.tsx",
+    "ChipIcon": "../../src/components/icons.tsx",
+    "CloseIcon": "../../src/components/icons.tsx",
+    "Divider": "../../src/components/ui.tsx",
+    "Flip": "../../src/components/anim.tsx",
+    "Glow": "../../src/components/anim.tsx",
+    "GoldFrame": "../../src/components/Gold.tsx",
+    "GoogleIcon": "../../src/components/icons.tsx",
+    "HeartsPill": "../../src/components/ui.tsx",
+    "HomeIcon": "../../src/components/icons.tsx",
+    "Nudge": "../../src/components/anim.tsx",
+    "NumberField": "../../src/components/ui.tsx",
+    "OutlineButton": "../../src/components/ui.tsx",
+    "Pop": "../../src/components/anim.tsx",
+    "Pressable": null,
+    "ProgressBar": "../../src/components/ui.tsx",
+    "RedButton": "../../src/components/ui.tsx",
+    "RewardButton": "../../src/components/ui.tsx",
+    "RewardCard": "../../src/components/Gold.tsx",
+    "RewardPill": "../../src/components/ui.tsx",
+    "Rise": "../../src/components/anim.tsx",
+    "SafeAreaProvider": null,
+    "ScrollView": null,
+    "Shake": "../../src/components/anim.tsx",
+    "Sheen": "../../src/components/Gold.tsx",
+    "SilverFrame": "../../src/components/Gold.tsx",
+    "StatPill": "../../src/components/ui.tsx",
+    "StreakPill": "../../src/components/ui.tsx",
+    "StyleSheet": null,
+    "Suit": "../../src/components/ui.tsx",
+    "SyncPill": "../../src/components/ui.tsx",
+    "Text": null,
+    "TextInput": null,
+    "Tilt": "../../src/components/anim.tsx",
+    "TrendingUpIcon": "../../src/components/icons.tsx",
+    "UserIcon": "../../src/components/icons.tsx",
+    "View": null
+  },
+  "provider": {
+    "component": "SafeAreaProvider",
+    "props": {
+      "initialMetrics": {
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 844
+        },
+        "insets": {
+          "top": 0,
+          "left": 0,
+          "right": 0,
+          "bottom": 0
+        }
+      },
+      "style": {
+        "backgroundColor": "#080d0a",
+        "padding": 16
+      }
+    }
+  },
+  "docsMap": {
+    "AceCard": "../../.design-sync/groups/cards.md",
+    "AuthField": "../../.design-sync/groups/inputs.md",
+    "Avatar": "../../.design-sync/groups/navigation.md",
+    "BackgroundCards": "../../.design-sync/groups/cards.md",
+    "Brand": "../../.design-sync/groups/navigation.md",
+    "CardBack": "../../.design-sync/groups/cards.md",
+    "Chip": "../../.design-sync/groups/chips.md",
+    "ChipDisc": "../../.design-sync/groups/chips.md",
+    "ChipDrop": "../../.design-sync/groups/motion.md",
+    "ChipEdge": "../../.design-sync/groups/chips.md",
+    "ChipIcon": "../../.design-sync/groups/icons.md",
+    "CloseIcon": "../../.design-sync/groups/icons.md",
+    "Divider": "../../.design-sync/groups/surfaces.md",
+    "Felt": "../../.design-sync/groups/surfaces.md",
+    "Flip": "../../.design-sync/groups/motion.md",
+    "FlipCard": "../../.design-sync/groups/cards.md",
+    "Glow": "../../.design-sync/groups/motion.md",
+    "GoldFrame": "../../.design-sync/groups/surfaces.md",
+    "GoogleIcon": "../../.design-sync/groups/icons.md",
+    "Header": "../../.design-sync/groups/navigation.md",
+    "HeartsPill": "../../.design-sync/groups/status.md",
+    "HeldHand": "../../.design-sync/groups/cards.md",
+    "HomeIcon": "../../.design-sync/groups/icons.md",
+    "LegalLinks": "../../.design-sync/groups/navigation.md",
+    "Nudge": "../../.design-sync/groups/motion.md",
+    "NumberField": "../../.design-sync/groups/inputs.md",
+    "OutlineButton": "../../.design-sync/groups/buttons.md",
+    "Pop": "../../.design-sync/groups/motion.md",
+    "ProgressBar": "../../.design-sync/groups/status.md",
+    "RankChip": "../../.design-sync/groups/chips.md",
+    "RedButton": "../../.design-sync/groups/buttons.md",
+    "RewardButton": "../../.design-sync/groups/buttons.md",
+    "RewardCard": "../../.design-sync/groups/surfaces.md",
+    "RewardPill": "../../.design-sync/groups/status.md",
+    "Rise": "../../.design-sync/groups/motion.md",
+    "Shake": "../../.design-sync/groups/motion.md",
+    "Sheen": "../../.design-sync/groups/surfaces.md",
+    "SilverFrame": "../../.design-sync/groups/surfaces.md",
+    "StatPill": "../../.design-sync/groups/status.md",
+    "StreakPill": "../../.design-sync/groups/status.md",
+    "Suit": "../../.design-sync/groups/cards.md",
+    "SwatchPicker": "../../.design-sync/groups/inputs.md",
+    "SyncPill": "../../.design-sync/groups/status.md",
+    "TabBar": "../../.design-sync/groups/navigation.md",
+    "Tilt": "../../.design-sync/groups/motion.md",
+    "TrendingUpIcon": "../../.design-sync/groups/icons.md",
+    "UserIcon": "../../.design-sync/groups/icons.md"
+  },
+  "overrides": {
+    "AceCard": {
+      "cardMode": "column"
+    },
+    "BackgroundCards": {
+      "cardMode": "single",
+      "viewport": "390x780"
+    },
+    "SwatchPicker": {
+      "cardMode": "single",
+      "viewport": "390x420"
+    }
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}
