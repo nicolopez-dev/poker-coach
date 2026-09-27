@@ -1,5 +1,8 @@
-import React, { forwardRef, useState } from 'react';
+import React, { forwardRef, useEffect, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
+  Platform,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -12,8 +15,9 @@ import {
 } from 'react-native';
 
 import { MAX_HEARTS, formatCountdown } from '../lib/hearts';
-import { colors, font, ls, radius, shadows, TOUCH } from '../theme/tokens';
+import { absoluteFill, colors, font, ls, radius, shadows, TOUCH } from '../theme/tokens';
 import { Glow } from './anim';
+import { DoubleXpBadge } from './DoubleXpChip';
 import { GoldFrame } from './Gold';
 import { useCountdown } from './useCountdown';
 
@@ -75,17 +79,92 @@ export const AuthField = forwardRef<TextInput, TextInputProps>(function AuthFiel
   );
 });
 
-/** The ♠ mark plus wordmark, used in the header and on the login screen. */
-export function Brand() {
+/**
+ * The ♠ mark plus wordmark, used in the header and on the login screen.
+ *
+ * While the day's ante runs, the header's mark is the 2X XP chip instead, turning slowly
+ * in the same 30px square — so the double shows from every tab without moving anything
+ * else in the bar. It goes the moment the ante does: a wrong answer, which the store
+ * takes as the end of it before the server confirms, or midnight, which is watched here
+ * because a phone left open across it gets no other signal.
+ */
+export function Brand({
+  doubleLive = false,
+  doubleEndsAt = null,
+  clockOffset = 0,
+}: {
+  doubleLive?: boolean;
+  /** when the ante closes on its own — the player's midnight */
+  doubleEndsAt?: string | null;
+  clockOffset?: number;
+}) {
+  // only counted while there is something to count down to
+  const left = useCountdown(doubleLive ? doubleEndsAt : null, clockOffset);
+  const live = doubleLive && (!doubleEndsAt || left > 0);
+
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-      <View style={styles.brandMark}>
-        <Suit glyph="♠" size={15} color={colors.text} />
-      </View>
+      <BrandMark double={live} />
       <Text style={styles.brandWord}>Poker Coach</Text>
     </View>
   );
 }
+
+/** How long the mark takes to trade places with the chip, either way. */
+const MARK_SWAP_MS = 280;
+
+function BrandMark({ double }: { double: boolean }) {
+  const t = useRef(new Animated.Value(double ? 1 : 0)).current;
+  // the chip stays mounted through its fade out, and not a frame longer — its turn
+  // re-renders it eighteen times a second
+  const [chipShown, setChipShown] = useState(double);
+
+  useEffect(() => {
+    if (double) setChipShown(true);
+    const run = Animated.timing(t, {
+      toValue: double ? 1 : 0,
+      duration: MARK_SWAP_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: Platform.OS !== 'web',
+    });
+    run.start(({ finished }) => {
+      if (finished && !double) setChipShown(false);
+    });
+    return () => run.stop();
+  }, [double, t]);
+
+  return (
+    <View
+      style={styles.brandSlot}
+      accessibilityLabel={double ? 'Double XP running' : undefined}>
+      <Animated.View
+        style={[
+          styles.brandMark,
+          {
+            opacity: t.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+            transform: [{ scale: t.interpolate({ inputRange: [0, 1], outputRange: [1, 0.7] }) }],
+          },
+        ]}>
+        <Suit glyph="♠" size={15} color={colors.text} />
+      </Animated.View>
+      {chipShown && (
+        <Animated.View
+          style={[
+            styles.brandChip,
+            {
+              opacity: t,
+              transform: [{ scale: t.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }],
+            },
+          ]}>
+          <DoubleXpBadge size={BRAND_MARK} />
+        </Animated.View>
+      )}
+    </View>
+  );
+}
+
+/** The mark's square, which the chip takes over whole. */
+const BRAND_MARK = 30;
 
 /**
  * A number that has not arrived from the server yet. Never a zero in its place: an empty
@@ -415,14 +494,16 @@ export const pressable =
     pressed ? [base, { transform: [{ scale }] }] : base;
 
 const styles = StyleSheet.create({
+  brandSlot: { width: BRAND_MARK, height: BRAND_MARK },
   brandMark: {
-    width: 30,
-    height: 30,
+    width: BRAND_MARK,
+    height: BRAND_MARK,
     borderRadius: 10,
     backgroundColor: colors.greenDeep,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  brandChip: { ...absoluteFill, pointerEvents: 'none' },
   brandWord: {
     fontFamily: font.bold,
     fontSize: 14,

@@ -144,6 +144,8 @@ export type State = {
   doubleLive: boolean;
   /** it has been taken today, so the offer is spent whether or not it is still live */
   doubleToday: boolean;
+  /** the ante has just been taken and its 2X XP chip has the screen */
+  anteOpen: boolean;
   /** no wrong answer in the drill open right now, so it is still in the running */
   drillClean: boolean;
 
@@ -250,6 +252,7 @@ export const initialState: State = {
   cleanRun: 0,
   doubleLive: false,
   doubleToday: false,
+  anteOpen: false,
   drillClean: true,
 
   // the case an account starts with, until the server sends one of its own
@@ -298,6 +301,8 @@ type Action =
   | { type: 'recomputeStreak'; today: LocalDay; expiresAt: string | null }
   | { type: 'toggleGames' }
   | { type: 'dismissHearts' }
+  | { type: 'anteTaken' }
+  | { type: 'closeAnte' }
   | { type: 'dismissVerify' }
   | { type: 'loadGame'; game: RecordedGame };
 
@@ -491,7 +496,21 @@ export function reducer(state: State, action: Action): State {
         return state;
       }
 
-      return { ...state, streak, streakAtRisk: atRisk, streakExpiresAt: action.expiresAt };
+      // The ante is a day's affair and closes at the midnight of the day it was taken. A
+      // later midnight than the one on record means that day is over, and so is the ante —
+      // compared as instants, since the server and the device spell the same one differently.
+      const dayTurned =
+        state.streakExpiresAt !== null &&
+        action.expiresAt !== null &&
+        Date.parse(action.expiresAt) > Date.parse(state.streakExpiresAt);
+
+      return {
+        ...state,
+        streak,
+        streakAtRisk: atRisk,
+        streakExpiresAt: action.expiresAt,
+        doubleLive: dayTurned ? false : state.doubleLive,
+      };
     }
 
     case 'syncStart':
@@ -570,16 +589,25 @@ export function reducer(state: State, action: Action): State {
       }
 
       // A missed answer takes the drill out of the running for the side bet, whatever
-      // then happens to the heart.
+      // then happens to the heart — and it ends the ante outright: `double_window` closes
+      // at the first wrong answer after it was taken, so the header's chip goes now
+      // rather than a round trip later.
       const at = new Date(action.at);
       try {
-        return { ...state, chosen: action.id, drillClean: false, ...spent(state, at) };
+        return {
+          ...state,
+          chosen: action.id,
+          drillClean: false,
+          doubleLive: false,
+          ...spent(state, at),
+        };
       } catch {
         // nothing left to spend, and no server needed to know it
         return {
           ...state,
           chosen: action.id,
           drillClean: false,
+          doubleLive: false,
           hearts: 0,
           outOfHearts: true,
           drillOpen: false,
@@ -640,6 +668,14 @@ export function reducer(state: State, action: Action): State {
 
     case 'dismissHearts':
       return { ...state, outOfHearts: false, tab: 'home' };
+
+    // Only ever after the server has taken the bet and says it is running — the
+    // celebration is for a double that exists, not for a tap.
+    case 'anteTaken':
+      return state.doubleLive ? { ...state, anteOpen: true } : state;
+
+    case 'closeAnte':
+      return { ...state, anteOpen: false };
 
     // Advancing only. The last question does not end the drill by itself any more — the
     // done card waits on `complete_lesson`, so that a lesson the server refused is never
@@ -846,6 +882,8 @@ export type Store = State & {
   setEditingName: (index: number | null) => void;
   /** take the day's ante — double XP until a wrong answer */
   takeDouble: () => void;
+  /** leaves the ante's 2X XP screen */
+  closeAnte: () => void;
   /** answer the hand of the day for real: marked, paid and spent like any other */
   answerDailyHand: (hand: DailyHand, day: string, optionId: string) => void;
   toggleGames: () => void;
@@ -1126,16 +1164,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       // not worth announcing: re-reading the state is what corrects the offer.
       takeDouble: () => {
         void takeDouble()
-          .then((next) =>
+          .then((next) => {
             dispatch({
               type: 'hydrate',
               state: next,
               clockOffset: Date.parse(next.serverNow) - Date.now(),
               source: 'server',
-            }),
-          )
+            });
+            dispatch({ type: 'anteTaken' });
+          })
           .catch(() => refresh());
       },
+      closeAnte: () => dispatch({ type: 'closeAnte' }),
       /**
        * The day's hand goes through `submit_answer` like every other question: the
        * server marks it against `content_questions`, spends a heart if it was wrong, and

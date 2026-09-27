@@ -106,7 +106,7 @@ src/
   auth/                  the session: Supabase client, secure storage, deep links
   server/                the only module that talks to the database — RPCs, hydration, case, games
   components/            felt, gold frame, chip, ace card, header, tab bar, motion
-  screens/               Login, Home, Path, Drill, Chips (+ Result, Balance), You
+  screens/               Login, Home, Path, Drill, Ante, Chips (+ Result, Balance), You
 site/                    the privacy, terms and deletion pages the stores require
 docs/design-handoff/     the design bundle — read-only reference
 docs/authoring-lessons.md  how to add chapters and lessons
@@ -415,6 +415,33 @@ Supabase's side of the account rather than the app's.
   `lesson_completions`, never banked —
   [`20260908120000_side_bet.sql`](supabase/migrations/20260908120000_side_bet.sql), pinned by
   [`side_bet.test.sql`](supabase/tests/side_bet.test.sql).
+
+### From the 2X XP chip
+
+The Claude Design project "Chips and cards alignment fixes" draws a lesson-complete boost —
+`Lesson Boost.dc.html` around the three.js `2x XP Chip.html`. The app plays it when the ante is
+taken instead: [`AnteScreen.tsx`](src/screens/AnteScreen.tsx), the chip in
+[`DoubleXpChip.tsx`](src/components/DoubleXpChip.tsx).
+
+- **It answers the ante, not a lesson.** It opens from Home's "Ante up — double XP" once
+  `take_double` comes back with the double live, never on the tap alone, so a refused bet shows
+  nothing. The title is the ante's rather than the lesson's.
+- **The copy is the server's.** The design promises "every lesson you finish in the next 30
+  minutes" and shows "+80 XP earned" and "30:00 boost left". The ante is none of those: each
+  right answer pays 16 instead of 8 until the first wrong one or the player's midnight. The card
+  says that, and the pills show 16 and the time to midnight.
+- **"Back to today" sits under the button.** The design's only way out is "Next lesson"; a
+  player who antes up at the end of the day may not want another hand, so there is a quiet way
+  home. With no hearts left, "Back to today" is the button.
+- **The chip stays in the header while the ante runs.** Not in the design: the header's ♠ mark
+  becomes the same chip, 30px and turning slowly, so the double shows from every tab without
+  moving anything in the bar. It goes the moment the ante does — a wrong answer (the store drops
+  `doubleLive` on the miss rather than waiting for the server) or the player's midnight.
+- **The chip is SVG, projected by hand.** Same camera, units and timeline as the three.js scene,
+  the way the rank chip is done: facets shaded by where the design's softboxes stand, the iframe's
+  mask as a radial fade on every effect, sparks and lightning batched into a few paths a frame.
+  The halo and core sprites are left out — the design builds them but never adds them to the
+  scene.
 
 ### React Native equivalents
 
