@@ -6,18 +6,40 @@
  * This way Google's own sheet does the work, hands back a signed ID token, and Supabase
  * verifies that token against Google's keys. Nothing in between gets to see or forge it.
  *
- * Needs a custom dev build: the module is native, so Expo Go cannot load it.
+ * Needs a custom dev build: the module is native. Expo Go has no `RNGoogleSignin`, so
+ * the module is loaded lazily (below) — importing this file must never touch it, or the
+ * whole app dies at boot in Expo Go before the login screen can render.
  */
 
-import {
-  GoogleSignin,
-  isErrorWithCode,
-  statusCodes,
-} from '@react-native-google-signin/google-signin';
-import { Platform } from 'react-native';
+import { Platform, TurboModuleRegistry } from 'react-native';
 
 import { authErrorMessage } from './errors';
 import { supabase } from './supabase';
+
+/**
+ * Loaded lazily, and never at import time. The package reaches for its native
+ * TurboModule as it evaluates, which throws `RNGoogleSignin could not be found` in
+ * Expo Go and takes the app down before anything renders.
+ *
+ * Lazy is not enough on its own: the native module has to be confirmed present
+ * *before* the require. A `try` around it catches nothing — Metro's require guard
+ * hands a module that throws while evaluating straight to `ErrorUtils.reportFatalError`
+ * (a red box in dev, a crash in release) and returns `undefined` to the caller.
+ * `TurboModuleRegistry.get` is the lookup the package itself makes, minus the throw.
+ */
+type GoogleModule = typeof import('@react-native-google-signin/google-signin');
+
+let mod: GoogleModule | null | undefined;
+
+function google(): GoogleModule | null {
+  if (mod !== undefined) return mod;
+  // react-native-web has no TurboModuleRegistry, and no native module to find
+  const linked = Platform.OS !== 'web' && TurboModuleRegistry.get('RNGoogleSignin') != null;
+  mod = linked
+    ? (require('@react-native-google-signin/google-signin') as GoogleModule)
+    : null; // Expo Go, or any build without the native module linked
+  return mod;
+}
 
 /**
  * The **Web** client id, not the platform ones. Supabase checks the token's `aud`
@@ -52,9 +74,11 @@ let configured = false;
 /** Configuring twice is harmless, but there is no reason to do it on every press. */
 function configure(): boolean {
   if (!WEB_CLIENT_ID) return false;
+  const g = google();
+  if (!g) return false;
   if (configured) return true;
 
-  GoogleSignin.configure({
+  g.GoogleSignin.configure({
     webClientId: WEB_CLIENT_ID,
     iosClientId: IOS_CLIENT_ID,
     // the ID token is the whole point; no server auth code round trip
@@ -69,6 +93,11 @@ export async function signInWithGoogle(): Promise<GoogleOutcome> {
   // and pretending otherwise produces a misleading error.
   if (Platform.OS === 'web') return { ok: false, cancelled: false, message: NATIVE_ONLY };
   if (!configure()) return { ok: false, cancelled: false, message: NOT_CONFIGURED };
+
+  // configure() already returned false where this is null; re-read to narrow the type.
+  const g = google();
+  if (!g) return { ok: false, cancelled: false, message: NOT_CONFIGURED };
+  const { GoogleSignin, isErrorWithCode, statusCodes } = g;
 
   try {
     // Android only, and it throws rather than returns when Play Services are missing
@@ -124,8 +153,10 @@ export async function signInWithGoogle(): Promise<GoogleOutcome> {
  */
 export async function signOutOfGoogle(): Promise<void> {
   if (!configured) return;
+  const g = google();
+  if (!g) return;
   try {
-    await GoogleSignin.signOut();
+    await g.GoogleSignin.signOut();
   } catch {
     // nothing the player can do about it, and their Supabase session is already gone
   }

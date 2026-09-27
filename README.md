@@ -204,8 +204,8 @@ behind account deletion.
 
 **Google and Apple sign-in need a dev build.** Both use the native ID-token flow rather than a
 browser redirect, so they are native modules and cannot run in Expo Go or on web: `npx expo
-prebuild`, then `npm run android` / `npm run ios`. The Google button is present on web and says
-it is unavailable rather than crashing. `@react-native-community/netinfo` and `expo-sharing` are
+prebuild`, then `npm run android` / `npm run ios`. The Google button is present on web and in
+Expo Go and says it is unavailable rather than crashing. `@react-native-community/netinfo` and `expo-sharing` are
 native modules too, so **an existing dev build has to be rebuilt once** after pulling them in.
 
 ## Running against the local stack
@@ -246,7 +246,9 @@ Email and password, password reset, and Google are wired against Supabase; see
 signed ID token and Supabase verifies it against Google's keys, so no web view and no redirect
 sit in the middle. That makes it a native module — **Google sign-in cannot run in Expo Go or on
 web**, only in a custom dev build (`npx expo prebuild` then `npm run android` / `npm run ios`).
-The button is present on web and reports that it is unavailable rather than crashing.
+The button is present on web and in Expo Go and reports that it is unavailable rather than
+crashing — the package is required only once its native module is confirmed present, since
+loading it without one is a fatal error even inside a `try`.
 
 Three OAuth clients exist (web, iOS, Android) but the app only ever sends the **web** client id
 as `webClientId` — that is the audience Supabase checks the token against. The iOS client id is
