@@ -11,7 +11,7 @@
  * whole app dies at boot in Expo Go before the login screen can render.
  */
 
-import { Platform } from 'react-native';
+import { Platform, TurboModuleRegistry } from 'react-native';
 
 import { authErrorMessage } from './errors';
 import { supabase } from './supabase';
@@ -19,9 +19,13 @@ import { supabase } from './supabase';
 /**
  * Loaded lazily, and never at import time. The package reaches for its native
  * TurboModule as it evaluates, which throws `RNGoogleSignin could not be found` in
- * Expo Go and takes the app down before anything renders. Requiring it only when a
- * press needs it keeps Expo Go alive; where the module is absent the button reports
- * itself unavailable rather than working.
+ * Expo Go and takes the app down before anything renders.
+ *
+ * Lazy is not enough on its own: the native module has to be confirmed present
+ * *before* the require. A `try` around it catches nothing — Metro's require guard
+ * hands a module that throws while evaluating straight to `ErrorUtils.reportFatalError`
+ * (a red box in dev, a crash in release) and returns `undefined` to the caller.
+ * `TurboModuleRegistry.get` is the lookup the package itself makes, minus the throw.
  */
 type GoogleModule = typeof import('@react-native-google-signin/google-signin');
 
@@ -29,11 +33,11 @@ let mod: GoogleModule | null | undefined;
 
 function google(): GoogleModule | null {
   if (mod !== undefined) return mod;
-  try {
-    mod = require('@react-native-google-signin/google-signin') as GoogleModule;
-  } catch {
-    mod = null; // Expo Go, or any build without the native module linked
-  }
+  // react-native-web has no TurboModuleRegistry, and no native module to find
+  const linked = Platform.OS !== 'web' && TurboModuleRegistry.get('RNGoogleSignin') != null;
+  mod = linked
+    ? (require('@react-native-google-signin/google-signin') as GoogleModule)
+    : null; // Expo Go, or any build without the native module linked
   return mod;
 }
 

@@ -247,7 +247,8 @@ signed ID token and Supabase verifies it against Google's keys, so no web view a
 sit in the middle. That makes it a native module — **Google sign-in cannot run in Expo Go or on
 web**, only in a custom dev build (`npx expo prebuild` then `npm run android` / `npm run ios`).
 The button is present on web and in Expo Go and reports that it is unavailable rather than
-crashing — the module is required lazily, since importing it at boot kills Expo Go outright.
+crashing — the package is required only once its native module is confirmed present, since
+loading it without one is a fatal error even inside a `try`.
 
 Three OAuth clients exist (web, iOS, Android) but the app only ever sends the **web** client id
 as `webClientId` — that is the audience Supabase checks the token against. The iOS client id is
