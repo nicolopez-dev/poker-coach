@@ -301,8 +301,9 @@ function goldFill(light: ReturnType<typeof lightAt>, emissive: number, rule = fa
   return css(ramp(rule ? b * 0.94 : b));
 }
 
+/** the design's `chip_black` material, which is the card ink */
 const BODY = (() => {
-  const { r, g, b } = rgb(colors.chipBlack);
+  const { r, g, b } = rgb(colors.cardInk);
   return [r, g, b] as RGB;
 })();
 const GLINT: RGB = [255, 241, 214];

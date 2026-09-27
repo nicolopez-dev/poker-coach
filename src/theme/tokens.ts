@@ -64,8 +64,6 @@ export const colors = {
   goldRule: '#c9a75c',
   /** the pale gold of the 2X XP chip's shockwave rings ("2x XP Chip") */
   goldLight: '#f0dca0',
-  /** the 2X XP chip's body — the design's `chip_black` */
-  chipBlack: '#17181a',
 
   valueLocked: '#152219',
 } as const;
