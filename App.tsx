@@ -9,6 +9,7 @@ import { Felt } from './src/components/Felt';
 import { Header } from './src/components/Header';
 import { TabBar } from './src/components/TabBar';
 import { VerifyBanner } from './src/components/VerifyBanner';
+import { AnteScreen } from './src/screens/AnteScreen';
 import { ChipsScreen } from './src/screens/ChipsScreen';
 import { DrillOverlay } from './src/screens/DrillOverlay';
 import { ForgotScreen } from './src/screens/ForgotScreen';
@@ -58,6 +59,7 @@ function Root({ signedIn }: { signedIn: boolean }) {
     tab,
     drillOpen,
     outOfHearts,
+    anteOpen,
     streak,
     streakAtRisk,
     streakExpiresAt,
@@ -67,6 +69,7 @@ function Root({ signedIn }: { signedIn: boolean }) {
     clockOffset,
     offline,
     unsaved,
+    doubleLive,
     go,
   } = useStore();
   const { screen } = useAuth();
@@ -91,8 +94,11 @@ function Root({ signedIn }: { signedIn: boolean }) {
         clockOffset={clockOffset}
         offline={offline}
         unsaved={unsaved}
+        doubleLive={doubleLive}
       />
       {signedIn && <VerifyBanner />}
+      {/* under the header rather than over it, as the design draws it — zIndex 4 */}
+      {anteOpen && <AnteScreen />}
       {drillOpen && <DrillOverlay />}
       {outOfHearts && <OutOfHeartsScreen />}
       {gate && <AuthStack />}

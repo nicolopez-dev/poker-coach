@@ -818,6 +818,73 @@ describe('the ante, from the drill in progress', () => {
     expect(state.gained).toBe(questions.length * XP_PER_ANSWER * 2);
   });
 
+  it('celebrates an ante the server says is running, and nothing else', () => {
+    // `takeDouble` folds the server's state in first; a refusal never gets this far,
+    // and a state that came back without the double live is no reason for the chip
+    expect(reducer({ ...initialState, doubleLive: true }, { type: 'anteTaken' }).anteOpen).toBe(true);
+    expect(reducer({ ...initialState, doubleLive: false }, { type: 'anteTaken' }).anteOpen).toBe(false);
+  });
+
+  it('closes the celebration without touching the double', () => {
+    const state = reducer(
+      { ...initialState, doubleLive: true, doubleToday: true, anteOpen: true },
+      { type: 'closeAnte' },
+    );
+    expect(state.anteOpen).toBe(false);
+    expect(state.doubleLive).toBe(true);
+    expect(state.doubleToday).toBe(true);
+  });
+
+  it('ends the ante on a wrong answer, before the server says so', () => {
+    const open = reducer(
+      { ...initialState, hydrated: true, hearts: 5, doubleLive: true, doubleToday: true },
+      { type: 'startLesson', ref: REF },
+    );
+
+    const right = reducer(open, { type: 'pick', id: RIGHT, at: NOW });
+    expect(right.doubleLive).toBe(true);
+
+    const wrong = reducer(open, { type: 'pick', id: WRONG, at: NOW });
+    expect(wrong.doubleLive).toBe(false);
+    expect(wrong.hearts).toBe(4);
+    // spent, not refunded: the offer does not come back the same day
+    expect(wrong.doubleToday).toBe(true);
+  });
+
+  it('ends the ante on a wrong answer that spends the last heart, too', () => {
+    const state = reducer(
+      reducer(
+        { ...initialState, hydrated: true, hearts: 1, doubleLive: true },
+        { type: 'startLesson', ref: REF },
+      ),
+      { type: 'pick', id: WRONG, at: NOW },
+    );
+    expect(state.doubleLive).toBe(false);
+  });
+
+  it('ends the ante when the day it was taken in has turned', () => {
+    const today = {
+      ...initialState,
+      doubleLive: true,
+      streakExpiresAt: '2026-09-05T22:00:00+00:00',
+    };
+
+    // the same midnight, as the device spells it: nothing has ended
+    const same = reducer(today, {
+      type: 'recomputeStreak',
+      today: '2026-09-05',
+      expiresAt: '2026-09-05T22:00:00.000Z',
+    });
+    expect(same.doubleLive).toBe(true);
+
+    const tomorrow = reducer(today, {
+      type: 'recomputeStreak',
+      today: '2026-09-06',
+      expiresAt: '2026-09-06T22:00:00.000Z',
+    });
+    expect(tomorrow.doubleLive).toBe(false);
+  });
+
   it('takes a wrong answer out of the ante as well as the side bet', () => {
     let state = reducer(
       { ...initialState, hydrated: true, hearts: 5, doubleLive: true, drillClean: true },

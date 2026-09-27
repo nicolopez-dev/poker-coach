@@ -23,6 +23,7 @@ export function Header({
   clockOffset = 0,
   offline = false,
   unsaved = 0,
+  doubleLive = false,
 }: {
   streak: number;
   hearts: number;
@@ -33,6 +34,8 @@ export function Header({
   clockOffset?: number;
   offline?: boolean;
   unsaved?: number;
+  /** the day's ante is running — the brand mark turns into the 2X XP chip */
+  doubleLive?: boolean;
 }) {
   const insets = useSafeAreaInsets();
 
@@ -43,7 +46,8 @@ export function Header({
       experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
       style={[styles.header, { paddingTop: 16 + insets.top }]}>
       <View style={styles.fill} />
-      <Brand />
+      {/* the ante closes at the same midnight the streak turns at */}
+      <Brand doubleLive={doubleLive} doubleEndsAt={streakExpiresAt} clockOffset={clockOffset} />
       <View style={styles.right}>
         <SyncPill offline={offline} unsaved={unsaved} />
         <StreakPill
